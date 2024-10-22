@@ -37,7 +37,7 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --prefer-dist --no-interaction --no-progress
 
-      - name: Install npm dependencies
+      - name: Install npm dependencies 
         run: npm install
 
       - name: Copy environment file
