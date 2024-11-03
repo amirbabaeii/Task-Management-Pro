@@ -10,49 +10,35 @@ class AuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_login_with_valid_credentials(): void
+    public function test_login_screen_can_be_rendered(): void
     {
-        $user = User::factory()->create([
-            'email' => 'test@example.com',
-            'password' => bcrypt('password123')
-        ]);
+        $response = $this->get('/login');
 
-        $response = $this->postJson('/api/login', [
-            'email' => 'test@example.com',
-            'password' => 'password123'
-        ]);
-
-        $response
-            ->assertStatus(200)
-            ->assertJsonStructure([
-                'success',
-                'message',
-                'data' => [
-                    'user' => [
-                        'id',
-                        'name',
-                        'email',
-                    ],
-                    'token'
-                ]
-            ])
-            ->assertJson([
-                'success' => true,
-            ]);
-
-        $this->assertAuthenticated();
+        $response->assertStatus(200);
     }
 
-    public function test_user_cannot_login_with_invalid_credentials(): void
+    public function test_users_can_authenticate_using_the_login_screen(): void
     {
         $user = User::factory()->create();
 
-        $response = $this->postJson('/api/login', [
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
+    public function test_users_can_not_authenticate_with_invalid_password(): void
+    {
+        $user = User::factory()->create();
+
+        $this->post('/login', [
             'email' => $user->email,
             'password' => 'wrong-password',
         ]);
 
-        $response->assertStatus(422);
         $this->assertGuest();
     }
 
