@@ -33,5 +33,6 @@ class AuthService implements AuthServiceInterface
         if (!$this->authRepository->deleteCurrentToken($user)) {
             throw new \RuntimeException('Failed to logout user');
         }
+        return true;
     }
 } 
