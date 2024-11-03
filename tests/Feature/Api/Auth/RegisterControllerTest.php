@@ -19,7 +19,7 @@ class RegisterControllerTest extends TestCase
             'password_confirmation' => 'TestPass123!'
         ];
 
-        $response = $this->postJson('/api/register', $userData);
+        $response = $this->postJson(route('api.v1.auth.register'), $userData);
 
         $response->assertStatus(201)
             ->assertJsonStructure([
@@ -54,7 +54,7 @@ class RegisterControllerTest extends TestCase
             'password_confirmation' => 'password123'
         ];
 
-        $response = $this->postJson('/api/register', $userData);
+        $response = $this->postJson(route('api.v1.auth.register'), $userData);
 
         $response->assertStatus(422)
             ->assertJsonStructure(['data' => ['errors' => [ 'email' ]]]);
@@ -69,7 +69,7 @@ class RegisterControllerTest extends TestCase
             'password_confirmation' => 'different'
         ];
 
-        $response = $this->postJson('/api/register', $userData);
+        $response = $this->postJson(route('api.v1.auth.register'), $userData);
 
         $response->assertStatus(422)
             ->assertJsonStructure(['data' => ['errors' => [ 'name', 'email', 'password' ]]]);
@@ -93,7 +93,7 @@ class RegisterControllerTest extends TestCase
                 'password_confirmation' => 'password123'
             ];
 
-            $response = $this->postJson('/api/register', $userData);
+            $response = $this->postJson(route('api.v1.auth.register'), $userData);
             $response->assertStatus(422)
                 ->assertJsonStructure(['data' => ['errors' => [ 'email' ]]]);
         }
@@ -115,7 +115,7 @@ class RegisterControllerTest extends TestCase
                 'password_confirmation' => 'password123'
             ];
 
-            $response = $this->postJson('/api/register', $userData);
+            $response = $this->postJson(route('api.v1.auth.register'), $userData);
             $response->assertStatus(422)
                 ->assertJsonStructure(['data' => ['errors' => [ 'name' ]]]);
         }
@@ -139,7 +139,7 @@ class RegisterControllerTest extends TestCase
                 'password_confirmation' => $password
             ];
 
-            $response = $this->postJson('/api/register', $userData);
+            $response = $this->postJson(route('api.v1.auth.register'), $userData);
             $response->assertStatus(422)
                 ->assertJsonStructure(['data' => ['errors' => [ 'password' ]]]);
         }
@@ -147,7 +147,7 @@ class RegisterControllerTest extends TestCase
 
     public function test_user_cannot_register_with_missing_fields()
     {
-        $response = $this->postJson('/api/register', []);
+        $response = $this->postJson(route('api.v1.auth.register'), []);
 
         $response->assertStatus(422)
             ->assertJsonStructure(['data' => ['errors' => [ 'name', 'email', 'password' ]]]);
@@ -162,7 +162,7 @@ class RegisterControllerTest extends TestCase
             'password_confirmation' => null
         ];
 
-        $response = $this->postJson('/api/register', $userData);
+        $response = $this->postJson(route('api.v1.auth.register'), $userData);
 
         $response->assertStatus(422)
             ->assertJsonStructure(['data' => ['errors' => [ 'name', 'email', 'password' ]]]);

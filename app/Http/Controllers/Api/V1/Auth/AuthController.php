@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\Auth;
+namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Auth\LoginRequest;
@@ -46,7 +46,6 @@ class AuthController extends ApiController
     public function logout(Request $request): JsonResource
     {
         $this->authService->logout($request->user());
-        
         return new AuthResource(
             null,
             'Logged out successfully',

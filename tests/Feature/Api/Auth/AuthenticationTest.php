@@ -17,7 +17,7 @@ class AuthenticationTest extends TestCase
             'password' => bcrypt('password123')
         ]);
 
-        $response = $this->postJson('/api/login', [
+        $response = $this->postJson(route('api.v1.auth.login'), [
             'email' => 'test@example.com',
             'password' => 'password123'
         ]);
@@ -47,7 +47,7 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->postJson('/api/login', [
+        $response = $this->postJson(route('api.v1.auth.login'), [
             'email' => $user->email,
             'password' => 'wrong-password',
         ]);
@@ -59,10 +59,13 @@ class AuthenticationTest extends TestCase
     public function test_users_can_logout(): void
     {
         $user = User::factory()->create();
+        $token = $user->createToken('test-token')->plainTextToken;
 
-        $response = $this->actingAs($user)->post('/logout');
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->postJson(route('api.v1.auth.logout'));
 
-        $this->assertGuest();
-        $response->assertRedirect('/');
+        $response->assertStatus(200);
+        $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 }
