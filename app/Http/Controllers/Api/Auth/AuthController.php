@@ -8,64 +8,49 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
+use App\Services\Auth\AuthServiceInterface;
+use App\Http\Resources\Auth\AuthResource;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends ApiController
 { 
-    public function __construct()
+    private AuthServiceInterface $authService;
+
+    public function __construct(AuthServiceInterface $authService)
     {
         $this->middleware('auth:sanctum')->except(['login']);
+        $this->authService = $authService;
     }
 
     /**
      * Handle user login
      */
-    public function login(LoginRequest $request): JsonResponse
+    public function login(LoginRequest $request): JsonResource
     {
-        try {
-            $request->authenticate();
-            
-            $token = $request->user()->createToken('auth-token')->plainTextToken;
-            
-            return response()->json([
-                'token' => $token,
-                'user' => $request->user()
-            ]);
-        } catch (ValidationException $e) {
-            \Log::error('Authentication failed', [
-                'errors' => $e->errors(),
-                'status' => $e->status,
-                'message' => $e->getMessage()
-            ]);
-            
-            return response()->json([
-                'message' => 'The provided credentials are incorrect.',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            \Log::error('Unexpected error', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
-            return response()->json([
-                'message' => 'An unexpected error occurred',
-            ], 500);
-        }
+        $request->authenticate();
+        
+        $result = $this->authService->login([
+            'email' => $request->email,
+            'password' => $request->password
+        ]);
+        
+        return new AuthResource(
+            $result,
+            'Login successful',
+            200
+        );
     }
 
-    public function logout(Request $request): JsonResponse
+    public function logout(Request $request): JsonResource
     {
-        try {
-            $request->user()->currentAccessToken()->delete();
-            return response()->json(['message' => 'Logged out successfully']);
-        } catch (\Exception $e) {
-            \Log::error('Logout failed', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return response()->json([
-                'message' => 'Failed to logout',
-            ], 500);
-        }
+        $this->authService->logout($request->user());
+        
+        return new AuthResource(
+            null,
+            'Logged out successfully',
+            200
+        );
     }
 }

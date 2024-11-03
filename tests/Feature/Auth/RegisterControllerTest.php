@@ -57,7 +57,7 @@ class RegisterControllerTest extends TestCase
         $response = $this->postJson('/api/register', $userData);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['email']);
+            ->assertJsonStructure(['data' => ['errors' => [ 'email' ]]]);
     }
 
     public function test_user_cannot_register_with_invalid_data()
@@ -72,7 +72,7 @@ class RegisterControllerTest extends TestCase
         $response = $this->postJson('/api/register', $userData);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['name', 'email', 'password']);
+            ->assertJsonStructure(['data' => ['errors' => [ 'name', 'email', 'password' ]]]);
     }
 
     public function test_user_cannot_register_with_invalid_email_formats()
@@ -95,7 +95,7 @@ class RegisterControllerTest extends TestCase
 
             $response = $this->postJson('/api/register', $userData);
             $response->assertStatus(422)
-                ->assertJsonValidationErrors(['email']);
+                ->assertJsonStructure(['data' => ['errors' => [ 'email' ]]]);
         }
     }
 
@@ -117,7 +117,7 @@ class RegisterControllerTest extends TestCase
 
             $response = $this->postJson('/api/register', $userData);
             $response->assertStatus(422)
-                ->assertJsonValidationErrors(['name']);
+                ->assertJsonStructure(['data' => ['errors' => [ 'name' ]]]);
         }
     }
 
@@ -141,7 +141,7 @@ class RegisterControllerTest extends TestCase
 
             $response = $this->postJson('/api/register', $userData);
             $response->assertStatus(422)
-                ->assertJsonValidationErrors(['password']);
+                ->assertJsonStructure(['data' => ['errors' => [ 'password' ]]]);
         }
     }
 
@@ -150,7 +150,7 @@ class RegisterControllerTest extends TestCase
         $response = $this->postJson('/api/register', []);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['name', 'email', 'password']);
+            ->assertJsonStructure(['data' => ['errors' => [ 'name', 'email', 'password' ]]]);
     }
 
     public function test_user_cannot_register_with_null_values()
@@ -165,6 +165,6 @@ class RegisterControllerTest extends TestCase
         $response = $this->postJson('/api/register', $userData);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['name', 'email', 'password']);
+            ->assertJsonStructure(['data' => ['errors' => [ 'name', 'email', 'password' ]]]);
     }
 } 
