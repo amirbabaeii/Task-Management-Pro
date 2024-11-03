@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\Auth;
+namespace Tests\Feature\Api\Auth;
 
 use Tests\TestCase;
 use App\Models\User;
@@ -167,4 +167,4 @@ class RegisterControllerTest extends TestCase
         $response->assertStatus(422)
             ->assertJsonStructure(['data' => ['errors' => [ 'name', 'email', 'password' ]]]);
     }
-} 
+}
