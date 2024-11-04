@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
@@ -45,5 +46,37 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Get all tasks associated with the user.
+     */
+    public function tasks(): BelongsToMany
+    {
+        return $this->belongsToMany(Task::class)
+            ->withPivot('role')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get tasks where user is an assignee.
+     */
+    public function assignedTasks(): BelongsToMany
+    {
+        return $this->belongsToMany(Task::class)
+            ->withPivot('role')
+            ->withTimestamps()
+            ->wherePivot('role', 'assignee');
+    }
+
+    /**
+     * Get tasks where user is a reviewer.
+     */
+    public function reviewingTasks(): BelongsToMany
+    {
+        return $this->belongsToMany(Task::class)
+            ->withPivot('role')
+            ->withTimestamps()
+            ->wherePivot('role', 'reviewer');
     }
 }
