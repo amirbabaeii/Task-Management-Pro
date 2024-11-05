@@ -4,7 +4,7 @@ namespace App\Repositories\Auth;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
-use App\Repositories\Interfaces\AuthRepositoryInterface;
+use App\Repositories\Interfaces\Auth\AuthRepositoryInterface;
 
 class AuthRepository implements AuthRepositoryInterface
 {

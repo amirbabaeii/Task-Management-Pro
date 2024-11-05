@@ -4,7 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\Vite;
 use App\Services\Auth\AuthService;
-use App\Services\Auth\AuthServiceInterface;
+use App\Services\Interfaces\Auth\AuthServiceInterface;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Http\Resources\Json\JsonResource;
 use App\Exceptions\ApiExceptionHandler;

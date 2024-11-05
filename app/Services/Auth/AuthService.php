@@ -3,8 +3,9 @@
 namespace App\Services\Auth;
 
 use App\Models\User;
-use App\Repositories\Interfaces\AuthRepositoryInterface;
+use App\Repositories\Interfaces\Auth\AuthRepositoryInterface;
 use App\Exceptions\Auth\AuthenticationFailedException;
+use App\Services\Interfaces\Auth\AuthServiceInterface;
 
 class AuthService implements AuthServiceInterface
 {

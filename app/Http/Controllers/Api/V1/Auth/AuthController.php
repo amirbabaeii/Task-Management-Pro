@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
-use App\Services\Auth\AuthServiceInterface;
+use App\Services\Interfaces\Auth\AuthServiceInterface;
 use App\Http\Resources\Auth\AuthResource;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Resources\Json\JsonResource;
