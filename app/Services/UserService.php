@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
+use App\Services\Interfaces\UserServiceInterface;
 use App\Repositories\Interfaces\UserRepositoryInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class UserService
+class UserService implements UserServiceInterface
 {
     protected $userRepository;
 
