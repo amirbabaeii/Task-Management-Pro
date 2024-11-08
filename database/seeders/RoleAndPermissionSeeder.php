@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 
 class RoleAndPermissionSeeder extends Seeder
 {
@@ -18,15 +19,19 @@ class RoleAndPermissionSeeder extends Seeder
             'create-tasks',
             'edit-tasks',
             'delete-tasks',
+            'use-ai',
+            'see-users',
+            'add-users',
+            'edit-users',
+            'delete-users',
         ];
 
         foreach ($permissions as $permission) {
-            $normalUser->givePermissionTo($permission);
+            Permission::create(['name' => $permission, 'guard_name' => 'web']);
         }
-
-        $vipUser->givePermissionTo(array_merge($permissions, ['use-ai']));
-
-        $admin->givePermissionTo(array_merge($permissions, ['use-ai', 'see-users', 'add-users', 'edit-users', 'delete-users']));
-        
+        $normal_user_permissions = ['see-tasks', 'create-tasks', 'edit-tasks', 'delete-tasks'];
+        $normalUser->givePermissionTo($normal_user_permissions);
+        $vipUser->givePermissionTo(array_merge($normal_user_permissions, ['use-ai']));
+        $admin->givePermissionTo(array_merge($normal_user_permissions, ['use-ai', 'see-users', 'add-users', 'edit-users', 'delete-users']));
     }
 } 
