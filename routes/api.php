@@ -25,6 +25,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('user', function (Request $request) {
             return $request->user();
         })->name('user.profile');
+        
+        // Tasks resource
+        Route::resource('tasks', App\Http\Controllers\Api\V1\TaskController::class);
     });
 });
 
