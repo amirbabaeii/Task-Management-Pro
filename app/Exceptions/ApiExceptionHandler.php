@@ -55,7 +55,8 @@ class ApiExceptionHandler extends ExceptionHandler
                     401
                 );
             });
-            if(app()->environment('production')) {
+
+            if(!app()->hasDebugModeEnabled()) {
                 $this->renderable(function (Throwable $e) {
                     $statusCode = $this->isHttpException($e) ? $e->getStatusCode() : 500;
 
