@@ -18,11 +18,14 @@ class ApiResource extends JsonResource
 
     public function toArray($request)
     {
-        return [
-            'success' => $this->statusCode >= 200 && $this->statusCode < 300,
+        $output =[
+            'type' => ($this->statusCode >= 200 && $this->statusCode < 300) ? "success" : "error",
             'message' => $this->message,
-            'data' => $this->resource,
         ];
+        if(isset($this->resource)){
+            $output['data'] = $this->resource;
+        }
+        return $output;
     }
 
     public function withResponse($request, $response)

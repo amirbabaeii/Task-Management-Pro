@@ -25,7 +25,7 @@ class AuthenticationTest extends TestCase
         $response
             ->assertStatus(200)
             ->assertJsonStructure([
-                'success',
+                'type',
                 'message',
                 'data' => [
                     'user' => [
@@ -37,7 +37,7 @@ class AuthenticationTest extends TestCase
                 ]
             ])
             ->assertJson([
-                'success' => true,
+                'type' => "success",
             ]);
 
         $this->assertAuthenticated();

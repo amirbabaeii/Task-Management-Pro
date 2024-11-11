@@ -21,6 +21,6 @@ class RegisterController extends ApiController
         $user = $this->userService->register($request->validated());
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return new RegisterResource($user, $token);
+        return new RegisterResource($user,'User successfully registered', 201, $token);
     }
-} 
+}

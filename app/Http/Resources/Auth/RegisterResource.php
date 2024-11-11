@@ -9,9 +9,9 @@ class RegisterResource extends ApiResource
 {
     private $token;
 
-    public function __construct($resource, $token = null)
+    public function __construct($resource, $message, $statusCode = 200, $token = null)
     {
-        parent::__construct($resource, 'User successfully registered', 201);
+        parent::__construct($resource, $message, $statusCode);
         $this->token = $token;
     }
 
@@ -24,4 +24,4 @@ class RegisterResource extends ApiResource
             ],
         ]);
     }
-} 
+}
