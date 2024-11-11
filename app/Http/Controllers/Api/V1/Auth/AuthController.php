@@ -15,7 +15,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Log;
 
 class AuthController extends ApiController
-{ 
+{
     private AuthServiceInterface $authService;
 
     public function __construct(AuthServiceInterface $authService)
