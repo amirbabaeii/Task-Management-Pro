@@ -10,7 +10,8 @@ This project is a professional task management system developed using PHP with t
 - **User Collaboration**: Collaborate with team members in real-time.
 - **Notifications**: Stay updated with task progress and changes.
 - **Responsive Design**: Accessible on both desktop and mobile devices.
-
+- **Different Roles**: different level of access for each role.
+  
 ## Getting Started
 
 To run the project, use the following command:
