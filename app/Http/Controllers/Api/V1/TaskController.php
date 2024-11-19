@@ -7,6 +7,7 @@ use App\Http\Resources\TaskResource;
 use App\Repositories\Interfaces\TaskRepositoryInterface;
 use App\Repositories\TaskRepository;
 use Illuminate\Http\Request;
+use App\Http\Requests\Api\V1\StoreTaskRequest;
 
 class TaskController extends ApiController
 {
@@ -37,9 +38,10 @@ class TaskController extends ApiController
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreTaskRequest $request)
     {
-        //
+        $task = $this->taskRepository->create($request->validated());
+        return new TaskResource($task, "Task successfully created", 201);
     }
 
     /**
