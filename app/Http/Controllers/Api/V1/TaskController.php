@@ -8,6 +8,8 @@ use App\Repositories\Interfaces\TaskRepositoryInterface;
 use App\Repositories\TaskRepository;
 use Illuminate\Http\Request;
 use App\Http\Requests\Api\V1\StoreTaskRequest;
+use App\Http\Requests\Api\V1\UpdateTaskRequest;
+use App\Models\Task;
 
 class TaskController extends ApiController
 {
@@ -63,9 +65,10 @@ class TaskController extends ApiController
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(UpdateTaskRequest $request, Task $task)
     {
-        //
+        $task = $this->taskRepository->update($task->id, $request->validated());
+        return new TaskResource($task, "Task successfully updated", 200);
     }
 
     /**
