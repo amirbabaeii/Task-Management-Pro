@@ -177,5 +177,162 @@ class TaskCRUDTest extends TestCase
         // Assert
         $response->assertStatus(401);
     }
+
+    public function test_can_update_task_as_authenticated_user()
+    {
+        // Arrange
+        $task = Task::factory()->create([
+            'title' => 'Original Title',
+            'description' => 'Original Description',
+            'status' => 'pending',
+            'progress' => 0
+        ]);
+        
+        // Debug initial state
+        \Log::info('Initial task:', $task->toArray());
+        
+        $task->users()->attach($this->user, ['role' => 'assignee']);
+        
+        $updateData = [
+            'title' => 'Updated Task Title',
+            'description' => 'Updated Task Description',
+            'status' => 'in-progress',
+            'progress' => 50,
+        ];
+
+        // Act
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])->putJson(route('api.v1.tasks.update', $task->id), $updateData);
+
+        // Assert
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'data' => [
+                    'id',
+                    'title',
+                    'description',
+                    'status',
+                    'progress',
+                    'created_at',
+                    'updated_at',
+                ],
+                'message',
+                'type'
+            ])
+            ->assertJsonPath('message', 'Task successfully updated')
+            ->assertJsonPath('type', 'success');
+
+        // Add more specific assertions
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'title' => 'Updated Task Title',
+            'description' => 'Updated Task Description',
+            'status' => 'in-progress',
+            'progress' => 50,
+        ]);
+
+        // Add assertion to verify exact record
+        $updatedTask = Task::find($task->id);
+        $this->assertEquals(50, $updatedTask->progress);
+    }
+
+    public function test_cannot_update_task_with_invalid_data()
+    {
+        // Arrange
+        $task = Task::factory()->create();
+        $task->users()->attach($this->user, ['role' => 'assignee']);
+        
+        $invalidData = [
+            'status' => 'invalid-status',
+            'progress' => 150, // Invalid progress value
+        ];
+
+        // Act
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])->putJson(route('api.v1.tasks.update', $task->id), $invalidData);
+
+        // Assert
+        $response->assertStatus(422)
+            ->assertJsonStructure([
+                'data' => [
+                    'errors' => [
+                        'status',
+                        'progress'
+                    ]
+                ],
+                'message',
+                'type'
+            ])
+            ->assertJson([
+                'type' => 'error'
+            ]);
+    }
+
+    public function test_cannot_update_task_without_authentication()
+    {
+        // Arrange
+        $task = Task::factory()->create();
+        
+        $updateData = [
+            'title' => 'Updated Task Title',
+        ];
+
+        // Act
+        $response = $this->putJson(route('api.v1.tasks.update', $task->id), $updateData);
+
+        // Assert
+        $response->assertStatus(401);
+    }
+
+    public function test_cannot_update_task_if_not_assigned()
+    {
+        // Arrange
+        $task = Task::factory()->create();
+        // Not attaching the user to the task
+        
+        $updateData = [
+            'title' => 'Updated Task Title',
+        ];
+
+        // Act
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])->putJson(route('api.v1.tasks.update', $task->id), $updateData);
+
+        // Assert
+        $response->assertStatus(403);
+    }
+
+    public function test_can_partially_update_task()
+    {
+        // Arrange
+        $task = Task::factory()->create([
+            'title' => 'Original Title',
+            'description' => 'Original Description',
+            'status' => 'pending',
+        ]);
+        $task->users()->attach($this->user, ['role' => 'assignee']);
+
+        $partialUpdate = [
+            'status' => 'in-progress',
+        ];
+
+        // Act
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])->putJson(route('api.v1.tasks.update', $task->id), $partialUpdate);
+
+        // Assert
+        $response->assertStatus(200);
+        
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'title' => 'Original Title', // Should remain unchanged
+            'description' => 'Original Description', // Should remain unchanged
+            'status' => 'in-progress', // Should be updated
+        ]);
+    }
 }
 
