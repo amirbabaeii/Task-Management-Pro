@@ -17,7 +17,20 @@ class TaskResource extends ApiResource
 
         if ($this->resource instanceof LengthAwarePaginator) {
             $response['data'] = [
-                'data' => $this->resource->toArray(),
+                'data' => $this->resource->getCollection()->map(function ($task) {
+                    return [
+                        'id' => $task->id,
+                        'title' => $task->title,
+                        'description' => $task->description,
+                        'status' => $task->status,
+                        'priority' => $task->priority,
+                        'created_at' => $task->created_at,
+                        'updated_at' => $task->updated_at,
+                    ];
+                })->toArray(),
+                'current_page' => $this->resource->currentPage(),
+                'total' => $this->resource->total(),
+                'per_page' => $this->resource->perPage(),
             ];
         }
 
