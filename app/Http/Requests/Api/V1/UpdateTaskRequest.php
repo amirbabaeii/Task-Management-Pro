@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\Api\V1;
 
-use Illuminate\Foundation\Http\FormRequest;
 use App\Models\Task;
-use Route;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateTaskRequest extends FormRequest
 {
@@ -27,9 +27,10 @@ class UpdateTaskRequest extends FormRequest
         return [
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
-            'status' => ['sometimes', 'required', 'string', 'in:pending,in-progress,completed'],
+            'status' => ['sometimes', 'required', 'string', Rule::in(Task::STATUSES)],
             'progress' => ['sometimes', 'integer', 'min:0', 'max:100'],
             'deadline_at' => ['sometimes', 'nullable', 'date'],
+            'priority' => ['sometimes', 'required', 'string', Rule::in(Task::PRIORITIES)],
         ];
     }
-} 
+}

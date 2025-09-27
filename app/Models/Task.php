@@ -21,6 +21,7 @@ class Task extends Model
         'status',
         'progress',
         'deadline_at',
+        'priority',
     ];
 
     /**
@@ -43,6 +44,17 @@ class Task extends Model
         'pending',
         'in-progress',
         'completed'
+    ];
+
+    /**
+     * Valid priority values for the task.
+     *
+     * @var array<string>
+     */
+    public const PRIORITIES = [
+        'low',
+        'medium',
+        'high',
     ];
 
     /**
