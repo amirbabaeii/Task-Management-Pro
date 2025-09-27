@@ -16,22 +16,12 @@ class TaskResource extends ApiResource
         $response = parent::toArray($request);
 
         if ($this->resource instanceof LengthAwarePaginator) {
-            $response['data'] = $this->transformPaginatedData($this->resource);
+            $response['data'] = [
+                'data' => $this->resource->toArray(),
+            ];
         }
 
         return $response;
-    }
-
-    private function transformPaginatedData(LengthAwarePaginator $paginator): array
-    {
-        $paginated = $paginator->toArray();
-
-        $paginated['data'] = array_map(
-            static fn (array $task) => $task + ['data' => $task],
-            $paginated['data']
-        );
-
-        return $paginated;
     }
 }
 
