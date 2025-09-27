@@ -5,11 +5,10 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Resources\TaskResource;
 use App\Repositories\Interfaces\TaskRepositoryInterface;
-use App\Repositories\TaskRepository;
-use Illuminate\Http\Request;
 use App\Http\Requests\Api\V1\StoreTaskRequest;
 use App\Http\Requests\Api\V1\UpdateTaskRequest;
 use App\Models\Task;
+use Illuminate\Http\Request;
 
 class TaskController extends ApiController
 {
@@ -50,9 +49,9 @@ class TaskController extends ApiController
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Task $task)
     {
-        //
+        return new TaskResource($task, "Task successfully retrieved", 200);
     }
 
     /**
@@ -75,8 +74,10 @@ class TaskController extends ApiController
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Task $task)
     {
-        //
+        $this->taskRepository->delete($task->id);
+
+        return new TaskResource(null, "Task successfully deleted", 200);
     }
 }
