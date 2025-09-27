@@ -1,6 +1,6 @@
 # Professional Task Management System
 
-This project is a professional task management system developed using PHP with the Laravel framework. It leverages Vue 3 with Inertia.js to provide a seamless, modern user interface.
+This project is a professional task management system developed using PHP with the Laravel 11.9 framework. It leverages Vue 3 with Inertia.js to provide a seamless, modern user interface.
 
 **Note: This project is currently under development.**
 
