@@ -12,6 +12,6 @@ interface TaskRepositoryInterface
     public function create(array $data) : Task;
     public function update($id, array $data) : Task;
     public function delete($id) : bool;
-    public function find($id) : Task;
+    public function find($id) : Collection;
 
 }
