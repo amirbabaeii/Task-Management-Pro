@@ -23,9 +23,10 @@ class TaskController extends ApiController
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $list = $this->taskRepository->list(10);
+        $filters = $request->only(['priority']);
+        $list = $this->taskRepository->list(10, array_filter($filters));
         return new TaskResource($list, "List of tasks successfully received", 200);
     }
 

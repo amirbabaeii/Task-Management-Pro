@@ -4,16 +4,19 @@ namespace App\Repositories;
 
 use App\Models\Task;
 use App\Repositories\Interfaces\TaskRepositoryInterface;
-use App\Repositories\Interfaces\UserRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Hash;
-
 class TaskRepository implements TaskRepositoryInterface
 {
-    public function list(int $limit): Collection|LengthAwarePaginator
+    public function list(int $limit, array $filters = []): Collection|LengthAwarePaginator
     {
-        return Task::paginate($limit);
+        $query = Task::query();
+
+        if (! empty($filters['priority']) && in_array($filters['priority'], Task::PRIORITIES, true)) {
+            $query->where('priority', $filters['priority']);
+        }
+
+        return $query->paginate($limit);
     }
     public function create(array $data): Task
     {

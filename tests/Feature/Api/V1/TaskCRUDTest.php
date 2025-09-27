@@ -41,6 +41,7 @@ class TaskCRUDTest extends TestCase
                             'id',
                             'title',
                             'description',
+                            'priority',
                             'created_at',
                             'updated_at',
                         ]
@@ -63,6 +64,7 @@ class TaskCRUDTest extends TestCase
         $taskData = [
             'title' => 'New Test Task',
             'description' => 'Test Task Description',
+            'priority' => 'high',
         ];
 
         // Act
@@ -77,6 +79,7 @@ class TaskCRUDTest extends TestCase
                     'id',
                     'title',
                     'description',
+                    'priority',
                     'created_at',
                     'updated_at',
                 ],
@@ -84,11 +87,13 @@ class TaskCRUDTest extends TestCase
                 'type'
             ])
             ->assertJsonPath('message', 'Task successfully created')
-            ->assertJsonPath('type', 'success');
+            ->assertJsonPath('type', 'success')
+            ->assertJsonPath('data.priority', 'high');
 
         $this->assertDatabaseHas('tasks', [
             'title' => 'New Test Task',
             'description' => 'Test Task Description',
+            'priority' => 'high',
         ]);
     }
 
@@ -97,6 +102,7 @@ class TaskCRUDTest extends TestCase
         $invalidData = [
             'title' => '', // Empty title
             'status' => 'invalid_status', // Invalid status
+            'priority' => 'urgent',
         ];
 
         $response = $this->withHeaders([
@@ -111,6 +117,7 @@ class TaskCRUDTest extends TestCase
                     'errors'=> [
                         'title',
                         'status',
+                        'priority',
                     ]
                 ],
                 'type'
@@ -127,6 +134,7 @@ class TaskCRUDTest extends TestCase
             'title' => 'New Test Task',
             'description' => 'Test Task Description',
             'status' => 'pending',
+            'priority' => 'medium',
         ];
 
         $response = $this->withHeaders([
@@ -140,17 +148,20 @@ class TaskCRUDTest extends TestCase
                     'title',
                     'description',
                     'status',
+                    'priority',
                     'created_at',
                     'updated_at',
                 ],
                 'message',
                 'type'
-            ]);
+            ])
+            ->assertJsonPath('data.priority', 'medium');
 
         $this->assertDatabaseHas('tasks', [
             'title' => 'New Test Task',
             'description' => 'Test Task Description',
             'status' => 'pending',
+            'priority' => 'medium',
         ]);
     }
 
@@ -185,12 +196,10 @@ class TaskCRUDTest extends TestCase
             'title' => 'Original Title',
             'description' => 'Original Description',
             'status' => 'pending',
-            'progress' => 0
+            'progress' => 0,
+            'priority' => 'low',
         ]);
-        
-        // Debug initial state
-        \Log::info('Initial task:', $task->toArray());
-        
+
         $task->users()->attach($this->user, ['role' => 'assignee']);
         
         $updateData = [
@@ -198,6 +207,7 @@ class TaskCRUDTest extends TestCase
             'description' => 'Updated Task Description',
             'status' => 'in-progress',
             'progress' => 50,
+            'priority' => 'high',
         ];
 
         // Act
@@ -214,6 +224,7 @@ class TaskCRUDTest extends TestCase
                     'description',
                     'status',
                     'progress',
+                    'priority',
                     'created_at',
                     'updated_at',
                 ],
@@ -230,11 +241,13 @@ class TaskCRUDTest extends TestCase
             'description' => 'Updated Task Description',
             'status' => 'in-progress',
             'progress' => 50,
+            'priority' => 'high',
         ]);
 
         // Add assertion to verify exact record
         $updatedTask = Task::find($task->id);
         $this->assertEquals(50, $updatedTask->progress);
+        $this->assertEquals('high', $updatedTask->priority);
     }
 
     public function test_cannot_update_task_with_invalid_data()
@@ -246,6 +259,7 @@ class TaskCRUDTest extends TestCase
         $invalidData = [
             'status' => 'invalid-status',
             'progress' => 150, // Invalid progress value
+            'priority' => 'critical',
         ];
 
         // Act
@@ -259,7 +273,8 @@ class TaskCRUDTest extends TestCase
                 'data' => [
                     'errors' => [
                         'status',
-                        'progress'
+                        'progress',
+                        'priority'
                     ]
                 ],
                 'message',
@@ -312,6 +327,7 @@ class TaskCRUDTest extends TestCase
             'title' => 'Original Title',
             'description' => 'Original Description',
             'status' => 'pending',
+            'priority' => 'low',
         ]);
         $task->users()->attach($this->user, ['role' => 'assignee']);
 
@@ -326,13 +342,29 @@ class TaskCRUDTest extends TestCase
 
         // Assert
         $response->assertStatus(200);
-        
+
         $this->assertDatabaseHas('tasks', [
             'id' => $task->id,
             'title' => 'Original Title', // Should remain unchanged
             'description' => 'Original Description', // Should remain unchanged
             'status' => 'in-progress', // Should be updated
+            'priority' => 'low', // Should remain unchanged
         ]);
+    }
+
+    public function test_can_filter_tasks_by_priority()
+    {
+        Task::factory()->count(3)->create(['priority' => 'low']);
+        Task::factory()->count(2)->create(['priority' => 'high']);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])->getJson(route('api.v1.tasks.index', ['priority' => 'high']));
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.data.data.*.priority', array_fill(0, 2, 'high'))
+            ->assertJsonPath('data.data.total', 2)
+            ->assertJsonPath('message', 'List of tasks successfully received');
     }
 }
 
