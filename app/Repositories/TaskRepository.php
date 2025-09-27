@@ -25,7 +25,7 @@ class TaskRepository implements TaskRepositoryInterface
         return Task::destroy($id);
     }
 
-    public function find($id): Task
+    public function find($id): Collection
     {
         return Task::find($id);
     }
