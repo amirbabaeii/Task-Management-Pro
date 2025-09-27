@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\Task;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Contracts\Validation\Validator;
-use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 class StoreTaskRequest extends FormRequest
 {
@@ -26,8 +26,9 @@ class StoreTaskRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'status' => ['nullable', 'string', 'in:pending,in-progress,completed'],
+            'status' => ['nullable', 'string', Rule::in(Task::STATUSES)],
+            'priority' => ['nullable', 'string', Rule::in(Task::PRIORITIES)],
         ];
     }
 
-} 
+}

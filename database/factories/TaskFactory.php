@@ -25,8 +25,9 @@ class TaskFactory extends Factory
             'title' => $this->faker->sentence,
             'description' => $this->faker->paragraph,
             'status' => $this->faker->randomElement(Task::STATUSES),
+            'priority' => $this->faker->randomElement(Task::PRIORITIES),
             'progress' => $this->faker->numberBetween(0, 100),
             'deadline_at' => $this->faker->dateTimeBetween('now', '+1 month'),
         ];
     }
-} 
+}
