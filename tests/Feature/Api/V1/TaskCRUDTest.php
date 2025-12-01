@@ -201,7 +201,7 @@ class TaskCRUDTest extends TestCase
         ]);
 
         $task->users()->attach($this->user, ['role' => 'assignee']);
-        
+
         $updateData = [
             'title' => 'Updated Task Title',
             'description' => 'Updated Task Description',
@@ -255,7 +255,7 @@ class TaskCRUDTest extends TestCase
         // Arrange
         $task = Task::factory()->create();
         $task->users()->attach($this->user, ['role' => 'assignee']);
-        
+
         $invalidData = [
             'status' => 'invalid-status',
             'progress' => 150, // Invalid progress value
@@ -289,7 +289,7 @@ class TaskCRUDTest extends TestCase
     {
         // Arrange
         $task = Task::factory()->create();
-        
+
         $updateData = [
             'title' => 'Updated Task Title',
         ];
@@ -306,7 +306,7 @@ class TaskCRUDTest extends TestCase
         // Arrange
         $task = Task::factory()->create();
         // Not attaching the user to the task
-        
+
         $updateData = [
             'title' => 'Updated Task Title',
         ];
@@ -360,10 +360,9 @@ class TaskCRUDTest extends TestCase
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
         ])->getJson(route('api.v1.tasks.index', ['priority' => 'high']));
-
         $response->assertStatus(200)
-            ->assertJsonPath('data.data.data.*.priority', array_fill(0, 2, 'high'))
-            ->assertJsonPath('data.data.total', 2)
+            ->assertJsonPath('data.data.*.priority', array_fill(0, 2, 'high'))
+            ->assertJsonPath('data.total', 2)
             ->assertJsonPath('message', 'List of tasks successfully received');
     }
 }
