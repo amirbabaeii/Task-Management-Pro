@@ -361,6 +361,18 @@ class TaskCRUDTest extends TestCase
             'Authorization' => 'Bearer ' . $this->token,
         ])->getJson(route('api.v1.tasks.index', ['priority' => 'high']));
         $response->assertStatus(200)
+            ->assertJsonStructure([
+                'data' => [
+                    'data' => [
+                        '*' => [
+                            'priority'
+                        ]
+                        ],
+                        'total'
+                ],
+                'message',
+                'type'
+            ])
             ->assertJsonPath('data.data.*.priority', array_fill(0, 2, 'high'))
             ->assertJsonPath('data.total', 2)
             ->assertJsonPath('message', 'List of tasks successfully received');
