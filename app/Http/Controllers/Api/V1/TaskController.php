@@ -23,7 +23,7 @@ class TaskController extends ApiController
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index(Request $request): TaskResource
     {
         $filters = $request->only(['priority']);
         $list = $this->taskRepository->list(10, array_filter($filters));
@@ -41,7 +41,7 @@ class TaskController extends ApiController
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreTaskRequest $request)
+    public function store(StoreTaskRequest $request): TaskResource
     {
         $task = $this->taskRepository->create($request->validated());
         return new TaskResource($task, "Task successfully created", 201);
@@ -66,7 +66,7 @@ class TaskController extends ApiController
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateTaskRequest $request, Task $task)
+    public function update(UpdateTaskRequest $request, Task $task): TaskResource
     {
         $task = $this->taskRepository->update($task->id, $request->validated());
         return new TaskResource($task, "Task successfully updated", 200);

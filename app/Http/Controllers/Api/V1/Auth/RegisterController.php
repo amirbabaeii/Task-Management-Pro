@@ -16,7 +16,7 @@ class RegisterController extends ApiController
         $this->userService = $userService;
     }
 
-    public function register(RegisterRequest $request)
+    public function register(RegisterRequest $request): RegisterResource
     {
         $user = $this->userService->register($request->validated());
         $token = $user->createToken('auth_token')->plainTextToken;
