@@ -71,4 +71,20 @@ class TaskBoardController extends Controller
             'task' => $task->only(['id', 'status']),
         ]);
     }
+
+    public function updateProgress(Request $request, Task $task): JsonResponse
+    {
+        $this->authorize('update', $task);
+
+        $validated = $request->validate([
+            'progress' => ['required', 'integer', 'min:0', 'max:100'],
+        ]);
+
+        $task->progress = $validated['progress'];
+        $task->save();
+
+        return response()->json([
+            'task' => $task->only(['id', 'progress']),
+        ]);
+    }
 }

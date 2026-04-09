@@ -88,4 +88,57 @@ class TaskBoardTest extends TestCase
             'status' => 'completed',
         ]);
     }
+
+    public function test_assignee_can_update_task_progress_from_the_board(): void
+    {
+        $user = User::factory()->create();
+        $task = Task::factory()->create([
+            'progress' => 15,
+        ]);
+
+        $task->users()->attach($user->id, [
+            'role' => 'assignee',
+        ]);
+
+        $response = $this->actingAs($user)->patchJson(
+            route('tasks.progress', $task),
+            ['progress' => 65],
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('task.id', $task->id)
+            ->assertJsonPath('task.progress', 65);
+
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'progress' => 65,
+        ]);
+    }
+
+    public function test_task_progress_update_requires_a_valid_percentage(): void
+    {
+        $user = User::factory()->create();
+        $task = Task::factory()->create([
+            'progress' => 20,
+        ]);
+
+        $task->users()->attach($user->id, [
+            'role' => 'assignee',
+        ]);
+
+        $response = $this->actingAs($user)->patchJson(
+            route('tasks.progress', $task),
+            ['progress' => 120],
+        );
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['progress']);
+
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'progress' => 20,
+        ]);
+    }
 }

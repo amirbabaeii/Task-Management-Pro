@@ -23,8 +23,14 @@ const props = defineProps({
     },
 });
 
-const tasks = ref(props.tasks.map((task) => ({ ...task })));
-const movingId = ref(null);
+const normalizeTask = (task) => ({
+    ...task,
+    progress: task.progress ?? 0,
+});
+
+const tasks = ref(props.tasks.map(normalizeTask));
+const updatingId = ref(null);
+const progressDrafts = ref({});
 const errorMessage = ref('');
 const defaultStatus = props.statuses.includes('pending')
     ? 'pending'
@@ -61,7 +67,7 @@ const priorityOptions = computed(() =>
 watch(
     () => props.tasks,
     (nextTasks) => {
-        tasks.value = nextTasks.map((task) => ({ ...task }));
+        tasks.value = nextTasks.map(normalizeTask);
     },
 );
 
@@ -92,6 +98,12 @@ const formatDate = (value) => {
     }).format(date);
 };
 
+const getProgressValue = (task) => progressDrafts.value[task.id] ?? task.progress;
+
+const progressBarStyle = (task) => ({
+    '--task-progress': `${getProgressValue(task)}%`,
+});
+
 const tasksByStatus = computed(() => {
     const grouped = {};
     boardStatuses.value.forEach((status) => {
@@ -108,32 +120,112 @@ const tasksByStatus = computed(() => {
     return grouped;
 });
 
-const updateStatus = async (task, nextStatus) => {
-    if (!nextStatus || task.status === nextStatus || movingId.value) {
+const patchTask = async (task, field, value, routeName, fallbackMessage) => {
+    if (value === null || value === undefined || task[field] === value || updatingId.value) {
         return;
     }
 
     errorMessage.value = '';
-    movingId.value = task.id;
-    const previousStatus = task.status;
-    task.status = nextStatus;
+    updatingId.value = task.id;
+    const previousValue = task[field];
+    task[field] = value;
 
     try {
-        await axios.patch(route('tasks.status', task.id), {
-            status: nextStatus,
+        const response = await axios.patch(route(routeName, task.id), {
+            [field]: value,
         });
+
+        if (response?.data?.task?.[field] !== undefined) {
+            task[field] = response.data.task[field];
+        }
     } catch (error) {
-        task.status = previousStatus;
+        task[field] = previousValue;
         errorMessage.value =
-            error?.response?.data?.message ||
-            'Unable to update task status. Please try again.';
+            error?.response?.data?.message || fallbackMessage;
     } finally {
-        movingId.value = null;
+        updatingId.value = null;
     }
+};
+
+const updateStatus = async (task, nextStatus) => {
+    await patchTask(
+        task,
+        'status',
+        nextStatus,
+        'tasks.status',
+        'Unable to update task status. Please try again.',
+    );
 };
 
 const onStatusChange = (event, task) => {
     updateStatus(task, event.target.value);
+};
+
+const parseProgress = (value) => {
+    const parsed = Number.parseInt(value, 10);
+
+    if (Number.isNaN(parsed)) {
+        return null;
+    }
+
+    return Math.min(100, Math.max(0, parsed));
+};
+
+const clearProgressDraft = (taskId) => {
+    if (!(taskId in progressDrafts.value)) {
+        return;
+    }
+
+    const nextDrafts = { ...progressDrafts.value };
+    delete nextDrafts[taskId];
+    progressDrafts.value = nextDrafts;
+};
+
+const onProgressInput = (event, task) => {
+    const nextProgress = parseProgress(event.target.value);
+
+    if (nextProgress === null) {
+        return;
+    }
+
+    progressDrafts.value = {
+        ...progressDrafts.value,
+        [task.id]: nextProgress,
+    };
+};
+
+const updateProgress = async (task, nextProgress) => {
+    if (
+        nextProgress === null ||
+        nextProgress === undefined ||
+        task.progress === nextProgress ||
+        updatingId.value
+    ) {
+        clearProgressDraft(task.id);
+        return;
+    }
+
+    errorMessage.value = '';
+    updatingId.value = task.id;
+
+    try {
+        const response = await axios.patch(route('tasks.progress', task.id), {
+            progress: nextProgress,
+        });
+
+        task.progress = response?.data?.task?.progress ?? nextProgress;
+    } catch (error) {
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to update task progress. Please try again.';
+    } finally {
+        clearProgressDraft(task.id);
+        updatingId.value = null;
+    }
+};
+
+const onProgressChange = (event, task) => {
+    updateProgress(task, getProgressValue(task));
 };
 
 const submitTask = () => {
@@ -356,27 +448,31 @@ const submitTask = () => {
                                         </span>
                                     </div>
 
-                                    <div
-                                        v-if="
-                                            task.progress !== null &&
-                                            task.progress !== undefined
-                                        "
-                                        class="mt-3"
-                                    >
-                                        <div
-                                            class="h-2 w-full rounded-full bg-gray-200"
+                                    <div class="mt-3">
+                                        <label
+                                            :for="`task-progress-${task.id}`"
+                                            class="sr-only"
                                         >
-                                            <div
-                                                class="h-2 rounded-full bg-gray-800"
-                                                :style="{
-                                                    width: `${task.progress}%`,
-                                                }"
-                                            />
-                                        </div>
-                                        <div
-                                            class="mt-1 text-[10px] text-gray-500"
-                                        >
-                                            {{ task.progress }}% complete
+                                            Progress
+                                        </label>
+                                        <input
+                                            :id="`task-progress-${task.id}`"
+                                            class="task-progress-slider block w-full"
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            step="5"
+                                            :value="getProgressValue(task)"
+                                            :style="progressBarStyle(task)"
+                                            :disabled="updatingId === task.id"
+                                            @input="onProgressInput($event, task)"
+                                            @change="
+                                                onProgressChange($event, task)
+                                            "
+                                        />
+                                        <div class="mt-1 text-[10px] text-gray-500">
+                                            {{ getProgressValue(task) }}%
+                                            complete
                                         </div>
                                     </div>
 
@@ -392,7 +488,7 @@ const submitTask = () => {
                                         </span>
                                         <div class="flex items-center gap-2">
                                             <span
-                                                v-if="movingId === task.id"
+                                                v-if="updatingId === task.id"
                                                 class="text-[11px] text-gray-400"
                                             >
                                                 Updating...
@@ -400,7 +496,7 @@ const submitTask = () => {
                                             <select
                                                 class="block w-32 rounded-md border-gray-300 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
                                                 :value="task.status"
-                                                :disabled="movingId === task.id"
+                                                :disabled="updatingId === task.id"
                                                 @change="
                                                     onStatusChange($event, task)
                                                 "
@@ -431,3 +527,66 @@ const submitTask = () => {
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+.task-progress-slider {
+    --task-progress: 0%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.task-progress-slider:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.task-progress-slider::-webkit-slider-runnable-track {
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: linear-gradient(
+        to right,
+        rgb(31 41 55) 0%,
+        rgb(31 41 55) var(--task-progress),
+        rgb(229 231 235) var(--task-progress),
+        rgb(229 231 235) 100%
+    );
+}
+
+.task-progress-slider::-moz-range-track {
+    height: 0.5rem;
+    border: 0;
+    border-radius: 9999px;
+    background: linear-gradient(
+        to right,
+        rgb(31 41 55) 0%,
+        rgb(31 41 55) var(--task-progress),
+        rgb(229 231 235) var(--task-progress),
+        rgb(229 231 235) 100%
+    );
+}
+
+.task-progress-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 0.9rem;
+    height: 0.9rem;
+    margin-top: -0.2rem;
+    border: 2px solid #fff;
+    border-radius: 9999px;
+    background: rgb(31 41 55);
+    box-shadow: 0 1px 3px rgb(15 23 42 / 0.25);
+}
+
+.task-progress-slider::-moz-range-thumb {
+    width: 0.9rem;
+    height: 0.9rem;
+    border: 2px solid #fff;
+    border-radius: 9999px;
+    background: rgb(31 41 55);
+    box-shadow: 0 1px 3px rgb(15 23 42 / 0.25);
+}
+</style>
