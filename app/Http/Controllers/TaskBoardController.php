@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Tasks\StoreTaskRequest;
 use App\Models\Task;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,7 +36,24 @@ class TaskBoardController extends Controller
         return Inertia::render('Tasks/Board', [
             'tasks' => $tasks,
             'statuses' => Task::STATUSES,
+            'priorities' => Task::PRIORITIES,
         ]);
+    }
+
+    public function store(StoreTaskRequest $request): RedirectResponse
+    {
+        $user = $request->user();
+        $validated = $request->validated();
+
+        DB::transaction(function () use ($user, $validated): void {
+            $task = Task::create($validated);
+
+            $task->users()->attach($user->id, [
+                'role' => 'assignee',
+            ]);
+        });
+
+        return redirect()->route('tasks.board');
     }
 
     public function updateStatus(Request $request, Task $task): JsonResponse

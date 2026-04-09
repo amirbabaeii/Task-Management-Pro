@@ -1,7 +1,11 @@
 <script setup>
-import { computed, ref } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
+import { Head, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import InputError from '@/Components/InputError.vue';
+import InputLabel from '@/Components/InputLabel.vue';
+import PrimaryButton from '@/Components/PrimaryButton.vue';
+import TextInput from '@/Components/TextInput.vue';
 import axios from 'axios';
 
 const props = defineProps({
@@ -13,11 +17,29 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    priorities: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const tasks = ref(props.tasks.map((task) => ({ ...task })));
 const movingId = ref(null);
 const errorMessage = ref('');
+const defaultStatus = props.statuses.includes('pending')
+    ? 'pending'
+    : (props.statuses[0] ?? 'pending');
+const defaultPriority = props.priorities.includes('medium')
+    ? 'medium'
+    : (props.priorities[0] ?? 'medium');
+
+const form = useForm({
+    title: '',
+    description: '',
+    status: defaultStatus,
+    priority: defaultPriority,
+    deadline_at: '',
+});
 
 const statusLabels = {
     pending: 'Pending',
@@ -29,6 +51,18 @@ const boardStatuses = computed(() =>
     props.statuses.length
         ? props.statuses
         : ['pending', 'in-progress', 'completed'],
+);
+const priorityOptions = computed(() =>
+    props.priorities.length
+        ? props.priorities
+        : ['low', 'medium', 'high'],
+);
+
+watch(
+    () => props.tasks,
+    (nextTasks) => {
+        tasks.value = nextTasks.map((task) => ({ ...task }));
+    },
 );
 
 const formatStatus = (status) => statusLabels[status] ?? status;
@@ -101,6 +135,13 @@ const updateStatus = async (task, nextStatus) => {
 const onStatusChange = (event, task) => {
     updateStatus(task, event.target.value);
 };
+
+const submitTask = () => {
+    form.post(route('tasks.store'), {
+        preserveScroll: true,
+        onSuccess: () => form.reset(),
+    });
+};
 </script>
 
 <template>
@@ -122,116 +163,262 @@ const onStatusChange = (event, task) => {
 
         <div class="py-12">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="grid gap-6 lg:grid-cols-3">
+                <div class="space-y-6">
                     <section
-                        v-for="status in boardStatuses"
-                        :key="status"
-                        class="flex flex-col rounded-lg border border-gray-200 bg-white shadow-sm"
+                        class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
                     >
                         <div
-                            class="flex items-center justify-between border-b border-gray-100 px-4 py-3"
+                            class="flex flex-col gap-1 border-b border-gray-100 pb-4 sm:flex-row sm:items-end sm:justify-between"
                         >
-                            <h3 class="text-sm font-semibold text-gray-700">
-                                {{ formatStatus(status) }}
-                            </h3>
-                            <span
-                                class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
-                            >
-                                {{ tasksByStatus[status]?.length || 0 }}
-                            </span>
-                        </div>
-                        <div class="flex-1 space-y-4 p-4">
-                            <div
-                                v-if="!tasksByStatus[status]?.length"
-                                class="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-6 text-center text-xs text-gray-500"
-                            >
-                                No tasks in this status.
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">
+                                    Create a new task
+                                </h3>
+                                <p class="text-sm text-gray-500">
+                                    New tasks are automatically assigned to you
+                                    and added to this board.
+                                </p>
                             </div>
-                            <article
-                                v-for="task in tasksByStatus[status]"
-                                :key="task.id"
-                                class="rounded-md border border-gray-200 bg-gray-50 p-4 shadow-sm"
+                            <p
+                                v-if="form.recentlySuccessful"
+                                class="text-sm font-medium text-green-600"
                             >
-                                <div
-                                    class="flex items-start justify-between gap-3"
-                                >
-                                    <div>
-                                        <h4
-                                            class="text-sm font-semibold text-gray-800"
-                                        >
-                                            {{ task.title }}
-                                        </h4>
-                                        <p
-                                            v-if="task.description"
-                                            class="mt-1 text-xs leading-relaxed text-gray-600"
-                                        >
-                                            {{ task.description }}
-                                        </p>
-                                    </div>
-                                    <span
-                                        class="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-700"
-                                    >
-                                        {{ formatPriority(task.priority) }}
-                                    </span>
-                                </div>
+                                Task created successfully.
+                            </p>
+                        </div>
 
+                        <form
+                            class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+                            @submit.prevent="submitTask"
+                        >
+                            <div class="xl:col-span-2">
+                                <InputLabel for="title" value="Title" />
+                                <TextInput
+                                    id="title"
+                                    v-model="form.title"
+                                    type="text"
+                                    class="mt-1 block w-full"
+                                    required
+                                    maxlength="150"
+                                    autocomplete="off"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="form.errors.title"
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel for="status" value="Status" />
+                                <select
+                                    id="status"
+                                    v-model="form.status"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                    required
+                                >
+                                    <option
+                                        v-for="status in boardStatuses"
+                                        :key="status"
+                                        :value="status"
+                                    >
+                                        {{ formatStatus(status) }}
+                                    </option>
+                                </select>
+                                <InputError
+                                    class="mt-2"
+                                    :message="form.errors.status"
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel for="priority" value="Priority" />
+                                <select
+                                    id="priority"
+                                    v-model="form.priority"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                    required
+                                >
+                                    <option
+                                        v-for="priority in priorityOptions"
+                                        :key="priority"
+                                        :value="priority"
+                                    >
+                                        {{ formatPriority(priority) }}
+                                    </option>
+                                </select>
+                                <InputError
+                                    class="mt-2"
+                                    :message="form.errors.priority"
+                                />
+                            </div>
+
+                            <div class="md:col-span-2 xl:col-span-3">
+                                <InputLabel
+                                    for="description"
+                                    value="Description"
+                                />
+                                <textarea
+                                    id="description"
+                                    v-model="form.description"
+                                    rows="4"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="form.errors.description"
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel
+                                    for="deadline_at"
+                                    value="Deadline"
+                                />
+                                <input
+                                    id="deadline_at"
+                                    v-model="form.deadline_at"
+                                    type="date"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="form.errors.deadline_at"
+                                />
+                            </div>
+
+                            <div
+                                class="flex items-center justify-end md:col-span-2 xl:col-span-4"
+                            >
+                                <PrimaryButton
+                                    :class="{ 'opacity-25': form.processing }"
+                                    :disabled="form.processing"
+                                >
+                                    {{
+                                        form.processing
+                                            ? 'Creating...'
+                                            : 'Create Task'
+                                    }}
+                                </PrimaryButton>
+                            </div>
+                        </form>
+                    </section>
+
+                    <div class="grid gap-6 lg:grid-cols-3">
+                        <section
+                            v-for="status in boardStatuses"
+                            :key="status"
+                            class="flex flex-col rounded-lg border border-gray-200 bg-white shadow-sm"
+                        >
+                            <div
+                                class="flex items-center justify-between border-b border-gray-100 px-4 py-3"
+                            >
+                                <h3 class="text-sm font-semibold text-gray-700">
+                                    {{ formatStatus(status) }}
+                                </h3>
+                                <span
+                                    class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
+                                >
+                                    {{ tasksByStatus[status]?.length || 0 }}
+                                </span>
+                            </div>
+                            <div class="flex-1 space-y-4 p-4">
                                 <div
-                                    v-if="
-                                        task.progress !== null &&
-                                        task.progress !== undefined
-                                    "
-                                    class="mt-3"
+                                    v-if="!tasksByStatus[status]?.length"
+                                    class="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-6 text-center text-xs text-gray-500"
+                                >
+                                    No tasks in this status.
+                                </div>
+                                <article
+                                    v-for="task in tasksByStatus[status]"
+                                    :key="task.id"
+                                    class="rounded-md border border-gray-200 bg-gray-50 p-4 shadow-sm"
                                 >
                                     <div
-                                        class="h-2 w-full rounded-full bg-gray-200"
+                                        class="flex items-start justify-between gap-3"
+                                    >
+                                        <div>
+                                            <h4
+                                                class="text-sm font-semibold text-gray-800"
+                                            >
+                                                {{ task.title }}
+                                            </h4>
+                                            <p
+                                                v-if="task.description"
+                                                class="mt-1 text-xs leading-relaxed text-gray-600"
+                                            >
+                                                {{ task.description }}
+                                            </p>
+                                        </div>
+                                        <span
+                                            class="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-700"
+                                        >
+                                            {{ formatPriority(task.priority) }}
+                                        </span>
+                                    </div>
+
+                                    <div
+                                        v-if="
+                                            task.progress !== null &&
+                                            task.progress !== undefined
+                                        "
+                                        class="mt-3"
                                     >
                                         <div
-                                            class="h-2 rounded-full bg-gray-800"
-                                            :style="{
-                                                width: `${task.progress}%`,
-                                            }"
-                                        />
+                                            class="h-2 w-full rounded-full bg-gray-200"
+                                        >
+                                            <div
+                                                class="h-2 rounded-full bg-gray-800"
+                                                :style="{
+                                                    width: `${task.progress}%`,
+                                                }"
+                                            />
+                                        </div>
+                                        <div
+                                            class="mt-1 text-[10px] text-gray-500"
+                                        >
+                                            {{ task.progress }}% complete
+                                        </div>
                                     </div>
-                                    <div class="mt-1 text-[10px] text-gray-500">
-                                        {{ task.progress }}% complete
-                                    </div>
-                                </div>
 
-                                <div
-                                    class="mt-3 flex flex-wrap items-center justify-between gap-2"
-                                >
-                                    <span
-                                        v-if="formatDate(task.deadline_at)"
-                                        class="text-[11px] text-gray-500"
+                                    <div
+                                        class="mt-3 flex flex-wrap items-center justify-between gap-2"
                                     >
-                                        Due {{ formatDate(task.deadline_at) }}
-                                    </span>
-                                    <div class="flex items-center gap-2">
                                         <span
-                                            v-if="movingId === task.id"
-                                            class="text-[11px] text-gray-400"
+                                            v-if="formatDate(task.deadline_at)"
+                                            class="text-[11px] text-gray-500"
                                         >
-                                            Updating...
+                                            Due
+                                            {{ formatDate(task.deadline_at) }}
                                         </span>
-                                        <select
-                                            class="block w-32 rounded-md border-gray-300 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                            :value="task.status"
-                                            :disabled="movingId === task.id"
-                                            @change="onStatusChange($event, task)"
-                                        >
-                                            <option
-                                                v-for="option in boardStatuses"
-                                                :key="option"
-                                                :value="option"
+                                        <div class="flex items-center gap-2">
+                                            <span
+                                                v-if="movingId === task.id"
+                                                class="text-[11px] text-gray-400"
                                             >
-                                                {{ formatStatus(option) }}
-                                            </option>
-                                        </select>
+                                                Updating...
+                                            </span>
+                                            <select
+                                                class="block w-32 rounded-md border-gray-300 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                                :value="task.status"
+                                                :disabled="movingId === task.id"
+                                                @change="
+                                                    onStatusChange($event, task)
+                                                "
+                                            >
+                                                <option
+                                                    v-for="option in boardStatuses"
+                                                    :key="option"
+                                                    :value="option"
+                                                >
+                                                    {{ formatStatus(option) }}
+                                                </option>
+                                            </select>
+                                        </div>
                                     </div>
-                                </div>
-                            </article>
-                        </div>
-                    </section>
+                                </article>
+                            </div>
+                        </section>
+                    </div>
                 </div>
 
                 <p

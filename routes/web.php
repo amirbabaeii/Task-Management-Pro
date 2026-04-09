@@ -22,6 +22,8 @@ Route::get('/dashboard', function () {
 Route::middleware('auth')->group(function () {
     Route::get('/tasks/board', [TaskBoardController::class, 'index'])
         ->name('tasks.board');
+    Route::post('/tasks', [TaskBoardController::class, 'store'])
+        ->name('tasks.store');
     Route::patch('/tasks/{task}/status', [TaskBoardController::class, 'updateStatus'])
         ->name('tasks.status');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

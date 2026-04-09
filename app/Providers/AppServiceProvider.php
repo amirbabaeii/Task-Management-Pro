@@ -2,7 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\Task;
+use App\Policies\TaskPolicy;
 use Illuminate\Support\Facades\Vite;
+use Illuminate\Support\Facades\Gate;
 use App\Services\Auth\AuthService;
 use App\Services\Interfaces\Auth\AuthServiceInterface;
 use Illuminate\Support\ServiceProvider;
@@ -31,5 +34,6 @@ class AppServiceProvider extends ServiceProvider
     {
         Vite::prefetch(concurrency: 3);
         JsonResource::withoutWrapping();
+        Gate::policy(Task::class, TaskPolicy::class);
     }
 }
