@@ -31,6 +31,9 @@ const normalizeTask = (task) => ({
 const tasks = ref(props.tasks.map(normalizeTask));
 const updatingId = ref(null);
 const progressDrafts = ref({});
+const draggedTaskId = ref(null);
+const dragOverStatus = ref(null);
+const dragBlockedTaskId = ref(null);
 const errorMessage = ref('');
 const defaultStatus = props.statuses.includes('pending')
     ? 'pending'
@@ -104,6 +107,11 @@ const progressBarStyle = (task) => ({
     '--task-progress': `${getProgressValue(task)}%`,
 });
 
+const isDraggingTask = (taskId) => draggedTaskId.value === taskId;
+
+const isDropTarget = (status) =>
+    draggedTaskId.value !== null && dragOverStatus.value === status;
+
 const tasksByStatus = computed(() => {
     const grouped = {};
     boardStatuses.value.forEach((status) => {
@@ -157,8 +165,71 @@ const updateStatus = async (task, nextStatus) => {
     );
 };
 
-const onStatusChange = (event, task) => {
-    updateStatus(task, event.target.value);
+const resetDragState = () => {
+    draggedTaskId.value = null;
+    dragOverStatus.value = null;
+};
+
+const blockTaskDrag = (taskId) => {
+    dragBlockedTaskId.value = taskId;
+};
+
+const clearTaskDragBlock = (taskId = null) => {
+    if (taskId === null || dragBlockedTaskId.value === taskId) {
+        dragBlockedTaskId.value = null;
+    }
+};
+
+const onTaskDragStart = (event, task) => {
+    if (updatingId.value || dragBlockedTaskId.value === task.id) {
+        event.preventDefault();
+        clearTaskDragBlock(task.id);
+        return;
+    }
+
+    draggedTaskId.value = task.id;
+    dragOverStatus.value = task.status;
+
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(task.id));
+    }
+};
+
+const onTaskDragEnd = () => {
+    clearTaskDragBlock();
+    resetDragState();
+};
+
+const onColumnDragOver = (event, status) => {
+    if (draggedTaskId.value === null) {
+        return;
+    }
+
+    event.preventDefault();
+    dragOverStatus.value = status;
+
+    if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move';
+    }
+};
+
+const onColumnDrop = async (status) => {
+    if (draggedTaskId.value === null) {
+        return;
+    }
+
+    const task = tasks.value.find(
+        (candidate) => candidate.id === draggedTaskId.value,
+    );
+
+    resetDragState();
+
+    if (!task) {
+        return;
+    }
+
+    await updateStatus(task, status);
 };
 
 const parseProgress = (value) => {
@@ -226,6 +297,7 @@ const updateProgress = async (task, nextProgress) => {
 
 const onProgressChange = (event, task) => {
     updateProgress(task, getProgressValue(task));
+    clearTaskDragBlock(task.id);
 };
 
 const submitTask = () => {
@@ -399,7 +471,12 @@ const submitTask = () => {
                         <section
                             v-for="status in boardStatuses"
                             :key="status"
-                            class="flex flex-col rounded-lg border border-gray-200 bg-white shadow-sm"
+                            class="task-column flex flex-col rounded-lg border border-gray-200 bg-white shadow-sm transition"
+                            :class="{
+                                'task-column--drop-target': isDropTarget(status),
+                            }"
+                            @dragover="onColumnDragOver($event, status)"
+                            @drop.prevent="onColumnDrop(status)"
                         >
                             <div
                                 class="flex items-center justify-between border-b border-gray-100 px-4 py-3"
@@ -423,7 +500,13 @@ const submitTask = () => {
                                 <article
                                     v-for="task in tasksByStatus[status]"
                                     :key="task.id"
-                                    class="rounded-md border border-gray-200 bg-gray-50 p-4 shadow-sm"
+                                    class="task-card rounded-md border border-gray-200 bg-gray-50 p-4 shadow-sm transition"
+                                    :class="{
+                                        'task-card--dragging': isDraggingTask(task.id),
+                                    }"
+                                    :draggable="updatingId !== task.id"
+                                    @dragstart="onTaskDragStart($event, task)"
+                                    @dragend="onTaskDragEnd"
                                 >
                                     <div
                                         class="flex items-start justify-between gap-3"
@@ -448,7 +531,14 @@ const submitTask = () => {
                                         </span>
                                     </div>
 
-                                    <div class="mt-3">
+                                    <div
+                                        class="mt-3"
+                                        data-no-drag
+                                        @pointerdown="blockTaskDrag(task.id)"
+                                        @pointerup="clearTaskDragBlock(task.id)"
+                                        @pointercancel="clearTaskDragBlock(task.id)"
+                                        @dragstart.prevent
+                                    >
                                         <label
                                             :for="`task-progress-${task.id}`"
                                             class="sr-only"
@@ -476,9 +566,7 @@ const submitTask = () => {
                                         </div>
                                     </div>
 
-                                    <div
-                                        class="mt-3 flex flex-wrap items-center justify-between gap-2"
-                                    >
+                                    <div class="mt-3 flex flex-wrap items-center gap-2">
                                         <span
                                             v-if="formatDate(task.deadline_at)"
                                             class="text-[11px] text-gray-500"
@@ -493,22 +581,6 @@ const submitTask = () => {
                                             >
                                                 Updating...
                                             </span>
-                                            <select
-                                                class="block w-32 rounded-md border-gray-300 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                                :value="task.status"
-                                                :disabled="updatingId === task.id"
-                                                @change="
-                                                    onStatusChange($event, task)
-                                                "
-                                            >
-                                                <option
-                                                    v-for="option in boardStatuses"
-                                                    :key="option"
-                                                    :value="option"
-                                                >
-                                                    {{ formatStatus(option) }}
-                                                </option>
-                                            </select>
                                         </div>
                                     </div>
                                 </article>
@@ -529,6 +601,22 @@ const submitTask = () => {
 </template>
 
 <style scoped>
+.task-column--drop-target {
+    border-color: rgb(55 65 81);
+    background: rgb(249 250 251);
+    box-shadow: inset 0 0 0 1px rgb(55 65 81 / 0.1);
+}
+
+.task-card {
+    cursor: grab;
+}
+
+.task-card--dragging {
+    opacity: 0.55;
+    transform: rotate(1deg);
+    cursor: grabbing;
+}
+
 .task-progress-slider {
     --task-progress: 0%;
     -webkit-appearance: none;
