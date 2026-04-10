@@ -4,7 +4,9 @@ import { Head, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
+import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import axios from 'axios';
 
@@ -34,6 +36,7 @@ const progressDrafts = ref({});
 const draggedTaskId = ref(null);
 const dragOverStatus = ref(null);
 const dragBlockedTaskId = ref(null);
+const showingCreateModal = ref(false);
 const errorMessage = ref('');
 const defaultStatus = props.statuses.includes('pending')
     ? 'pending'
@@ -106,6 +109,12 @@ const getProgressValue = (task) => progressDrafts.value[task.id] ?? task.progres
 const progressBarStyle = (task) => ({
     '--task-progress': `${getProgressValue(task)}%`,
 });
+
+const closeCreateModal = () => {
+    showingCreateModal.value = false;
+    form.reset();
+    form.clearErrors();
+};
 
 const isDraggingTask = (taskId) => draggedTaskId.value === taskId;
 
@@ -303,7 +312,7 @@ const onProgressChange = (event, task) => {
 const submitTask = () => {
     form.post(route('tasks.store'), {
         preserveScroll: true,
-        onSuccess: () => form.reset(),
+        onSuccess: () => closeCreateModal(),
     });
 };
 </script>
@@ -314,160 +323,25 @@ const submitTask = () => {
     <AuthenticatedLayout>
         <template #header>
             <div
-                class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"
+                class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
             >
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                    Task Board
-                </h2>
-                <p class="text-sm text-gray-500">
-                    Move tasks between statuses to keep work flowing.
-                </p>
+                <div class="space-y-1">
+                    <h2 class="text-xl font-semibold leading-tight text-gray-800">
+                        Task Board
+                    </h2>
+                    <p class="text-sm text-gray-500">
+                        Move tasks between statuses to keep work flowing.
+                    </p>
+                </div>
+                <PrimaryButton @click="showingCreateModal = true">
+                    New Task
+                </PrimaryButton>
             </div>
         </template>
 
         <div class="py-12">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="space-y-6">
-                    <section
-                        class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
-                    >
-                        <div
-                            class="flex flex-col gap-1 border-b border-gray-100 pb-4 sm:flex-row sm:items-end sm:justify-between"
-                        >
-                            <div>
-                                <h3 class="text-lg font-semibold text-gray-900">
-                                    Create a new task
-                                </h3>
-                                <p class="text-sm text-gray-500">
-                                    New tasks are automatically assigned to you
-                                    and added to this board.
-                                </p>
-                            </div>
-                            <p
-                                v-if="form.recentlySuccessful"
-                                class="text-sm font-medium text-green-600"
-                            >
-                                Task created successfully.
-                            </p>
-                        </div>
-
-                        <form
-                            class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
-                            @submit.prevent="submitTask"
-                        >
-                            <div class="xl:col-span-2">
-                                <InputLabel for="title" value="Title" />
-                                <TextInput
-                                    id="title"
-                                    v-model="form.title"
-                                    type="text"
-                                    class="mt-1 block w-full"
-                                    required
-                                    maxlength="150"
-                                    autocomplete="off"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="form.errors.title"
-                                />
-                            </div>
-
-                            <div>
-                                <InputLabel for="status" value="Status" />
-                                <select
-                                    id="status"
-                                    v-model="form.status"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                    required
-                                >
-                                    <option
-                                        v-for="status in boardStatuses"
-                                        :key="status"
-                                        :value="status"
-                                    >
-                                        {{ formatStatus(status) }}
-                                    </option>
-                                </select>
-                                <InputError
-                                    class="mt-2"
-                                    :message="form.errors.status"
-                                />
-                            </div>
-
-                            <div>
-                                <InputLabel for="priority" value="Priority" />
-                                <select
-                                    id="priority"
-                                    v-model="form.priority"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                    required
-                                >
-                                    <option
-                                        v-for="priority in priorityOptions"
-                                        :key="priority"
-                                        :value="priority"
-                                    >
-                                        {{ formatPriority(priority) }}
-                                    </option>
-                                </select>
-                                <InputError
-                                    class="mt-2"
-                                    :message="form.errors.priority"
-                                />
-                            </div>
-
-                            <div class="md:col-span-2 xl:col-span-3">
-                                <InputLabel
-                                    for="description"
-                                    value="Description"
-                                />
-                                <textarea
-                                    id="description"
-                                    v-model="form.description"
-                                    rows="4"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="form.errors.description"
-                                />
-                            </div>
-
-                            <div>
-                                <InputLabel
-                                    for="deadline_at"
-                                    value="Deadline"
-                                />
-                                <input
-                                    id="deadline_at"
-                                    v-model="form.deadline_at"
-                                    type="date"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="form.errors.deadline_at"
-                                />
-                            </div>
-
-                            <div
-                                class="flex items-center justify-end md:col-span-2 xl:col-span-4"
-                            >
-                                <PrimaryButton
-                                    :class="{ 'opacity-25': form.processing }"
-                                    :disabled="form.processing"
-                                >
-                                    {{
-                                        form.processing
-                                            ? 'Creating...'
-                                            : 'Create Task'
-                                    }}
-                                </PrimaryButton>
-                            </div>
-                        </form>
-                    </section>
-
-                    <div class="grid gap-6 lg:grid-cols-3">
+                <div class="grid gap-6 lg:grid-cols-3">
                         <section
                             v-for="status in boardStatuses"
                             :key="status"
@@ -586,7 +460,6 @@ const submitTask = () => {
                                 </article>
                             </div>
                         </section>
-                    </div>
                 </div>
 
                 <p
@@ -595,6 +468,144 @@ const submitTask = () => {
                 >
                     {{ errorMessage }}
                 </p>
+
+                <Modal
+                    :show="showingCreateModal"
+                    max-width="2xl"
+                    @close="closeCreateModal"
+                >
+                    <div class="p-6">
+                        <div
+                            class="flex flex-col gap-1 border-b border-gray-100 pb-4"
+                        >
+                            <h3 class="text-lg font-semibold text-gray-900">
+                                Create a new task
+                            </h3>
+                            <p class="text-sm text-gray-500">
+                                New tasks are automatically assigned to you and
+                                added to this board.
+                            </p>
+                        </div>
+
+                        <form
+                            class="mt-6 grid gap-4 md:grid-cols-2"
+                            @submit.prevent="submitTask"
+                        >
+                            <div class="md:col-span-2">
+                                <InputLabel for="title" value="Title" />
+                                <TextInput
+                                    id="title"
+                                    v-model="form.title"
+                                    type="text"
+                                    class="mt-1 block w-full"
+                                    required
+                                    maxlength="150"
+                                    autocomplete="off"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="form.errors.title"
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel for="status" value="Status" />
+                                <select
+                                    id="status"
+                                    v-model="form.status"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                    required
+                                >
+                                    <option
+                                        v-for="status in boardStatuses"
+                                        :key="status"
+                                        :value="status"
+                                    >
+                                        {{ formatStatus(status) }}
+                                    </option>
+                                </select>
+                                <InputError
+                                    class="mt-2"
+                                    :message="form.errors.status"
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel for="priority" value="Priority" />
+                                <select
+                                    id="priority"
+                                    v-model="form.priority"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                    required
+                                >
+                                    <option
+                                        v-for="priority in priorityOptions"
+                                        :key="priority"
+                                        :value="priority"
+                                    >
+                                        {{ formatPriority(priority) }}
+                                    </option>
+                                </select>
+                                <InputError
+                                    class="mt-2"
+                                    :message="form.errors.priority"
+                                />
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <InputLabel
+                                    for="description"
+                                    value="Description"
+                                />
+                                <textarea
+                                    id="description"
+                                    v-model="form.description"
+                                    rows="5"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="form.errors.description"
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel
+                                    for="deadline_at"
+                                    value="Deadline"
+                                />
+                                <input
+                                    id="deadline_at"
+                                    v-model="form.deadline_at"
+                                    type="date"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="form.errors.deadline_at"
+                                />
+                            </div>
+
+                            <div
+                                class="md:col-span-2 flex items-center justify-end gap-3 pt-2"
+                            >
+                                <SecondaryButton @click="closeCreateModal">
+                                    Cancel
+                                </SecondaryButton>
+                                <PrimaryButton
+                                    :class="{ 'opacity-25': form.processing }"
+                                    :disabled="form.processing"
+                                >
+                                    {{
+                                        form.processing
+                                            ? 'Creating...'
+                                            : 'Create Task'
+                                    }}
+                                </PrimaryButton>
+                            </div>
+                        </form>
+                    </div>
+                </Modal>
             </div>
         </div>
     </AuthenticatedLayout>
