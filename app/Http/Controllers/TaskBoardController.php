@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Tasks\StoreTaskRequest;
+use App\Http\Requests\Tasks\UpdateTaskRequest;
 use App\Models\Task;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
@@ -52,6 +53,14 @@ class TaskBoardController extends Controller
                 'role' => 'assignee',
             ]);
         });
+
+        return redirect()->route('tasks.board');
+    }
+
+    public function update(UpdateTaskRequest $request, Task $task): RedirectResponse
+    {
+        $task->fill($request->validated());
+        $task->save();
 
         return redirect()->route('tasks.board');
     }

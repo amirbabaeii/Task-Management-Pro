@@ -37,6 +37,8 @@ const draggedTaskId = ref(null);
 const dragOverStatus = ref(null);
 const dragBlockedTaskId = ref(null);
 const showingCreateModal = ref(false);
+const showingEditModal = ref(false);
+const editingTaskId = ref(null);
 const errorMessage = ref('');
 const defaultStatus = props.statuses.includes('pending')
     ? 'pending'
@@ -45,13 +47,16 @@ const defaultPriority = props.priorities.includes('medium')
     ? 'medium'
     : (props.priorities[0] ?? 'medium');
 
-const form = useForm({
+const blankTaskData = () => ({
     title: '',
     description: '',
     status: defaultStatus,
     priority: defaultPriority,
     deadline_at: '',
 });
+
+const form = useForm(blankTaskData());
+const editForm = useForm(blankTaskData());
 
 const statusLabels = {
     pending: 'Pending',
@@ -110,10 +115,56 @@ const progressBarStyle = (task) => ({
     '--task-progress': `${getProgressValue(task)}%`,
 });
 
+const formatDateInput = (value) => {
+    if (!value) {
+        return '';
+    }
+
+    if (typeof value === 'string') {
+        return value.slice(0, 10);
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+
+    return date.toISOString().slice(0, 10);
+};
+
+const setTaskFormValues = (taskForm, values = {}) => {
+    taskForm.title = values.title ?? '';
+    taskForm.description = values.description ?? '';
+    taskForm.status = values.status ?? defaultStatus;
+    taskForm.priority = values.priority ?? defaultPriority;
+    taskForm.deadline_at = values.deadline_at ?? '';
+};
+
 const closeCreateModal = () => {
     showingCreateModal.value = false;
-    form.reset();
+    setTaskFormValues(form, blankTaskData());
     form.clearErrors();
+};
+
+const openEditModal = (task) => {
+    editingTaskId.value = task.id;
+    setTaskFormValues(editForm, {
+        title: task.title,
+        description: task.description ?? '',
+        status: task.status,
+        priority: task.priority,
+        deadline_at: formatDateInput(task.deadline_at),
+    });
+    editForm.clearErrors();
+    showingEditModal.value = true;
+};
+
+const closeEditModal = () => {
+    showingEditModal.value = false;
+    editingTaskId.value = null;
+    setTaskFormValues(editForm, blankTaskData());
+    editForm.clearErrors();
 };
 
 const isDraggingTask = (taskId) => draggedTaskId.value === taskId;
@@ -315,6 +366,17 @@ const submitTask = () => {
         onSuccess: () => closeCreateModal(),
     });
 };
+
+const submitTaskUpdate = () => {
+    if (!editingTaskId.value) {
+        return;
+    }
+
+    editForm.patch(route('tasks.update', editingTaskId.value), {
+        preserveScroll: true,
+        onSuccess: () => closeEditModal(),
+    });
+};
 </script>
 
 <template>
@@ -448,7 +510,15 @@ const submitTask = () => {
                                             Due
                                             {{ formatDate(task.deadline_at) }}
                                         </span>
-                                        <div class="flex items-center gap-2">
+                                        <div class="ml-auto flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
+                                                :disabled="updatingId === task.id"
+                                                @click="openEditModal(task)"
+                                            >
+                                                Edit
+                                            </button>
                                             <span
                                                 v-if="updatingId === task.id"
                                                 class="text-[11px] text-gray-400"
@@ -600,6 +670,146 @@ const submitTask = () => {
                                         form.processing
                                             ? 'Creating...'
                                             : 'Create Task'
+                                    }}
+                                </PrimaryButton>
+                            </div>
+                        </form>
+                    </div>
+                </Modal>
+
+                <Modal
+                    :show="showingEditModal"
+                    max-width="2xl"
+                    @close="closeEditModal"
+                >
+                    <div class="p-6">
+                        <div
+                            class="flex flex-col gap-1 border-b border-gray-100 pb-4"
+                        >
+                            <h3 class="text-lg font-semibold text-gray-900">
+                                Update task
+                            </h3>
+                            <p class="text-sm text-gray-500">
+                                Edit the task details without leaving the board.
+                            </p>
+                        </div>
+
+                        <form
+                            class="mt-6 grid gap-4 md:grid-cols-2"
+                            @submit.prevent="submitTaskUpdate"
+                        >
+                            <div class="md:col-span-2">
+                                <InputLabel for="edit-title" value="Title" />
+                                <TextInput
+                                    id="edit-title"
+                                    v-model="editForm.title"
+                                    type="text"
+                                    class="mt-1 block w-full"
+                                    required
+                                    maxlength="150"
+                                    autocomplete="off"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="editForm.errors.title"
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel for="edit-status" value="Status" />
+                                <select
+                                    id="edit-status"
+                                    v-model="editForm.status"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                    required
+                                >
+                                    <option
+                                        v-for="status in boardStatuses"
+                                        :key="status"
+                                        :value="status"
+                                    >
+                                        {{ formatStatus(status) }}
+                                    </option>
+                                </select>
+                                <InputError
+                                    class="mt-2"
+                                    :message="editForm.errors.status"
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel
+                                    for="edit-priority"
+                                    value="Priority"
+                                />
+                                <select
+                                    id="edit-priority"
+                                    v-model="editForm.priority"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                    required
+                                >
+                                    <option
+                                        v-for="priority in priorityOptions"
+                                        :key="priority"
+                                        :value="priority"
+                                    >
+                                        {{ formatPriority(priority) }}
+                                    </option>
+                                </select>
+                                <InputError
+                                    class="mt-2"
+                                    :message="editForm.errors.priority"
+                                />
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <InputLabel
+                                    for="edit-description"
+                                    value="Description"
+                                />
+                                <textarea
+                                    id="edit-description"
+                                    v-model="editForm.description"
+                                    rows="5"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="editForm.errors.description"
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel
+                                    for="edit-deadline_at"
+                                    value="Deadline"
+                                />
+                                <input
+                                    id="edit-deadline_at"
+                                    v-model="editForm.deadline_at"
+                                    type="date"
+                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="editForm.errors.deadline_at"
+                                />
+                            </div>
+
+                            <div
+                                class="md:col-span-2 flex items-center justify-end gap-3 pt-2"
+                            >
+                                <SecondaryButton @click="closeEditModal">
+                                    Cancel
+                                </SecondaryButton>
+                                <PrimaryButton
+                                    :class="{ 'opacity-25': editForm.processing }"
+                                    :disabled="editForm.processing"
+                                >
+                                    {{
+                                        editForm.processing
+                                            ? 'Saving...'
+                                            : 'Save Changes'
                                     }}
                                 </PrimaryButton>
                             </div>
