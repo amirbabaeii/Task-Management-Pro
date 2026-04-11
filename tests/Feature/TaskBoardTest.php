@@ -40,6 +40,7 @@ class TaskBoardTest extends TestCase
             'task_id' => $task->id,
             'user_id' => $user->id,
             'role' => 'assignee',
+            'sort_order' => 1,
         ]);
     }
 
@@ -135,6 +136,112 @@ class TaskBoardTest extends TestCase
         );
     }
 
+    public function test_assignee_can_reorder_tasks_within_the_same_column(): void
+    {
+        $user = User::factory()->create();
+        $firstTask = Task::factory()->create([
+            'status' => 'pending',
+        ]);
+        $secondTask = Task::factory()->create([
+            'status' => 'pending',
+        ]);
+        $thirdTask = Task::factory()->create([
+            'status' => 'pending',
+        ]);
+
+        $this->attachAssignee($user, $firstTask, 1);
+        $this->attachAssignee($user, $secondTask, 2);
+        $this->attachAssignee($user, $thirdTask, 3);
+
+        $response = $this->actingAs($user)->patchJson(
+            route('tasks.reorder', $thirdTask),
+            [
+                'status' => 'pending',
+                'before_id' => $firstTask->id,
+            ],
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('task.id', $thirdTask->id)
+            ->assertJsonPath('task.status', 'pending')
+            ->assertJsonPath('task.sort_order', 1);
+
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $thirdTask->id,
+            'user_id' => $user->id,
+            'role' => 'assignee',
+            'sort_order' => 1,
+        ]);
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $firstTask->id,
+            'user_id' => $user->id,
+            'role' => 'assignee',
+            'sort_order' => 2,
+        ]);
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $secondTask->id,
+            'user_id' => $user->id,
+            'role' => 'assignee',
+            'sort_order' => 3,
+        ]);
+    }
+
+    public function test_assignee_can_move_a_task_to_another_column_and_place_it_before_another_task(): void
+    {
+        $user = User::factory()->create();
+        $pendingTask = Task::factory()->create([
+            'status' => 'pending',
+        ]);
+        $inProgressTask = Task::factory()->create([
+            'status' => 'in-progress',
+        ]);
+        $anotherInProgressTask = Task::factory()->create([
+            'status' => 'in-progress',
+        ]);
+
+        $this->attachAssignee($user, $pendingTask, 1);
+        $this->attachAssignee($user, $inProgressTask, 1);
+        $this->attachAssignee($user, $anotherInProgressTask, 2);
+
+        $response = $this->actingAs($user)->patchJson(
+            route('tasks.reorder', $pendingTask),
+            [
+                'status' => 'in-progress',
+                'before_id' => $inProgressTask->id,
+            ],
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('task.id', $pendingTask->id)
+            ->assertJsonPath('task.status', 'in-progress')
+            ->assertJsonPath('task.sort_order', 1);
+
+        $this->assertDatabaseHas('tasks', [
+            'id' => $pendingTask->id,
+            'status' => 'in-progress',
+        ]);
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $pendingTask->id,
+            'user_id' => $user->id,
+            'role' => 'assignee',
+            'sort_order' => 1,
+        ]);
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $inProgressTask->id,
+            'user_id' => $user->id,
+            'role' => 'assignee',
+            'sort_order' => 2,
+        ]);
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $anotherInProgressTask->id,
+            'user_id' => $user->id,
+            'role' => 'assignee',
+            'sort_order' => 3,
+        ]);
+    }
+
     public function test_task_board_update_requires_valid_data(): void
     {
         $user = User::factory()->create();
@@ -163,5 +270,13 @@ class TaskBoardTest extends TestCase
                 'priority',
                 'progress',
             ]);
+    }
+
+    private function attachAssignee(User $user, Task $task, int $sortOrder): void
+    {
+        $task->users()->attach($user->id, [
+            'role' => 'assignee',
+            'sort_order' => $sortOrder,
+        ]);
     }
 }
