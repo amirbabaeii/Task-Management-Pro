@@ -27,13 +27,25 @@ const props = defineProps({
 
 const normalizeTask = (task) => ({
     ...task,
-    progress: task.progress ?? 0,
+    progress: Number(task.progress ?? 0),
+    sort_order: Number(task.sort_order ?? 0),
 });
+
+const cloneTasks = (taskList) => taskList.map((task) => ({ ...task }));
+
+const sortTaskList = (taskList) =>
+    [...taskList].sort(
+        (left, right) =>
+            (left.sort_order ?? 0) - (right.sort_order ?? 0) ||
+            left.id - right.id,
+    );
 
 const tasks = ref(props.tasks.map(normalizeTask));
 const updatingId = ref(null);
 const draggedTaskId = ref(null);
 const dragOverStatus = ref(null);
+const dragOverTaskId = ref(null);
+const dragInsertPosition = ref('before');
 const showingCreateModal = ref(false);
 const showingDetailsModal = ref(false);
 const showingEditModal = ref(false);
@@ -209,8 +221,15 @@ const openEditFromDetails = () => {
 
 const isDraggingTask = (taskId) => draggedTaskId.value === taskId;
 
-const isDropTarget = (status) =>
-    draggedTaskId.value !== null && dragOverStatus.value === status;
+const isColumnDropTarget = (status) =>
+    draggedTaskId.value !== null &&
+    dragOverStatus.value === status &&
+    dragOverTaskId.value === null;
+
+const isTaskDropTarget = (taskId, position) =>
+    draggedTaskId.value !== null &&
+    dragOverTaskId.value === taskId &&
+    dragInsertPosition.value === position;
 
 const tasksByStatus = computed(() => {
     const grouped = {};
@@ -225,49 +244,132 @@ const tasksByStatus = computed(() => {
         grouped[task.status].push(task);
     });
 
+    Object.keys(grouped).forEach((status) => {
+        grouped[status] = sortTaskList(grouped[status]);
+    });
+
     return grouped;
 });
 
-const patchTask = async (task, field, value, routeName, fallbackMessage) => {
-    if (value === null || value === undefined || task[field] === value || updatingId.value) {
+const buildGroupedTasks = (taskList) => {
+    const grouped = {};
+
+    boardStatuses.value.forEach((status) => {
+        grouped[status] = [];
+    });
+
+    taskList.forEach((task) => {
+        if (!grouped[task.status]) {
+            grouped[task.status] = [];
+        }
+
+        grouped[task.status].push({ ...normalizeTask(task) });
+    });
+
+    Object.keys(grouped).forEach((status) => {
+        grouped[status] = sortTaskList(grouped[status]);
+    });
+
+    return grouped;
+};
+
+const flattenGroupedTasks = (grouped) => {
+    const orderedStatuses = [
+        ...boardStatuses.value,
+        ...Object.keys(grouped).filter(
+            (status) => !boardStatuses.value.includes(status),
+        ),
+    ];
+
+    return orderedStatuses.flatMap((status) => grouped[status] ?? []);
+};
+
+const applyTaskOrderUpdates = (orderUpdates) => {
+    if (!Array.isArray(orderUpdates) || !orderUpdates.length) {
         return;
     }
 
-    errorMessage.value = '';
-    updatingId.value = task.id;
-    const previousValue = task[field];
-    task[field] = value;
+    const updatesById = new Map(
+        orderUpdates.map((update) => [update.id, update]),
+    );
 
-    try {
-        const response = await axios.patch(route(routeName, task.id), {
-            [field]: value,
-        });
+    tasks.value = tasks.value.map((task) => {
+        const update = updatesById.get(task.id);
 
-        if (response?.data?.task?.[field] !== undefined) {
-            task[field] = response.data.task[field];
+        if (!update) {
+            return task;
         }
-    } catch (error) {
-        task[field] = previousValue;
-        errorMessage.value =
-            error?.response?.data?.message || fallbackMessage;
-    } finally {
-        updatingId.value = null;
-    }
+
+        return normalizeTask({
+            ...task,
+            status: update.status ?? task.status,
+            sort_order: update.sort_order ?? task.sort_order,
+        });
+    });
 };
 
-const updateStatus = async (task, nextStatus) => {
-    await patchTask(
-        task,
-        'status',
-        nextStatus,
-        'tasks.status',
-        'Unable to update task status. Please try again.',
+const moveTaskLocally = (taskId, destinationStatus, beforeTaskId = null) => {
+    const grouped = buildGroupedTasks(cloneTasks(tasks.value));
+    let movingTask = null;
+    let sourceStatus = null;
+
+    Object.keys(grouped).forEach((status) => {
+        grouped[status] = grouped[status].filter((task) => {
+            if (task.id !== taskId) {
+                return true;
+            }
+
+            movingTask = task;
+            sourceStatus = status;
+
+            return false;
+        });
+    });
+
+    if (!movingTask || !sourceStatus) {
+        return false;
+    }
+
+    if (!grouped[destinationStatus]) {
+        grouped[destinationStatus] = [];
+    }
+
+    movingTask.status = destinationStatus;
+
+    const destinationTasks = grouped[destinationStatus];
+    const insertAt = beforeTaskId === null
+        ? destinationTasks.length
+        : destinationTasks.findIndex((task) => task.id === beforeTaskId);
+
+    destinationTasks.splice(
+        insertAt === -1 ? destinationTasks.length : insertAt,
+        0,
+        movingTask,
     );
+
+    [sourceStatus, destinationStatus].forEach((status) => {
+        if (!grouped[status]) {
+            return;
+        }
+
+        grouped[status] = grouped[status].map((task, index) =>
+            normalizeTask({
+                ...task,
+                sort_order: index + 1,
+            }),
+        );
+    });
+
+    tasks.value = flattenGroupedTasks(grouped);
+
+    return true;
 };
 
 const resetDragState = () => {
     draggedTaskId.value = null;
     dragOverStatus.value = null;
+    dragOverTaskId.value = null;
+    dragInsertPosition.value = 'before';
 };
 
 const onTaskDragStart = (event, task) => {
@@ -278,6 +380,8 @@ const onTaskDragStart = (event, task) => {
 
     draggedTaskId.value = task.id;
     dragOverStatus.value = task.status;
+    dragOverTaskId.value = null;
+    dragInsertPosition.value = 'before';
 
     if (event.dataTransfer) {
         event.dataTransfer.effectAllowed = 'move';
@@ -296,10 +400,110 @@ const onColumnDragOver = (event, status) => {
 
     event.preventDefault();
     dragOverStatus.value = status;
+    dragOverTaskId.value = null;
+    dragInsertPosition.value = 'after';
 
     if (event.dataTransfer) {
         event.dataTransfer.dropEffect = 'move';
     }
+};
+
+const getBeforeTaskIdForDrop = (status, targetTaskId, position) => {
+    const destinationTasks = (tasksByStatus.value[status] ?? []).filter(
+        (task) => task.id !== draggedTaskId.value,
+    );
+    const targetIndex = destinationTasks.findIndex(
+        (task) => task.id === targetTaskId,
+    );
+
+    if (targetIndex === -1) {
+        return null;
+    }
+
+    if (position === 'before') {
+        return targetTaskId;
+    }
+
+    return destinationTasks[targetIndex + 1]?.id ?? null;
+};
+
+const reorderTask = async (task, destinationStatus, beforeTaskId = null) => {
+    if (updatingId.value) {
+        return;
+    }
+
+    if (!task) {
+        return;
+    }
+
+    errorMessage.value = '';
+    updatingId.value = task.id;
+    const previousTasks = cloneTasks(tasks.value);
+    const moved = moveTaskLocally(task.id, destinationStatus, beforeTaskId);
+
+    if (!moved) {
+        updatingId.value = null;
+        resetDragState();
+        return;
+    }
+
+    try {
+        const response = await axios.patch(route('tasks.reorder', task.id), {
+            status: destinationStatus,
+            before_id: beforeTaskId,
+        });
+
+        applyTaskOrderUpdates(response?.data?.orders);
+
+        if (response?.data?.task) {
+            applyTaskOrderUpdates([response.data.task]);
+        }
+    } catch (error) {
+        tasks.value = previousTasks.map(normalizeTask);
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to reorder task. Please try again.';
+    } finally {
+        updatingId.value = null;
+        resetDragState();
+    }
+};
+
+const onTaskDragOver = (event, task) => {
+    if (draggedTaskId.value === null || draggedTaskId.value === task.id) {
+        return;
+    }
+
+    event.preventDefault();
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const midpoint = bounds.top + bounds.height / 2;
+
+    dragOverStatus.value = task.status;
+    dragOverTaskId.value = task.id;
+    dragInsertPosition.value = event.clientY < midpoint ? 'before' : 'after';
+
+    if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move';
+    }
+};
+
+const onTaskDrop = async (task) => {
+    if (draggedTaskId.value === null || draggedTaskId.value === task.id) {
+        return;
+    }
+
+    const draggedTask = tasks.value.find(
+        (candidate) => candidate.id === draggedTaskId.value,
+    );
+
+    const beforeTaskId = getBeforeTaskIdForDrop(
+        task.status,
+        task.id,
+        dragInsertPosition.value,
+    );
+
+    await reorderTask(draggedTask, task.status, beforeTaskId);
 };
 
 const onColumnDrop = async (status) => {
@@ -311,13 +515,7 @@ const onColumnDrop = async (status) => {
         (candidate) => candidate.id === draggedTaskId.value,
     );
 
-    resetDragState();
-
-    if (!task) {
-        return;
-    }
-
-    await updateStatus(task, status);
+    await reorderTask(task, status, null);
 };
 
 const submitTask = () => {
@@ -352,7 +550,7 @@ const submitTaskUpdate = () => {
                         Task Board
                     </h2>
                     <p class="text-sm text-gray-500">
-                        Move tasks between statuses to keep work flowing.
+                        Drag tasks between columns and reorder them within each status.
                     </p>
                 </div>
                 <PrimaryButton @click="showingCreateModal = true">
@@ -369,7 +567,7 @@ const submitTaskUpdate = () => {
                             :key="status"
                             class="task-column flex flex-col rounded-lg border border-gray-200 bg-white shadow-sm transition"
                             :class="{
-                                'task-column--drop-target': isDropTarget(status),
+                                'task-column--drop-target': isColumnDropTarget(status),
                             }"
                             @dragover="onColumnDragOver($event, status)"
                             @drop.prevent="onColumnDrop(status)"
@@ -399,6 +597,8 @@ const submitTaskUpdate = () => {
                                     class="task-card rounded-md border border-gray-200 bg-gray-50 p-4 shadow-sm transition"
                                     :class="{
                                         'task-card--dragging': isDraggingTask(task.id),
+                                        'task-card--drop-before': isTaskDropTarget(task.id, 'before'),
+                                        'task-card--drop-after': isTaskDropTarget(task.id, 'after'),
                                     }"
                                     role="button"
                                     tabindex="0"
@@ -407,6 +607,8 @@ const submitTaskUpdate = () => {
                                     @keydown.enter.prevent="openTaskDetails(task)"
                                     @keydown.space.prevent="openTaskDetails(task)"
                                     @dragstart="onTaskDragStart($event, task)"
+                                    @dragover.stop="onTaskDragOver($event, task)"
+                                    @drop.stop.prevent="onTaskDrop(task)"
                                     @dragend="onTaskDragEnd"
                                 >
                                     <div
@@ -925,6 +1127,18 @@ const submitTaskUpdate = () => {
     opacity: 0.55;
     transform: rotate(1deg);
     cursor: grabbing;
+}
+
+.task-card--drop-before {
+    box-shadow:
+        inset 0 3px 0 rgb(31 41 55),
+        0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+.task-card--drop-after {
+    box-shadow:
+        inset 0 -3px 0 rgb(31 41 55),
+        0 1px 2px rgb(15 23 42 / 0.08);
 }
 
 .task-progress-slider {

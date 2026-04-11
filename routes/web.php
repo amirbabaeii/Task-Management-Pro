@@ -26,6 +26,8 @@ Route::middleware('auth')->group(function () {
         ->name('tasks.store');
     Route::patch('/tasks/{task}', [TaskBoardController::class, 'update'])
         ->name('tasks.update');
+    Route::patch('/tasks/{task}/reorder', [TaskBoardController::class, 'reorder'])
+        ->name('tasks.reorder');
     Route::patch('/tasks/{task}/status', [TaskBoardController::class, 'updateStatus'])
         ->name('tasks.status');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

@@ -63,7 +63,7 @@ class Task extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-            ->withPivot('role')
+            ->withPivot('role', 'sort_order')
             ->withTimestamps();
     }
 
@@ -73,7 +73,7 @@ class Task extends Model
     public function assignees(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-            ->withPivot('role')
+            ->withPivot('role', 'sort_order')
             ->withTimestamps()
             ->wherePivot('role', 'assignee');
     }
@@ -84,8 +84,8 @@ class Task extends Model
     public function reviewers(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-            ->withPivot('role')
+            ->withPivot('role', 'sort_order')
             ->withTimestamps()
             ->wherePivot('role', 'reviewer');
     }
-} 
+}

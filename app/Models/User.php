@@ -54,7 +54,7 @@ class User extends Authenticatable
     public function tasks(): BelongsToMany
     {
         return $this->belongsToMany(Task::class)
-            ->withPivot('role')
+            ->withPivot('role', 'sort_order')
             ->withTimestamps();
     }
 
@@ -64,7 +64,7 @@ class User extends Authenticatable
     public function assignedTasks(): BelongsToMany
     {
         return $this->belongsToMany(Task::class)
-            ->withPivot('role')
+            ->withPivot('role', 'sort_order')
             ->withTimestamps()
             ->wherePivot('role', 'assignee');
     }
@@ -75,7 +75,7 @@ class User extends Authenticatable
     public function reviewingTasks(): BelongsToMany
     {
         return $this->belongsToMany(Task::class)
-            ->withPivot('role')
+            ->withPivot('role', 'sort_order')
             ->withTimestamps()
             ->wherePivot('role', 'reviewer');
     }
