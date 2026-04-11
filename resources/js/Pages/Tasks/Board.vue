@@ -32,10 +32,8 @@ const normalizeTask = (task) => ({
 
 const tasks = ref(props.tasks.map(normalizeTask));
 const updatingId = ref(null);
-const progressDrafts = ref({});
 const draggedTaskId = ref(null);
 const dragOverStatus = ref(null);
-const dragBlockedTaskId = ref(null);
 const showingCreateModal = ref(false);
 const showingDetailsModal = ref(false);
 const showingEditModal = ref(false);
@@ -54,6 +52,7 @@ const blankTaskData = () => ({
     description: '',
     status: defaultStatus,
     priority: defaultPriority,
+    progress: 0,
     deadline_at: '',
 });
 
@@ -130,12 +129,6 @@ const formatDateTime = (value) => {
     }).format(date);
 };
 
-const getProgressValue = (task) => progressDrafts.value[task.id] ?? task.progress;
-
-const progressBarStyle = (task) => ({
-    '--task-progress': `${getProgressValue(task)}%`,
-});
-
 const activeTask = computed(() =>
     tasks.value.find((task) => task.id === selectedTaskId.value) ?? null,
 );
@@ -163,6 +156,7 @@ const setTaskFormValues = (taskForm, values = {}) => {
     taskForm.description = values.description ?? '';
     taskForm.status = values.status ?? defaultStatus;
     taskForm.priority = values.priority ?? defaultPriority;
+    taskForm.progress = values.progress ?? 0;
     taskForm.deadline_at = values.deadline_at ?? '';
 };
 
@@ -189,6 +183,7 @@ const openEditModal = (task) => {
         description: task.description ?? '',
         status: task.status,
         priority: task.priority,
+        progress: task.progress ?? 0,
         deadline_at: formatDateInput(task.deadline_at),
     });
     editForm.clearErrors();
@@ -275,20 +270,9 @@ const resetDragState = () => {
     dragOverStatus.value = null;
 };
 
-const blockTaskDrag = (taskId) => {
-    dragBlockedTaskId.value = taskId;
-};
-
-const clearTaskDragBlock = (taskId = null) => {
-    if (taskId === null || dragBlockedTaskId.value === taskId) {
-        dragBlockedTaskId.value = null;
-    }
-};
-
 const onTaskDragStart = (event, task) => {
-    if (updatingId.value || dragBlockedTaskId.value === task.id) {
+    if (updatingId.value) {
         event.preventDefault();
-        clearTaskDragBlock(task.id);
         return;
     }
 
@@ -302,7 +286,6 @@ const onTaskDragStart = (event, task) => {
 };
 
 const onTaskDragEnd = () => {
-    clearTaskDragBlock();
     resetDragState();
 };
 
@@ -335,74 +318,6 @@ const onColumnDrop = async (status) => {
     }
 
     await updateStatus(task, status);
-};
-
-const parseProgress = (value) => {
-    const parsed = Number.parseInt(value, 10);
-
-    if (Number.isNaN(parsed)) {
-        return null;
-    }
-
-    return Math.min(100, Math.max(0, parsed));
-};
-
-const clearProgressDraft = (taskId) => {
-    if (!(taskId in progressDrafts.value)) {
-        return;
-    }
-
-    const nextDrafts = { ...progressDrafts.value };
-    delete nextDrafts[taskId];
-    progressDrafts.value = nextDrafts;
-};
-
-const onProgressInput = (event, task) => {
-    const nextProgress = parseProgress(event.target.value);
-
-    if (nextProgress === null) {
-        return;
-    }
-
-    progressDrafts.value = {
-        ...progressDrafts.value,
-        [task.id]: nextProgress,
-    };
-};
-
-const updateProgress = async (task, nextProgress) => {
-    if (
-        nextProgress === null ||
-        nextProgress === undefined ||
-        task.progress === nextProgress ||
-        updatingId.value
-    ) {
-        clearProgressDraft(task.id);
-        return;
-    }
-
-    errorMessage.value = '';
-    updatingId.value = task.id;
-
-    try {
-        const response = await axios.patch(route('tasks.progress', task.id), {
-            progress: nextProgress,
-        });
-
-        task.progress = response?.data?.task?.progress ?? nextProgress;
-    } catch (error) {
-        errorMessage.value =
-            error?.response?.data?.message ||
-            'Unable to update task progress. Please try again.';
-    } finally {
-        clearProgressDraft(task.id);
-        updatingId.value = null;
-    }
-};
-
-const onProgressChange = (event, task) => {
-    updateProgress(task, getProgressValue(task));
-    clearTaskDragBlock(task.id);
 };
 
 const submitTask = () => {
@@ -517,39 +432,19 @@ const submitTaskUpdate = () => {
                                         </span>
                                     </div>
 
-                                    <div
-                                        class="mt-3"
-                                        data-no-drag
-                                        @pointerdown="blockTaskDrag(task.id)"
-                                        @pointerup="clearTaskDragBlock(task.id)"
-                                        @pointercancel="clearTaskDragBlock(task.id)"
-                                        @click.stop
-                                        @dragstart.prevent
-                                    >
-                                        <label
-                                            :for="`task-progress-${task.id}`"
-                                            class="sr-only"
+                                    <div class="mt-3">
+                                        <div
+                                            class="h-2 w-full rounded-full bg-gray-200"
                                         >
-                                            Progress
-                                        </label>
-                                        <input
-                                            :id="`task-progress-${task.id}`"
-                                            class="task-progress-slider block w-full"
-                                            type="range"
-                                            min="0"
-                                            max="100"
-                                            step="5"
-                                            :value="getProgressValue(task)"
-                                            :style="progressBarStyle(task)"
-                                            :disabled="updatingId === task.id"
-                                            @input="onProgressInput($event, task)"
-                                            @change="
-                                                onProgressChange($event, task)
-                                            "
-                                        />
+                                            <div
+                                                class="h-2 rounded-full bg-gray-800"
+                                                :style="{
+                                                    width: `${task.progress}%`,
+                                                }"
+                                            />
+                                        </div>
                                         <div class="mt-1 text-[10px] text-gray-500">
-                                            {{ getProgressValue(task) }}%
-                                            complete
+                                            {{ task.progress }}% complete
                                         </div>
                                     </div>
 
@@ -940,7 +835,35 @@ const submitTaskUpdate = () => {
                                 />
                             </div>
 
-                            <div>
+                            <div class="md:col-span-2">
+                                <InputLabel
+                                    for="edit-progress"
+                                    value="Progress"
+                                />
+                                <div class="mt-2">
+                                    <input
+                                        id="edit-progress"
+                                        v-model.number="editForm.progress"
+                                        class="task-progress-slider block w-full"
+                                        type="range"
+                                        min="0"
+                                        max="100"
+                                        step="5"
+                                        :style="{
+                                            '--task-progress': `${editForm.progress}%`,
+                                        }"
+                                    />
+                                    <div class="mt-1 text-sm text-gray-500">
+                                        {{ editForm.progress }}% complete
+                                    </div>
+                                </div>
+                                <InputError
+                                    class="mt-2"
+                                    :message="editForm.errors.progress"
+                                />
+                            </div>
+
+                            <div class="md:col-span-2">
                                 <InputLabel
                                     for="edit-deadline_at"
                                     value="Deadline"
@@ -1014,11 +937,6 @@ const submitTaskUpdate = () => {
     cursor: pointer;
 }
 
-.task-progress-slider:disabled {
-    cursor: not-allowed;
-    opacity: 0.7;
-}
-
 .task-progress-slider::-webkit-slider-runnable-track {
     height: 0.5rem;
     border-radius: 9999px;
@@ -1064,4 +982,5 @@ const submitTaskUpdate = () => {
     background: rgb(31 41 55);
     box-shadow: 0 1px 3px rgb(15 23 42 / 0.25);
 }
+
 </style>

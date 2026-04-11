@@ -33,6 +33,7 @@ class UpdateTaskRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:1000'],
             'status' => ['required', 'string', Rule::in(Task::STATUSES)],
             'priority' => ['required', 'string', Rule::in(Task::PRIORITIES)],
+            'progress' => ['required', 'integer', 'min:0', 'max:100'],
             'deadline_at' => ['nullable', 'date'],
         ];
     }
