@@ -625,39 +625,6 @@ const submitTaskUpdate = () => {
                         </div>
 
                         <div class="mt-6 space-y-6">
-                            <section class="space-y-2">
-                                <h4 class="text-sm font-semibold text-gray-900">
-                                    Description
-                                </h4>
-                                <p class="text-sm leading-6 text-gray-600">
-                                    {{
-                                        activeTask.description ||
-                                        'No description provided.'
-                                    }}
-                                </p>
-                            </section>
-
-                            <section class="space-y-3">
-                                <div class="flex items-center justify-between">
-                                    <h4 class="text-sm font-semibold text-gray-900">
-                                        Progress
-                                    </h4>
-                                    <span class="text-sm text-gray-500">
-                                        {{ activeTask.progress }}%
-                                    </span>
-                                </div>
-                                <div
-                                    class="h-2 w-full rounded-full bg-gray-200"
-                                >
-                                    <div
-                                        class="h-2 rounded-full bg-gray-800"
-                                        :style="{
-                                            width: `${activeTask.progress}%`,
-                                        }"
-                                    />
-                                </div>
-                            </section>
-
                             <section class="grid gap-4 sm:grid-cols-3">
                                 <div class="rounded-lg bg-gray-50 px-4 py-3">
                                     <div
@@ -694,6 +661,39 @@ const submitTaskUpdate = () => {
                                     <div class="mt-1 text-sm text-gray-700">
                                         #{{ activeTask.id }}
                                     </div>
+                                </div>
+                            </section>
+
+                            <section class="space-y-2">
+                                <h4 class="text-sm font-semibold text-gray-900">
+                                    Description
+                                </h4>
+                                <p class="text-sm leading-6 text-gray-600">
+                                    {{
+                                        activeTask.description ||
+                                        'No description provided.'
+                                    }}
+                                </p>
+                            </section>
+
+                            <section class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <h4 class="text-sm font-semibold text-gray-900">
+                                        Progress
+                                    </h4>
+                                    <span class="text-sm text-gray-500">
+                                        {{ activeTask.progress }}%
+                                    </span>
+                                </div>
+                                <div
+                                    class="h-2 w-full rounded-full bg-gray-200"
+                                >
+                                    <div
+                                        class="h-2 rounded-full bg-gray-800"
+                                        :style="{
+                                            width: `${activeTask.progress}%`,
+                                        }"
+                                    />
                                 </div>
                             </section>
                         </div>
