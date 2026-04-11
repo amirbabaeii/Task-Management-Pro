@@ -32,6 +32,7 @@ class TaskBoardController extends Controller
                 'priority',
                 'deadline_at',
                 'progress',
+                'created_at',
             ]);
 
         return Inertia::render('Tasks/Board', [

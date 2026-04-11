@@ -37,7 +37,9 @@ const draggedTaskId = ref(null);
 const dragOverStatus = ref(null);
 const dragBlockedTaskId = ref(null);
 const showingCreateModal = ref(false);
+const showingDetailsModal = ref(false);
 const showingEditModal = ref(false);
+const selectedTaskId = ref(null);
 const editingTaskId = ref(null);
 const errorMessage = ref('');
 const defaultStatus = props.statuses.includes('pending')
@@ -109,11 +111,34 @@ const formatDate = (value) => {
     }).format(date);
 };
 
+const formatDateTime = (value) => {
+    if (!value) {
+        return null;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    }).format(date);
+};
+
 const getProgressValue = (task) => progressDrafts.value[task.id] ?? task.progress;
 
 const progressBarStyle = (task) => ({
     '--task-progress': `${getProgressValue(task)}%`,
 });
+
+const activeTask = computed(() =>
+    tasks.value.find((task) => task.id === selectedTaskId.value) ?? null,
+);
 
 const formatDateInput = (value) => {
     if (!value) {
@@ -147,6 +172,16 @@ const closeCreateModal = () => {
     form.clearErrors();
 };
 
+const openTaskDetails = (task) => {
+    selectedTaskId.value = task.id;
+    showingDetailsModal.value = true;
+};
+
+const closeTaskDetails = () => {
+    showingDetailsModal.value = false;
+    selectedTaskId.value = null;
+};
+
 const openEditModal = (task) => {
     editingTaskId.value = task.id;
     setTaskFormValues(editForm, {
@@ -165,6 +200,16 @@ const closeEditModal = () => {
     editingTaskId.value = null;
     setTaskFormValues(editForm, blankTaskData());
     editForm.clearErrors();
+};
+
+const openEditFromDetails = () => {
+    if (!activeTask.value) {
+        return;
+    }
+
+    const task = activeTask.value;
+    closeTaskDetails();
+    openEditModal(task);
 };
 
 const isDraggingTask = (taskId) => draggedTaskId.value === taskId;
@@ -440,7 +485,12 @@ const submitTaskUpdate = () => {
                                     :class="{
                                         'task-card--dragging': isDraggingTask(task.id),
                                     }"
+                                    role="button"
+                                    tabindex="0"
                                     :draggable="updatingId !== task.id"
+                                    @click="openTaskDetails(task)"
+                                    @keydown.enter.prevent="openTaskDetails(task)"
+                                    @keydown.space.prevent="openTaskDetails(task)"
                                     @dragstart="onTaskDragStart($event, task)"
                                     @dragend="onTaskDragEnd"
                                 >
@@ -473,6 +523,7 @@ const submitTaskUpdate = () => {
                                         @pointerdown="blockTaskDrag(task.id)"
                                         @pointerup="clearTaskDragBlock(task.id)"
                                         @pointercancel="clearTaskDragBlock(task.id)"
+                                        @click.stop
                                         @dragstart.prevent
                                     >
                                         <label
@@ -515,7 +566,7 @@ const submitTaskUpdate = () => {
                                                 type="button"
                                                 class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
                                                 :disabled="updatingId === task.id"
-                                                @click="openEditModal(task)"
+                                                @click.stop="openEditModal(task)"
                                             >
                                                 Edit
                                             </button>
@@ -538,6 +589,116 @@ const submitTaskUpdate = () => {
                 >
                     {{ errorMessage }}
                 </p>
+
+                <Modal
+                    :show="showingDetailsModal"
+                    max-width="2xl"
+                    @close="closeTaskDetails"
+                >
+                    <div
+                        v-if="activeTask"
+                        class="p-6"
+                    >
+                        <div
+                            class="flex flex-col gap-4 border-b border-gray-100 pb-4 sm:flex-row sm:items-start sm:justify-between"
+                        >
+                            <div class="space-y-2">
+                                <h3 class="text-lg font-semibold text-gray-900">
+                                    {{ activeTask.title }}
+                                </h3>
+                                <div class="flex flex-wrap gap-2 text-xs">
+                                    <span
+                                        class="rounded-full bg-gray-100 px-2.5 py-1 font-semibold uppercase tracking-wide text-gray-700"
+                                    >
+                                        {{ formatStatus(activeTask.status) }}
+                                    </span>
+                                    <span
+                                        class="rounded-full bg-gray-100 px-2.5 py-1 font-semibold uppercase tracking-wide text-gray-700"
+                                    >
+                                        {{ formatPriority(activeTask.priority) }}
+                                    </span>
+                                </div>
+                            </div>
+                            <SecondaryButton @click="openEditFromDetails">
+                                Edit Task
+                            </SecondaryButton>
+                        </div>
+
+                        <div class="mt-6 space-y-6">
+                            <section class="space-y-2">
+                                <h4 class="text-sm font-semibold text-gray-900">
+                                    Description
+                                </h4>
+                                <p class="text-sm leading-6 text-gray-600">
+                                    {{
+                                        activeTask.description ||
+                                        'No description provided.'
+                                    }}
+                                </p>
+                            </section>
+
+                            <section class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <h4 class="text-sm font-semibold text-gray-900">
+                                        Progress
+                                    </h4>
+                                    <span class="text-sm text-gray-500">
+                                        {{ activeTask.progress }}%
+                                    </span>
+                                </div>
+                                <div
+                                    class="h-2 w-full rounded-full bg-gray-200"
+                                >
+                                    <div
+                                        class="h-2 rounded-full bg-gray-800"
+                                        :style="{
+                                            width: `${activeTask.progress}%`,
+                                        }"
+                                    />
+                                </div>
+                            </section>
+
+                            <section class="grid gap-4 sm:grid-cols-3">
+                                <div class="rounded-lg bg-gray-50 px-4 py-3">
+                                    <div
+                                        class="text-xs font-semibold uppercase tracking-wide text-gray-500"
+                                    >
+                                        Due Date
+                                    </div>
+                                    <div class="mt-1 text-sm text-gray-700">
+                                        {{
+                                            formatDate(activeTask.deadline_at) ||
+                                            'No deadline set'
+                                        }}
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 px-4 py-3">
+                                    <div
+                                        class="text-xs font-semibold uppercase tracking-wide text-gray-500"
+                                    >
+                                        Created At
+                                    </div>
+                                    <div class="mt-1 text-sm text-gray-700">
+                                        {{
+                                            formatDateTime(activeTask.created_at) ||
+                                            'Unavailable'
+                                        }}
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 px-4 py-3">
+                                    <div
+                                        class="text-xs font-semibold uppercase tracking-wide text-gray-500"
+                                    >
+                                        Task ID
+                                    </div>
+                                    <div class="mt-1 text-sm text-gray-700">
+                                        #{{ activeTask.id }}
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </Modal>
 
                 <Modal
                     :show="showingCreateModal"
@@ -830,6 +991,11 @@ const submitTaskUpdate = () => {
 
 .task-card {
     cursor: grab;
+}
+
+.task-card:focus-visible {
+    outline: 2px solid rgb(99 102 241);
+    outline-offset: 2px;
 }
 
 .task-card--dragging {
