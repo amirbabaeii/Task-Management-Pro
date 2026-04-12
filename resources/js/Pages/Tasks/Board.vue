@@ -105,6 +105,18 @@ const formatPriority = (priority) => {
     return `${priority.charAt(0).toUpperCase()}${priority.slice(1)}`;
 };
 
+const priorityBadgeClass = (priority) => {
+    if (priority === 'low') {
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    }
+
+    if (priority === 'high') {
+        return 'border-rose-200 bg-rose-50 text-rose-700';
+    }
+
+    return 'border-amber-200 bg-amber-50 text-amber-700';
+};
+
 const formatDate = (value) => {
     if (!value) {
         return null;
@@ -628,7 +640,8 @@ const submitTaskUpdate = () => {
                                             </p>
                                         </div>
                                         <span
-                                            class="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-700"
+                                            class="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                            :class="priorityBadgeClass(task.priority)"
                                         >
                                             {{ formatPriority(task.priority) }}
                                         </span>
@@ -710,7 +723,8 @@ const submitTaskUpdate = () => {
                                         {{ formatStatus(activeTask.status) }}
                                     </span>
                                     <span
-                                        class="rounded-full bg-gray-100 px-2.5 py-1 font-semibold uppercase tracking-wide text-gray-700"
+                                        class="rounded-full border px-2.5 py-1 font-semibold uppercase tracking-wide"
+                                        :class="priorityBadgeClass(activeTask.priority)"
                                     >
                                         {{ formatPriority(activeTask.priority) }}
                                     </span>
