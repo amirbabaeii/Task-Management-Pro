@@ -136,6 +136,28 @@ class TaskBoardTest extends TestCase
         );
     }
 
+    public function test_authenticated_user_can_update_a_board_column_label(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->patchJson(
+            route('tasks.status-labels.update', 'pending'),
+            ['label' => 'Backlog'],
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('status', 'pending')
+            ->assertJsonPath('label', 'Backlog')
+            ->assertJsonPath('status_labels.pending', 'Backlog');
+
+        $this->assertDatabaseHas('board_columns', [
+            'user_id' => $user->id,
+            'status' => 'pending',
+            'label' => 'Backlog',
+        ]);
+    }
+
     public function test_assignee_can_reorder_tasks_within_the_same_column(): void
     {
         $user = User::factory()->create();
@@ -270,6 +292,20 @@ class TaskBoardTest extends TestCase
                 'priority',
                 'progress',
             ]);
+    }
+
+    public function test_board_column_labels_require_valid_data(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->patchJson(
+            route('tasks.status-labels.update', 'blocked'),
+            ['label' => '   '],
+        );
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['status', 'label']);
     }
 
     private function attachAssignee(User $user, Task $task, int $sortOrder): void
