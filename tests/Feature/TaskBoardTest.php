@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BoardColumn;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -155,6 +156,63 @@ class TaskBoardTest extends TestCase
             'user_id' => $user->id,
             'status' => 'pending',
             'label' => 'Backlog',
+        ]);
+    }
+
+    public function test_authenticated_user_can_add_a_board_column(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post(route('tasks.columns.store'), [
+            'label' => 'Review',
+        ]);
+
+        $response
+            ->assertRedirect(route('tasks.board'))
+            ->assertSessionHasNoErrors();
+
+        $column = BoardColumn::query()
+            ->where('user_id', $user->id)
+            ->where('label', 'Review')
+            ->first();
+
+        $this->assertNotNull($column);
+        $this->assertSame(4, $column->position);
+        $this->assertStringStartsWith('column-', $column->status);
+    }
+
+    public function test_assignee_can_move_a_task_to_a_custom_board_column(): void
+    {
+        $user = User::factory()->create();
+        $task = Task::factory()->create([
+            'status' => 'pending',
+        ]);
+
+        BoardColumn::ensureDefaultsForUser($user);
+        $column = BoardColumn::query()->create([
+            'user_id' => $user->id,
+            'status' => 'column-review',
+            'label' => 'Review',
+            'position' => 4,
+        ]);
+
+        $task->users()->attach($user->id, [
+            'role' => 'assignee',
+        ]);
+
+        $response = $this->actingAs($user)->patchJson(
+            route('tasks.status', $task),
+            ['status' => $column->status],
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('task.id', $task->id)
+            ->assertJsonPath('task.status', $column->status);
+
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'status' => $column->status,
         ]);
     }
 
