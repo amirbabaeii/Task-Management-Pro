@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
@@ -18,6 +18,10 @@ const props = defineProps({
     statuses: {
         type: Array,
         default: () => [],
+    },
+    statusLabels: {
+        type: Object,
+        default: () => ({}),
     },
     priorities: {
         type: Array,
@@ -46,6 +50,10 @@ const draggedTaskId = ref(null);
 const dragOverStatus = ref(null);
 const dragOverTaskId = ref(null);
 const dragInsertPosition = ref('before');
+const editingStatusLabel = ref(null);
+const statusLabelDraft = ref('');
+const savingStatusLabel = ref(null);
+const statusLabelInput = ref(null);
 const showingCreateModal = ref(false);
 const showingDetailsModal = ref(false);
 const showingEditModal = ref(false);
@@ -71,17 +79,31 @@ const blankTaskData = () => ({
 const form = useForm(blankTaskData());
 const editForm = useForm(blankTaskData());
 
-const statusLabels = {
+const defaultStatusLabels = {
     pending: 'Pending',
     'in-progress': 'In Progress',
     completed: 'Completed',
 };
+const buildStatusLabels = (labels = {}) => ({
+    ...defaultStatusLabels,
+    ...Object.fromEntries(
+        Object.entries(labels)
+            .filter(
+                ([status, label]) =>
+                    boardStatuses.value.includes(status) &&
+                    typeof label === 'string' &&
+                    label.trim() !== '',
+            )
+            .map(([status, label]) => [status, label.trim()]),
+    ),
+});
 
 const boardStatuses = computed(() =>
     props.statuses.length
         ? props.statuses
         : ['pending', 'in-progress', 'completed'],
 );
+const boardStatusLabels = ref(buildStatusLabels(props.statusLabels));
 const priorityOptions = computed(() =>
     props.priorities.length
         ? props.priorities
@@ -95,7 +117,15 @@ watch(
     },
 );
 
-const formatStatus = (status) => statusLabels[status] ?? status;
+watch(
+    () => props.statusLabels,
+    (nextStatusLabels) => {
+        boardStatusLabels.value = buildStatusLabels(nextStatusLabels);
+    },
+);
+
+const formatStatus = (status) =>
+    boardStatusLabels.value[status] ?? defaultStatusLabels[status] ?? status;
 
 const formatPriority = (priority) => {
     if (!priority) {
@@ -188,6 +218,84 @@ const closeCreateModal = () => {
     showingCreateModal.value = false;
     setTaskFormValues(form, blankTaskData());
     form.clearErrors();
+};
+
+const setStatusLabelInput = (element) => {
+    statusLabelInput.value = element;
+};
+
+const cancelStatusLabelEdit = () => {
+    editingStatusLabel.value = null;
+    statusLabelDraft.value = '';
+};
+
+const startStatusLabelEdit = async (status) => {
+    if (savingStatusLabel.value) {
+        return;
+    }
+
+    editingStatusLabel.value = status;
+    statusLabelDraft.value = formatStatus(status);
+
+    await nextTick();
+
+    statusLabelInput.value?.focus();
+    statusLabelInput.value?.select();
+};
+
+const saveStatusLabel = async (status) => {
+    if (
+        editingStatusLabel.value !== status ||
+        savingStatusLabel.value === status
+    ) {
+        return;
+    }
+
+    const nextLabel = statusLabelDraft.value.trim();
+
+    if (!nextLabel) {
+        errorMessage.value = 'Column title cannot be empty.';
+        return;
+    }
+
+    if (nextLabel === formatStatus(status)) {
+        cancelStatusLabelEdit();
+        return;
+    }
+
+    errorMessage.value = '';
+    savingStatusLabel.value = status;
+
+    const previousLabels = { ...boardStatusLabels.value };
+    boardStatusLabels.value = {
+        ...boardStatusLabels.value,
+        [status]: nextLabel,
+    };
+
+    let shouldClose = false;
+
+    try {
+        const response = await axios.patch(
+            route('tasks.status-labels.update', status),
+            { label: nextLabel },
+        );
+
+        boardStatusLabels.value = buildStatusLabels(
+            response?.data?.status_labels,
+        );
+        shouldClose = true;
+    } catch (error) {
+        boardStatusLabels.value = previousLabels;
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to update column title. Please try again.';
+    } finally {
+        savingStatusLabel.value = null;
+
+        if (shouldClose) {
+            cancelStatusLabelEdit();
+        }
+    }
 };
 
 const openTaskDetails = (task) => {
@@ -587,9 +695,28 @@ const submitTaskUpdate = () => {
                             <div
                                 class="flex items-center justify-between border-b border-gray-100 px-4 py-3"
                             >
-                                <h3 class="text-sm font-semibold text-gray-700">
-                                    {{ formatStatus(status) }}
-                                </h3>
+                                <div class="min-w-0 flex-1 pr-3">
+                                    <input
+                                        v-if="editingStatusLabel === status"
+                                        :ref="setStatusLabelInput"
+                                        v-model="statusLabelDraft"
+                                        type="text"
+                                        maxlength="40"
+                                        class="block w-full rounded-md border-gray-300 px-2 py-1 text-sm font-semibold text-gray-700 shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                        @click.stop
+                                        @keydown.enter.prevent="saveStatusLabel(status)"
+                                        @keydown.esc.prevent="cancelStatusLabelEdit"
+                                        @blur="saveStatusLabel(status)"
+                                    />
+                                    <button
+                                        v-else
+                                        type="button"
+                                        class="block max-w-full truncate rounded-md px-2 py-1 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                        @click.stop="startStatusLabelEdit(status)"
+                                    >
+                                        {{ formatStatus(status) }}
+                                    </button>
+                                </div>
                                 <span
                                     class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
                                 >

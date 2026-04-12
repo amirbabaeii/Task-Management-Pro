@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BoardColumn;
 use App\Http\Requests\Tasks\ReorderTaskRequest;
 use App\Http\Requests\Tasks\StoreTaskRequest;
 use App\Http\Requests\Tasks\UpdateTaskRequest;
@@ -23,6 +24,7 @@ class TaskBoardController extends Controller
         return Inertia::render('Tasks/Board', [
             'tasks' => $this->boardTasksForUser($request->user()),
             'statuses' => Task::STATUSES,
+            'statusLabels' => $this->statusLabelsForUser($request->user()),
             'priorities' => Task::PRIORITIES,
         ]);
     }
@@ -160,6 +162,45 @@ class TaskBoardController extends Controller
         ]);
     }
 
+    public function updateStatusLabel(Request $request, string $status): JsonResponse
+    {
+        $validated = validator(
+            [
+                'status' => $status,
+                'label' => trim((string) $request->input('label')),
+            ],
+            [
+                'status' => ['required', 'string', Rule::in(Task::STATUSES)],
+                'label' => ['required', 'string', 'max:40'],
+            ],
+        )->validate();
+
+        $user = $request->user();
+        $defaultLabels = $this->defaultStatusLabels();
+
+        if ($validated['label'] === $defaultLabels[$validated['status']]) {
+            $user->boardColumns()
+                ->where('status', $validated['status'])
+                ->delete();
+        } else {
+            BoardColumn::query()->updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'status' => $validated['status'],
+                ],
+                [
+                    'label' => $validated['label'],
+                ],
+            );
+        }
+
+        return response()->json([
+            'status' => $validated['status'],
+            'label' => $validated['label'],
+            'status_labels' => $this->statusLabelsForUser($user->fresh()),
+        ]);
+    }
+
     private function boardTasksForUser(User $user): array
     {
         return $user->assignedTasks()
@@ -191,6 +232,28 @@ class TaskBoardController extends Controller
             })
             ->values()
             ->all();
+    }
+
+    private function statusLabelsForUser(User $user): array
+    {
+        $defaultLabels = $this->defaultStatusLabels();
+        $customLabels = $user->boardColumns()
+            ->whereIn('status', Task::STATUSES)
+            ->pluck('label', 'status')
+            ->map(fn (string $label): string => trim($label))
+            ->filter()
+            ->all();
+
+        return array_replace($defaultLabels, $customLabels);
+    }
+
+    private function defaultStatusLabels(): array
+    {
+        return [
+            'pending' => 'Pending',
+            'in-progress' => 'In Progress',
+            'completed' => 'Completed',
+        ];
     }
 
     private function moveTaskToStatusForAssignees(
