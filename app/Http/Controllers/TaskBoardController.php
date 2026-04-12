@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -21,10 +22,12 @@ class TaskBoardController extends Controller
 {
     public function index(Request $request): Response
     {
+        $user = $request->user();
+
         return Inertia::render('Tasks/Board', [
-            'tasks' => $this->boardTasksForUser($request->user()),
-            'statuses' => Task::STATUSES,
-            'statusLabels' => $this->statusLabelsForUser($request->user()),
+            'tasks' => $this->boardTasksForUser($user),
+            'statuses' => BoardColumn::statusesForUser($user),
+            'statusLabels' => $this->statusLabelsForUser($user),
             'priorities' => Task::PRIORITIES,
         ]);
     }
@@ -49,12 +52,34 @@ class TaskBoardController extends Controller
         return redirect()->route('tasks.board');
     }
 
+    public function storeColumn(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $validated = validator(
+            [
+                'label' => trim((string) $request->input('label')),
+            ],
+            [
+                'label' => ['required', 'string', 'max:40'],
+            ],
+        )->validate();
+
+        BoardColumn::query()->create([
+            'user_id' => $user->id,
+            'status' => 'column-'.Str::lower((string) Str::ulid()),
+            'label' => $validated['label'],
+            'position' => BoardColumn::nextPositionForUser($user),
+        ]);
+
+        return redirect()->route('tasks.board');
+    }
+
     public function update(UpdateTaskRequest $request, Task $task): RedirectResponse
     {
         $validated = $request->validated();
         $originalStatus = $task->status;
 
-        DB::transaction(function () use ($task, $validated, $originalStatus): void {
+        DB::transaction(function () use ($request, $task, $validated, $originalStatus): void {
             $task->fill($validated);
             $task->save();
 
@@ -63,6 +88,7 @@ class TaskBoardController extends Controller
                     $task,
                     $originalStatus,
                     $task->status,
+                    $request->user()->id,
                 );
             }
         });
@@ -109,6 +135,7 @@ class TaskBoardController extends Controller
                     $task,
                     $sourceStatus,
                     $destinationStatus,
+                    $user->id,
                 );
             }
 
@@ -134,13 +161,13 @@ class TaskBoardController extends Controller
         $this->authorize('update', $task);
 
         $validated = $request->validate([
-            'status' => ['required', 'string', Rule::in(Task::STATUSES)],
+            'status' => ['required', 'string', Rule::in(BoardColumn::statusesForUser($request->user()))],
         ]);
 
         $originalStatus = $task->status;
         $destinationStatus = $validated['status'];
 
-        DB::transaction(function () use ($task, $originalStatus, $destinationStatus): void {
+        DB::transaction(function () use ($request, $task, $originalStatus, $destinationStatus): void {
             $task->status = $destinationStatus;
             $task->save();
 
@@ -149,6 +176,7 @@ class TaskBoardController extends Controller
                     $task,
                     $originalStatus,
                     $destinationStatus,
+                    $request->user()->id,
                 );
             }
         });
@@ -170,29 +198,17 @@ class TaskBoardController extends Controller
                 'label' => trim((string) $request->input('label')),
             ],
             [
-                'status' => ['required', 'string', Rule::in(Task::STATUSES)],
+                'status' => ['required', 'string', Rule::in(BoardColumn::statusesForUser($request->user()))],
                 'label' => ['required', 'string', 'max:40'],
             ],
         )->validate();
 
         $user = $request->user();
-        $defaultLabels = $this->defaultStatusLabels();
-
-        if ($validated['label'] === $defaultLabels[$validated['status']]) {
-            $user->boardColumns()
-                ->where('status', $validated['status'])
-                ->delete();
-        } else {
-            BoardColumn::query()->updateOrCreate(
-                [
-                    'user_id' => $user->id,
-                    'status' => $validated['status'],
-                ],
-                [
-                    'label' => $validated['label'],
-                ],
-            );
-        }
+        $user->boardColumns()
+            ->where('status', $validated['status'])
+            ->update([
+                'label' => $validated['label'],
+            ]);
 
         return response()->json([
             'status' => $validated['status'],
@@ -236,30 +252,14 @@ class TaskBoardController extends Controller
 
     private function statusLabelsForUser(User $user): array
     {
-        $defaultLabels = $this->defaultStatusLabels();
-        $customLabels = $user->boardColumns()
-            ->whereIn('status', Task::STATUSES)
-            ->pluck('label', 'status')
-            ->map(fn (string $label): string => trim($label))
-            ->filter()
-            ->all();
-
-        return array_replace($defaultLabels, $customLabels);
-    }
-
-    private function defaultStatusLabels(): array
-    {
-        return [
-            'pending' => 'Pending',
-            'in-progress' => 'In Progress',
-            'completed' => 'Completed',
-        ];
+        return BoardColumn::labelsForUser($user);
     }
 
     private function moveTaskToStatusForAssignees(
         Task $task,
         string $sourceStatus,
         string $destinationStatus,
+        int $sourceUserId,
     ): void {
         $userIds = DB::table('task_user')
             ->where('task_id', $task->id)
@@ -271,6 +271,12 @@ class TaskBoardController extends Controller
                 (int) $userId,
                 $sourceStatus,
                 $task->id,
+            );
+
+            $this->ensureBoardColumnForUserStatus(
+                (int) $userId,
+                $destinationStatus,
+                $sourceUserId,
             );
 
             $destinationTaskIds = $this->assignedTaskIdsForStatus(
@@ -425,5 +431,38 @@ class TaskBoardController extends Controller
             ->where('tasks.id', $taskId)
             ->where('tasks.status', $status)
             ->exists();
+    }
+
+    private function ensureBoardColumnForUserStatus(
+        int $userId,
+        string $status,
+        int $sourceUserId,
+    ): void {
+        $exists = BoardColumn::query()
+            ->where('user_id', $userId)
+            ->where('status', $status)
+            ->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        $sourceUser = User::query()->findOrFail($sourceUserId);
+        $label = $sourceUser->boardColumns()
+            ->where('status', $status)
+            ->value('label')
+            ?? BoardColumn::query()
+                ->where('status', $status)
+                ->value('label')
+            ?? (string) Str::of($status)->replace('-', ' ')->title();
+
+        $targetUser = User::query()->findOrFail($userId);
+
+        BoardColumn::query()->create([
+            'user_id' => $userId,
+            'status' => $status,
+            'label' => trim((string) $label),
+            'position' => BoardColumn::nextPositionForUser($targetUser),
+        ]);
     }
 }

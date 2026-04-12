@@ -36,7 +36,7 @@ class Task extends Model
 
 
     /**
-     * Valid status values for the task.
+     * Default status values available on new boards.
      *
      * @var array<string>
      */

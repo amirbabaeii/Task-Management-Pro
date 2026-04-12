@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\BoardColumn;
 use App\Models\Task;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,7 +27,7 @@ class StoreTaskRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'status' => ['nullable', 'string', Rule::in(Task::STATUSES)],
+            'status' => ['nullable', 'string', Rule::in(BoardColumn::statusesForUser($this->user()))],
             'priority' => ['nullable', 'string', Rule::in(Task::PRIORITIES)],
         ];
     }

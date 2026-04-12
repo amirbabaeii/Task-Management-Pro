@@ -54,6 +54,7 @@ const editingStatusLabel = ref(null);
 const statusLabelDraft = ref('');
 const savingStatusLabel = ref(null);
 const statusLabelInput = ref(null);
+const showingColumnModal = ref(false);
 const showingCreateModal = ref(false);
 const showingDetailsModal = ref(false);
 const showingEditModal = ref(false);
@@ -78,6 +79,9 @@ const blankTaskData = () => ({
 
 const form = useForm(blankTaskData());
 const editForm = useForm(blankTaskData());
+const columnForm = useForm({
+    label: '',
+});
 
 const defaultStatusLabels = {
     pending: 'Pending',
@@ -218,6 +222,12 @@ const closeCreateModal = () => {
     showingCreateModal.value = false;
     setTaskFormValues(form, blankTaskData());
     form.clearErrors();
+};
+
+const closeColumnModal = () => {
+    showingColumnModal.value = false;
+    columnForm.reset();
+    columnForm.clearErrors();
 };
 
 const setStatusLabelInput = (element) => {
@@ -645,6 +655,13 @@ const submitTask = () => {
     });
 };
 
+const submitColumn = () => {
+    columnForm.post(route('tasks.columns.store'), {
+        preserveScroll: true,
+        onSuccess: () => closeColumnModal(),
+    });
+};
+
 const submitTaskUpdate = () => {
     if (!editingTaskId.value) {
         return;
@@ -673,19 +690,25 @@ const submitTaskUpdate = () => {
                         Drag tasks between columns and reorder them within each status.
                     </p>
                 </div>
-                <PrimaryButton @click="showingCreateModal = true">
-                    New Task
-                </PrimaryButton>
+                <div class="flex items-center gap-3">
+                    <SecondaryButton @click="showingColumnModal = true">
+                        Add Column
+                    </SecondaryButton>
+                    <PrimaryButton @click="showingCreateModal = true">
+                        New Task
+                    </PrimaryButton>
+                </div>
             </div>
         </template>
 
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="grid gap-6 lg:grid-cols-3">
+        <div class="min-h-[calc(100vh-9rem)] py-8">
+            <div class="w-full px-4 sm:px-6 lg:px-8">
+                <div class="h-full overflow-x-auto overflow-y-hidden pb-2">
+                    <div class="flex min-h-[calc(100vh-13rem)] w-max min-w-full items-stretch justify-center gap-6">
                         <section
                             v-for="status in boardStatuses"
                             :key="status"
-                            class="task-column flex flex-col rounded-lg border border-gray-200 bg-white shadow-sm transition"
+                            class="task-column flex h-full w-80 min-w-80 shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm transition"
                             :class="{
                                 'task-column--drop-target': isColumnDropTarget(status),
                             }"
@@ -818,6 +841,7 @@ const submitTaskUpdate = () => {
                                 </article>
                             </div>
                         </section>
+                    </div>
                 </div>
 
                 <p
@@ -826,6 +850,70 @@ const submitTaskUpdate = () => {
                 >
                     {{ errorMessage }}
                 </p>
+
+                <Modal
+                    :show="showingColumnModal"
+                    max-width="lg"
+                    @close="closeColumnModal"
+                >
+                    <div class="p-6">
+                        <div
+                            class="flex flex-col gap-1 border-b border-gray-100 pb-4"
+                        >
+                            <h3 class="text-lg font-semibold text-gray-900">
+                                Add a board column
+                            </h3>
+                            <p class="text-sm text-gray-500">
+                                Create a new status column for this board.
+                            </p>
+                        </div>
+
+                        <form
+                            class="mt-6 space-y-4"
+                            @submit.prevent="submitColumn"
+                        >
+                            <div>
+                                <InputLabel
+                                    for="column-label"
+                                    value="Column Title"
+                                />
+                                <TextInput
+                                    id="column-label"
+                                    v-model="columnForm.label"
+                                    type="text"
+                                    class="mt-1 block w-full"
+                                    required
+                                    maxlength="40"
+                                    autocomplete="off"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="columnForm.errors.label"
+                                />
+                            </div>
+
+                            <div
+                                class="flex items-center justify-end gap-3 pt-2"
+                            >
+                                <SecondaryButton @click="closeColumnModal">
+                                    Cancel
+                                </SecondaryButton>
+                                <PrimaryButton
+                                    :class="{
+                                        'opacity-25': columnForm.processing,
+                                    }"
+                                    :disabled="columnForm.processing"
+                                >
+                                    {{
+                                        columnForm.processing
+                                            ? 'Adding...'
+                                            : 'Add Column'
+                                    }}
+                                </PrimaryButton>
+                            </div>
+                        </form>
+                    </div>
+                </Modal>
 
                 <Modal
                     :show="showingDetailsModal"

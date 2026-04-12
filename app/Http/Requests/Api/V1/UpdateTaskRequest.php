@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\BoardColumn;
 use App\Models\Task;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -27,7 +28,7 @@ class UpdateTaskRequest extends FormRequest
         return [
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
-            'status' => ['sometimes', 'required', 'string', Rule::in(Task::STATUSES)],
+            'status' => ['sometimes', 'required', 'string', Rule::in(BoardColumn::statusesForUser($this->user()))],
             'progress' => ['sometimes', 'integer', 'min:0', 'max:100'],
             'deadline_at' => ['sometimes', 'nullable', 'date'],
             'priority' => ['sometimes', 'required', 'string', Rule::in(Task::PRIORITIES)],
