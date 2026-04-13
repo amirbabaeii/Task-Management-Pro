@@ -11,6 +11,10 @@ import TextInput from '@/Components/TextInput.vue';
 import axios from 'axios';
 
 const props = defineProps({
+    currentBoard: {
+        type: Object,
+        default: null,
+    },
     tasks: {
         type: Array,
         default: () => [],
@@ -111,6 +115,8 @@ const buildStatusLabels = (labels = {}) => ({
 });
 
 const boardStatusLabels = ref(buildStatusLabels(props.statusLabels));
+const currentBoardId = computed(() => props.currentBoard?.id ?? null);
+const currentBoardName = computed(() => props.currentBoard?.name ?? 'Task Board');
 const priorityOptions = computed(() =>
     props.priorities.length
         ? props.priorities
@@ -297,7 +303,10 @@ const saveStatusLabel = async (status) => {
 
     try {
         const response = await axios.patch(
-            route('tasks.status-labels.update', status),
+            route('tasks.status-labels.update', {
+                board: currentBoardId.value,
+                status,
+            }),
             { label: nextLabel },
         );
 
@@ -401,7 +410,10 @@ const reorderBoardColumn = async (status, beforeStatus = null) => {
 
     try {
         const response = await axios.patch(
-            route('tasks.columns.reorder', status),
+            route('tasks.columns.reorder', {
+                board: currentBoardId.value,
+                status,
+            }),
             { before_status: beforeStatus },
         );
 
@@ -783,10 +795,16 @@ const reorderTask = async (task, destinationStatus, beforeTaskId = null) => {
     }
 
     try {
-        const response = await axios.patch(route('tasks.reorder', task.id), {
-            status: destinationStatus,
-            before_id: beforeTaskId,
-        });
+        const response = await axios.patch(
+            route('tasks.reorder', {
+                board: currentBoardId.value,
+                task: task.id,
+            }),
+            {
+                status: destinationStatus,
+                before_id: beforeTaskId,
+            },
+        );
 
         applyTaskOrderUpdates(response?.data?.orders);
 
@@ -854,14 +872,14 @@ const onColumnDrop = async (status) => {
 };
 
 const submitTask = () => {
-    form.post(route('tasks.store'), {
+    form.post(route('tasks.store', { board: currentBoardId.value }), {
         preserveScroll: true,
         onSuccess: () => closeCreateModal(),
     });
 };
 
 const submitColumn = () => {
-    columnForm.post(route('tasks.columns.store'), {
+    columnForm.post(route('tasks.columns.store', { board: currentBoardId.value }), {
         preserveScroll: true,
         onSuccess: () => closeColumnModal(),
     });
@@ -872,7 +890,10 @@ const submitTaskUpdate = () => {
         return;
     }
 
-    editForm.patch(route('tasks.update', editingTaskId.value), {
+    editForm.patch(route('tasks.update', {
+        board: currentBoardId.value,
+        task: editingTaskId.value,
+    }), {
         preserveScroll: true,
         onSuccess: () => closeEditModal(),
     });
@@ -880,7 +901,7 @@ const submitTaskUpdate = () => {
 </script>
 
 <template>
-    <Head title="Task Board" />
+    <Head :title="`${currentBoardName} - Task Board`" />
 
     <AuthenticatedLayout>
         <template #header>
@@ -889,13 +910,13 @@ const submitTaskUpdate = () => {
             >
                 <div class="space-y-1">
                     <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                        Task Board
+                        {{ currentBoardName }}
                     </h2>
                     <p class="text-sm text-gray-500">
                         Drag tasks between columns and reorder them within each status.
                     </p>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                     <SecondaryButton @click="showingColumnModal = true">
                         Add Column
                     </SecondaryButton>

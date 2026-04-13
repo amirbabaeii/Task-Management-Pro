@@ -20,21 +20,23 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/tasks/board', [TaskBoardController::class, 'index'])
+    Route::get('/tasks/board/{board?}', [TaskBoardController::class, 'index'])
         ->name('tasks.board');
-    Route::post('/tasks', [TaskBoardController::class, 'store'])
+    Route::post('/boards', [TaskBoardController::class, 'storeBoard'])
+        ->name('boards.store');
+    Route::post('/tasks/board/{board}/tasks', [TaskBoardController::class, 'store'])
         ->name('tasks.store');
-    Route::post('/tasks/board/columns', [TaskBoardController::class, 'storeColumn'])
+    Route::post('/tasks/board/{board}/columns', [TaskBoardController::class, 'storeColumn'])
         ->name('tasks.columns.store');
-    Route::patch('/tasks/board/columns/{status}/reorder', [TaskBoardController::class, 'reorderColumn'])
+    Route::patch('/tasks/board/{board}/columns/{status}/reorder', [TaskBoardController::class, 'reorderColumn'])
         ->name('tasks.columns.reorder');
-    Route::patch('/tasks/board/status-labels/{status}', [TaskBoardController::class, 'updateStatusLabel'])
+    Route::patch('/tasks/board/{board}/status-labels/{status}', [TaskBoardController::class, 'updateStatusLabel'])
         ->name('tasks.status-labels.update');
-    Route::patch('/tasks/{task}', [TaskBoardController::class, 'update'])
+    Route::patch('/tasks/board/{board}/tasks/{task}', [TaskBoardController::class, 'update'])
         ->name('tasks.update');
-    Route::patch('/tasks/{task}/reorder', [TaskBoardController::class, 'reorder'])
+    Route::patch('/tasks/board/{board}/tasks/{task}/reorder', [TaskBoardController::class, 'reorder'])
         ->name('tasks.reorder');
-    Route::patch('/tasks/{task}/status', [TaskBoardController::class, 'updateStatus'])
+    Route::patch('/tasks/board/{board}/tasks/{task}/status', [TaskBoardController::class, 'updateStatus'])
         ->name('tasks.status');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

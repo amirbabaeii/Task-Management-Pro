@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BoardColumn;
 use App\Http\Requests\Tasks\ReorderTaskRequest;
 use App\Http\Requests\Tasks\StoreTaskRequest;
 use App\Http\Requests\Tasks\UpdateTaskRequest;
+use App\Models\Board;
+use App\Models\BoardColumn;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -20,41 +21,72 @@ use Inertia\Response;
 
 class TaskBoardController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, ?Board $board = null): Response
     {
         $user = $request->user();
+        $board = $this->resolveBoard($user, $board);
 
         return Inertia::render('Tasks/Board', [
-            'tasks' => $this->boardTasksForUser($user),
-            'statuses' => BoardColumn::statusesForUser($user),
-            'statusLabels' => $this->statusLabelsForUser($user),
+            'boards' => $this->boardListForUser($user),
+            'currentBoard' => [
+                'id' => $board->id,
+                'name' => $board->name,
+            ],
+            'tasks' => $this->boardTasksForUser($user, $board),
+            'statuses' => BoardColumn::statusesForBoard($board),
+            'statusLabels' => $this->statusLabelsForBoard($board),
             'priorities' => Task::PRIORITIES,
         ]);
     }
 
-    public function store(StoreTaskRequest $request): RedirectResponse
+    public function storeBoard(Request $request): RedirectResponse
     {
         $user = $request->user();
+        $validated = validator(
+            [
+                'name' => trim((string) $request->input('name')),
+            ],
+            [
+                'name' => ['required', 'string', 'max:100'],
+            ],
+        )->validate();
+
+        $board = $user->boards()->create([
+            'name' => $validated['name'],
+            'position' => Board::nextPositionForUser($user),
+        ]);
+
+        BoardColumn::ensureDefaultsForBoard($board);
+
+        return redirect()->route('tasks.board', ['board' => $board]);
+    }
+
+    public function store(StoreTaskRequest $request, Board $board): RedirectResponse
+    {
+        $user = $request->user();
+        $board = $this->resolveBoard($user, $board);
         $validated = $request->validated();
 
-        DB::transaction(function () use ($user, $validated): void {
+        DB::transaction(function () use ($user, $board, $validated): void {
             $task = Task::create($validated);
 
             $task->users()->attach($user->id, [
+                'board_id' => $board->id,
                 'role' => 'assignee',
                 'sort_order' => $this->nextSortOrderForUserStatus(
                     $user->id,
+                    $board->id,
                     $task->status,
                 ),
             ]);
         });
 
-        return redirect()->route('tasks.board');
+        return redirect()->route('tasks.board', ['board' => $board]);
     }
 
-    public function storeColumn(Request $request): RedirectResponse
+    public function storeColumn(Request $request, Board $board): RedirectResponse
     {
-        $user = $request->user();
+        $board = $this->resolveBoard($request->user(), $board);
         $validated = validator(
             [
                 'label' => trim((string) $request->input('label')),
@@ -65,19 +97,23 @@ class TaskBoardController extends Controller
         )->validate();
 
         BoardColumn::query()->create([
-            'user_id' => $user->id,
+            'user_id' => $board->user_id,
+            'board_id' => $board->id,
             'status' => 'column-'.Str::lower((string) Str::ulid()),
             'label' => $validated['label'],
-            'position' => BoardColumn::nextPositionForUser($user),
+            'position' => BoardColumn::nextPositionForBoard($board),
         ]);
 
-        return redirect()->route('tasks.board');
+        return redirect()->route('tasks.board', ['board' => $board]);
     }
 
-    public function reorderColumn(Request $request, string $status): JsonResponse
-    {
-        $user = $request->user();
-        $availableStatuses = BoardColumn::statusesForUser($user);
+    public function reorderColumn(
+        Request $request,
+        Board $board,
+        string $status,
+    ): JsonResponse {
+        $board = $this->resolveBoard($request->user(), $board);
+        $availableStatuses = BoardColumn::statusesForBoard($board);
 
         $validated = validator(
             [
@@ -112,20 +148,31 @@ class TaskBoardController extends Controller
 
         array_splice($reorderedStatuses, $insertAt, 0, [$validated['status']]);
 
-        BoardColumn::syncOrderForUser($user, $reorderedStatuses);
+        BoardColumn::syncOrderForBoard($board, $reorderedStatuses);
 
         return response()->json([
-            'statuses' => BoardColumn::statusesForUser($user->fresh()),
-            'status_labels' => $this->statusLabelsForUser($user->fresh()),
+            'statuses' => BoardColumn::statusesForBoard($board->fresh()),
+            'status_labels' => $this->statusLabelsForBoard($board->fresh()),
         ]);
     }
 
-    public function update(UpdateTaskRequest $request, Task $task): RedirectResponse
-    {
+    public function update(
+        UpdateTaskRequest $request,
+        Board $board,
+        Task $task,
+    ): RedirectResponse {
+        $board = $this->resolveBoard($request->user(), $board);
+        $this->ensureTaskIsOnBoardForUser($request->user(), $board, $task);
+
         $validated = $request->validated();
         $originalStatus = $task->status;
 
-        DB::transaction(function () use ($request, $task, $validated, $originalStatus): void {
+        DB::transaction(function () use (
+            $board,
+            $task,
+            $validated,
+            $originalStatus,
+        ): void {
             $task->fill($validated);
             $task->save();
 
@@ -134,17 +181,23 @@ class TaskBoardController extends Controller
                     $task,
                     $originalStatus,
                     $task->status,
-                    $request->user()->id,
+                    $board->id,
                 );
             }
         });
 
-        return redirect()->route('tasks.board');
+        return redirect()->route('tasks.board', ['board' => $board]);
     }
 
-    public function reorder(ReorderTaskRequest $request, Task $task): JsonResponse
-    {
+    public function reorder(
+        ReorderTaskRequest $request,
+        Board $board,
+        Task $task,
+    ): JsonResponse {
         $user = $request->user();
+        $board = $this->resolveBoard($user, $board);
+        $this->ensureTaskIsOnBoardForUser($user, $board, $task);
+
         $validated = $request->validated();
         $destinationStatus = $validated['status'];
         $beforeTaskId = $validated['before_id'] ?? null;
@@ -158,6 +211,7 @@ class TaskBoardController extends Controller
 
         if ($beforeTaskId !== null && !$this->userHasTaskInStatus(
             $user->id,
+            $board->id,
             $beforeTaskId,
             $destinationStatus,
         )) {
@@ -168,6 +222,7 @@ class TaskBoardController extends Controller
 
         DB::transaction(function () use (
             $user,
+            $board,
             $task,
             $sourceStatus,
             $destinationStatus,
@@ -181,12 +236,13 @@ class TaskBoardController extends Controller
                     $task,
                     $sourceStatus,
                     $destinationStatus,
-                    $user->id,
+                    $board->id,
                 );
             }
 
             $this->reorderTaskForUser(
                 $user->id,
+                $board->id,
                 $task,
                 $destinationStatus,
                 $beforeTaskId,
@@ -194,26 +250,37 @@ class TaskBoardController extends Controller
         });
 
         return response()->json([
-            'task' => $this->taskPayloadForUser($task->fresh(), $user->id),
-            'orders' => $this->userTaskOrderPayload($user->id, [
+            'task' => $this->taskPayloadForUser($task->fresh(), $user->id, $board->id),
+            'orders' => $this->userTaskOrderPayload($user->id, $board->id, [
                 $sourceStatus,
                 $destinationStatus,
             ]),
         ]);
     }
 
-    public function updateStatus(Request $request, Task $task): JsonResponse
-    {
+    public function updateStatus(
+        Request $request,
+        Board $board,
+        Task $task,
+    ): JsonResponse {
         $this->authorize('update', $task);
 
+        $board = $this->resolveBoard($request->user(), $board);
+        $this->ensureTaskIsOnBoardForUser($request->user(), $board, $task);
+
         $validated = $request->validate([
-            'status' => ['required', 'string', Rule::in(BoardColumn::statusesForUser($request->user()))],
+            'status' => ['required', 'string', Rule::in(BoardColumn::statusesForBoard($board))],
         ]);
 
         $originalStatus = $task->status;
         $destinationStatus = $validated['status'];
 
-        DB::transaction(function () use ($request, $task, $originalStatus, $destinationStatus): void {
+        DB::transaction(function () use (
+            $board,
+            $task,
+            $originalStatus,
+            $destinationStatus,
+        ): void {
             $task->status = $destinationStatus;
             $task->save();
 
@@ -222,35 +289,43 @@ class TaskBoardController extends Controller
                     $task,
                     $originalStatus,
                     $destinationStatus,
-                    $request->user()->id,
+                    $board->id,
                 );
             }
         });
 
         return response()->json([
-            'task' => $this->taskPayloadForUser($task->fresh(), $request->user()->id),
-            'orders' => $this->userTaskOrderPayload($request->user()->id, [
-                $originalStatus,
-                $destinationStatus,
-            ]),
+            'task' => $this->taskPayloadForUser(
+                $task->fresh(),
+                $request->user()->id,
+                $board->id,
+            ),
+            'orders' => $this->userTaskOrderPayload(
+                $request->user()->id,
+                $board->id,
+                [$originalStatus, $destinationStatus],
+            ),
         ]);
     }
 
-    public function updateStatusLabel(Request $request, string $status): JsonResponse
-    {
+    public function updateStatusLabel(
+        Request $request,
+        Board $board,
+        string $status,
+    ): JsonResponse {
+        $board = $this->resolveBoard($request->user(), $board);
         $validated = validator(
             [
                 'status' => $status,
                 'label' => trim((string) $request->input('label')),
             ],
             [
-                'status' => ['required', 'string', Rule::in(BoardColumn::statusesForUser($request->user()))],
+                'status' => ['required', 'string', Rule::in(BoardColumn::statusesForBoard($board))],
                 'label' => ['required', 'string', 'max:40'],
             ],
         )->validate();
 
-        $user = $request->user();
-        $user->boardColumns()
+        $board->columns()
             ->where('status', $validated['status'])
             ->update([
                 'label' => $validated['label'],
@@ -259,13 +334,36 @@ class TaskBoardController extends Controller
         return response()->json([
             'status' => $validated['status'],
             'label' => $validated['label'],
-            'status_labels' => $this->statusLabelsForUser($user->fresh()),
+            'status_labels' => $this->statusLabelsForBoard($board->fresh()),
         ]);
     }
 
-    private function boardTasksForUser(User $user): array
+    private function resolveBoard(User $user, ?Board $board): Board
+    {
+        $board = $board ?? Board::ensureDefaultForUser($user);
+
+        abort_unless((int) $board->user_id === (int) $user->id, 404);
+
+        BoardColumn::ensureDefaultsForBoard($board);
+
+        return $board;
+    }
+
+    private function boardListForUser(User $user): array
+    {
+        return Board::orderedForUser($user)
+            ->map(fn (Board $board): array => [
+                'id' => $board->id,
+                'name' => $board->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function boardTasksForUser(User $user, Board $board): array
     {
         return $user->assignedTasks()
+            ->wherePivot('board_id', $board->id)
             ->select([
                 'tasks.id',
                 'tasks.title',
@@ -296,55 +394,77 @@ class TaskBoardController extends Controller
             ->all();
     }
 
-    private function statusLabelsForUser(User $user): array
+    private function statusLabelsForBoard(Board $board): array
     {
-        return BoardColumn::labelsForUser($user);
+        return BoardColumn::labelsForBoard($board);
+    }
+
+    private function ensureTaskIsOnBoardForUser(
+        User $user,
+        Board $board,
+        Task $task,
+    ): void {
+        abort_unless(
+            $this->userHasTaskOnBoard($user->id, $board->id, $task->id),
+            404,
+        );
     }
 
     private function moveTaskToStatusForAssignees(
         Task $task,
         string $sourceStatus,
         string $destinationStatus,
-        int $sourceUserId,
+        int $sourceBoardId,
     ): void {
-        $userIds = DB::table('task_user')
+        $assignments = DB::table('task_user')
             ->where('task_id', $task->id)
             ->where('role', 'assignee')
-            ->pluck('user_id');
+            ->get(['user_id', 'board_id']);
 
-        foreach ($userIds as $userId) {
+        foreach ($assignments as $assignment) {
+            if ($assignment->board_id === null) {
+                continue;
+            }
+
+            $userId = (int) $assignment->user_id;
+            $boardId = (int) $assignment->board_id;
+
             $this->normalizeUserStatusOrder(
-                (int) $userId,
+                $userId,
+                $boardId,
                 $sourceStatus,
                 $task->id,
             );
 
-            $this->ensureBoardColumnForUserStatus(
-                (int) $userId,
+            $this->ensureBoardColumnForBoardStatus(
+                $boardId,
                 $destinationStatus,
-                $sourceUserId,
+                $sourceBoardId,
             );
 
             $destinationTaskIds = $this->assignedTaskIdsForStatus(
-                (int) $userId,
+                $userId,
+                $boardId,
                 $destinationStatus,
                 $task->id,
             );
 
             $destinationTaskIds[] = $task->id;
 
-            $this->syncUserTaskOrder((int) $userId, $destinationTaskIds);
+            $this->syncUserTaskOrder($userId, $boardId, $destinationTaskIds);
         }
     }
 
     private function reorderTaskForUser(
         int $userId,
+        int $boardId,
         Task $task,
         string $status,
         ?int $beforeTaskId,
     ): void {
         $destinationTaskIds = $this->assignedTaskIdsForStatus(
             $userId,
+            $boardId,
             $status,
             $task->id,
         );
@@ -359,28 +479,37 @@ class TaskBoardController extends Controller
 
         array_splice($destinationTaskIds, $insertAt, 0, [$task->id]);
 
-        $this->syncUserTaskOrder($userId, $destinationTaskIds);
+        $this->syncUserTaskOrder($userId, $boardId, $destinationTaskIds);
     }
 
     private function normalizeUserStatusOrder(
         int $userId,
+        int $boardId,
         string $status,
         ?int $excludingTaskId = null,
     ): void {
         $this->syncUserTaskOrder(
             $userId,
-            $this->assignedTaskIdsForStatus($userId, $status, $excludingTaskId),
+            $boardId,
+            $this->assignedTaskIdsForStatus(
+                $userId,
+                $boardId,
+                $status,
+                $excludingTaskId,
+            ),
         );
     }
 
     private function assignedTaskIdsForStatus(
         int $userId,
+        int $boardId,
         string $status,
         ?int $excludingTaskId = null,
     ): array {
         return DB::table('task_user')
             ->join('tasks', 'tasks.id', '=', 'task_user.task_id')
             ->where('task_user.user_id', $userId)
+            ->where('task_user.board_id', $boardId)
             ->where('task_user.role', 'assignee')
             ->where('tasks.status', $status)
             ->when($excludingTaskId !== null, function ($query) use ($excludingTaskId) {
@@ -395,11 +524,13 @@ class TaskBoardController extends Controller
 
     private function nextSortOrderForUserStatus(
         int $userId,
+        int $boardId,
         string $status,
     ): int {
         $sortOrder = DB::table('task_user')
             ->join('tasks', 'tasks.id', '=', 'task_user.task_id')
             ->where('task_user.user_id', $userId)
+            ->where('task_user.board_id', $boardId)
             ->where('task_user.role', 'assignee')
             ->where('tasks.status', $status)
             ->max('task_user.sort_order');
@@ -407,13 +538,17 @@ class TaskBoardController extends Controller
         return ((int) $sortOrder) + 1;
     }
 
-    private function syncUserTaskOrder(int $userId, array $taskIds): void
-    {
+    private function syncUserTaskOrder(
+        int $userId,
+        int $boardId,
+        array $taskIds,
+    ): void {
         $timestamp = now();
 
         foreach (array_values($taskIds) as $index => $taskId) {
             DB::table('task_user')
                 ->where('user_id', $userId)
+                ->where('board_id', $boardId)
                 ->where('role', 'assignee')
                 ->where('task_id', $taskId)
                 ->update([
@@ -423,10 +558,14 @@ class TaskBoardController extends Controller
         }
     }
 
-    private function taskPayloadForUser(Task $task, int $userId): array
-    {
+    private function taskPayloadForUser(
+        Task $task,
+        int $userId,
+        int $boardId,
+    ): array {
         $sortOrder = DB::table('task_user')
             ->where('user_id', $userId)
+            ->where('board_id', $boardId)
             ->where('role', 'assignee')
             ->where('task_id', $task->id)
             ->value('sort_order');
@@ -438,13 +577,17 @@ class TaskBoardController extends Controller
         ];
     }
 
-    private function userTaskOrderPayload(int $userId, array $statuses): array
-    {
+    private function userTaskOrderPayload(
+        int $userId,
+        int $boardId,
+        array $statuses,
+    ): array {
         $statuses = array_values(array_unique($statuses));
 
         return DB::table('task_user')
             ->join('tasks', 'tasks.id', '=', 'task_user.task_id')
             ->where('task_user.user_id', $userId)
+            ->where('task_user.board_id', $boardId)
             ->where('task_user.role', 'assignee')
             ->whereIn('tasks.status', $statuses)
             ->orderBy('tasks.status')
@@ -465,27 +608,42 @@ class TaskBoardController extends Controller
             ->all();
     }
 
+    private function userHasTaskOnBoard(
+        int $userId,
+        int $boardId,
+        int $taskId,
+    ): bool {
+        return DB::table('task_user')
+            ->where('user_id', $userId)
+            ->where('board_id', $boardId)
+            ->where('role', 'assignee')
+            ->where('task_id', $taskId)
+            ->exists();
+    }
+
     private function userHasTaskInStatus(
         int $userId,
+        int $boardId,
         int $taskId,
         string $status,
     ): bool {
         return DB::table('task_user')
             ->join('tasks', 'tasks.id', '=', 'task_user.task_id')
             ->where('task_user.user_id', $userId)
+            ->where('task_user.board_id', $boardId)
             ->where('task_user.role', 'assignee')
             ->where('tasks.id', $taskId)
             ->where('tasks.status', $status)
             ->exists();
     }
 
-    private function ensureBoardColumnForUserStatus(
-        int $userId,
+    private function ensureBoardColumnForBoardStatus(
+        int $boardId,
         string $status,
-        int $sourceUserId,
+        int $sourceBoardId,
     ): void {
         $exists = BoardColumn::query()
-            ->where('user_id', $userId)
+            ->where('board_id', $boardId)
             ->where('status', $status)
             ->exists();
 
@@ -493,8 +651,8 @@ class TaskBoardController extends Controller
             return;
         }
 
-        $sourceUser = User::query()->findOrFail($sourceUserId);
-        $label = $sourceUser->boardColumns()
+        $sourceBoard = Board::query()->findOrFail($sourceBoardId);
+        $label = $sourceBoard->columns()
             ->where('status', $status)
             ->value('label')
             ?? BoardColumn::query()
@@ -502,13 +660,14 @@ class TaskBoardController extends Controller
                 ->value('label')
             ?? (string) Str::of($status)->replace('-', ' ')->title();
 
-        $targetUser = User::query()->findOrFail($userId);
+        $targetBoard = Board::query()->findOrFail($boardId);
 
         BoardColumn::query()->create([
-            'user_id' => $userId,
+            'user_id' => $targetBoard->user_id,
+            'board_id' => $targetBoard->id,
             'status' => $status,
             'label' => trim((string) $label),
-            'position' => BoardColumn::nextPositionForUser($targetUser),
+            'position' => BoardColumn::nextPositionForBoard($targetBoard),
         ]);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Board;
 use App\Models\BoardColumn;
 use App\Models\Task;
 use App\Models\User;
@@ -15,8 +16,9 @@ class TaskBoardTest extends TestCase
     public function test_authenticated_user_can_create_a_task_from_the_board(): void
     {
         $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
 
-        $response = $this->actingAs($user)->post(route('tasks.store'), [
+        $response = $this->actingAs($user)->post(route('tasks.store', ['board' => $board]), [
             'title' => 'Ship Inertia task form',
             'description' => 'Allow task creation directly from the board.',
             'status' => 'pending',
@@ -25,7 +27,7 @@ class TaskBoardTest extends TestCase
         ]);
 
         $response
-            ->assertRedirect(route('tasks.board'))
+            ->assertRedirect(route('tasks.board', ['board' => $board]))
             ->assertSessionHasNoErrors();
 
         $task = Task::query()
@@ -40,6 +42,7 @@ class TaskBoardTest extends TestCase
         $this->assertDatabaseHas('task_user', [
             'task_id' => $task->id,
             'user_id' => $user->id,
+            'board_id' => $board->id,
             'role' => 'assignee',
             'sort_order' => 1,
         ]);
@@ -48,17 +51,18 @@ class TaskBoardTest extends TestCase
     public function test_task_board_creation_requires_valid_data(): void
     {
         $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
 
-        $response = $this->from(route('tasks.board'))
+        $response = $this->from(route('tasks.board', ['board' => $board]))
             ->actingAs($user)
-            ->post(route('tasks.store'), [
+            ->post(route('tasks.store', ['board' => $board]), [
                 'title' => '   ',
                 'status' => 'blocked',
                 'priority' => 'urgent',
             ]);
 
         $response
-            ->assertRedirect(route('tasks.board'))
+            ->assertRedirect(route('tasks.board', ['board' => $board]))
             ->assertSessionHasErrors(['title', 'status', 'priority']);
 
         $this->assertDatabaseCount('tasks', 0);
@@ -67,16 +71,18 @@ class TaskBoardTest extends TestCase
     public function test_assignee_can_update_task_status_from_the_board(): void
     {
         $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
         $task = Task::factory()->create([
             'status' => 'pending',
         ]);
 
         $task->users()->attach($user->id, [
+            'board_id' => $board->id,
             'role' => 'assignee',
         ]);
 
         $response = $this->actingAs($user)->patchJson(
-            route('tasks.status', $task),
+            route('tasks.status', ['board' => $board, 'task' => $task]),
             ['status' => 'completed'],
         );
 
@@ -94,6 +100,7 @@ class TaskBoardTest extends TestCase
     public function test_assignee_can_update_task_details_from_the_board(): void
     {
         $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
         $task = Task::factory()->create([
             'title' => 'Original title',
             'description' => 'Original description',
@@ -104,12 +111,13 @@ class TaskBoardTest extends TestCase
         ]);
 
         $task->users()->attach($user->id, [
+            'board_id' => $board->id,
             'role' => 'assignee',
         ]);
 
-        $response = $this->from(route('tasks.board'))
+        $response = $this->from(route('tasks.board', ['board' => $board]))
             ->actingAs($user)
-            ->patch(route('tasks.update', $task), [
+            ->patch(route('tasks.update', ['board' => $board, 'task' => $task]), [
                 'title' => 'Updated task title',
                 'description' => 'Updated description',
                 'status' => 'in-progress',
@@ -119,7 +127,7 @@ class TaskBoardTest extends TestCase
             ]);
 
         $response
-            ->assertRedirect(route('tasks.board'))
+            ->assertRedirect(route('tasks.board', ['board' => $board]))
             ->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('tasks', [
@@ -140,9 +148,10 @@ class TaskBoardTest extends TestCase
     public function test_authenticated_user_can_update_a_board_column_label(): void
     {
         $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
 
         $response = $this->actingAs($user)->patchJson(
-            route('tasks.status-labels.update', 'pending'),
+            route('tasks.status-labels.update', ['board' => $board, 'status' => 'pending']),
             ['label' => 'Backlog'],
         );
 
@@ -154,6 +163,7 @@ class TaskBoardTest extends TestCase
 
         $this->assertDatabaseHas('board_columns', [
             'user_id' => $user->id,
+            'board_id' => $board->id,
             'status' => 'pending',
             'label' => 'Backlog',
         ]);
@@ -162,17 +172,18 @@ class TaskBoardTest extends TestCase
     public function test_authenticated_user_can_add_a_board_column(): void
     {
         $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
 
-        $response = $this->actingAs($user)->post(route('tasks.columns.store'), [
+        $response = $this->actingAs($user)->post(route('tasks.columns.store', ['board' => $board]), [
             'label' => 'Review',
         ]);
 
         $response
-            ->assertRedirect(route('tasks.board'))
+            ->assertRedirect(route('tasks.board', ['board' => $board]))
             ->assertSessionHasNoErrors();
 
         $column = BoardColumn::query()
-            ->where('user_id', $user->id)
+            ->where('board_id', $board->id)
             ->where('label', 'Review')
             ->first();
 
@@ -184,11 +195,10 @@ class TaskBoardTest extends TestCase
     public function test_authenticated_user_can_reorder_board_columns(): void
     {
         $user = User::factory()->create();
-
-        BoardColumn::ensureDefaultsForUser($user);
+        $board = $this->defaultBoardFor($user);
 
         $response = $this->actingAs($user)->patchJson(
-            route('tasks.columns.reorder', 'completed'),
+            route('tasks.columns.reorder', ['board' => $board, 'status' => 'completed']),
             ['before_status' => 'pending'],
         );
 
@@ -199,43 +209,77 @@ class TaskBoardTest extends TestCase
             ->assertJsonPath('statuses.2', 'in-progress');
 
         $this->assertDatabaseHas('board_columns', [
-            'user_id' => $user->id,
+            'board_id' => $board->id,
             'status' => 'completed',
             'position' => 1,
         ]);
         $this->assertDatabaseHas('board_columns', [
-            'user_id' => $user->id,
+            'board_id' => $board->id,
             'status' => 'pending',
             'position' => 2,
         ]);
         $this->assertDatabaseHas('board_columns', [
-            'user_id' => $user->id,
+            'board_id' => $board->id,
             'status' => 'in-progress',
             'position' => 3,
+        ]);
+    }
+
+    public function test_authenticated_user_can_create_a_new_board(): void
+    {
+        $user = User::factory()->create();
+        $this->defaultBoardFor($user);
+
+        $response = $this->actingAs($user)->post(route('boards.store'), [
+            'name' => 'Roadmap',
+        ]);
+
+        $board = Board::query()
+            ->where('user_id', $user->id)
+            ->where('name', 'Roadmap')
+            ->first();
+
+        $this->assertNotNull($board);
+
+        $response
+            ->assertRedirect(route('tasks.board', ['board' => $board]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('boards', [
+            'id' => $board->id,
+            'user_id' => $user->id,
+            'position' => 2,
+        ]);
+        $this->assertDatabaseHas('board_columns', [
+            'board_id' => $board->id,
+            'status' => 'pending',
+            'position' => 1,
         ]);
     }
 
     public function test_assignee_can_move_a_task_to_a_custom_board_column(): void
     {
         $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
         $task = Task::factory()->create([
             'status' => 'pending',
         ]);
 
-        BoardColumn::ensureDefaultsForUser($user);
         $column = BoardColumn::query()->create([
             'user_id' => $user->id,
+            'board_id' => $board->id,
             'status' => 'column-review',
             'label' => 'Review',
             'position' => 4,
         ]);
 
         $task->users()->attach($user->id, [
+            'board_id' => $board->id,
             'role' => 'assignee',
         ]);
 
         $response = $this->actingAs($user)->patchJson(
-            route('tasks.status', $task),
+            route('tasks.status', ['board' => $board, 'task' => $task]),
             ['status' => $column->status],
         );
 
@@ -253,6 +297,7 @@ class TaskBoardTest extends TestCase
     public function test_assignee_can_reorder_tasks_within_the_same_column(): void
     {
         $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
         $firstTask = Task::factory()->create([
             'status' => 'pending',
         ]);
@@ -263,12 +308,12 @@ class TaskBoardTest extends TestCase
             'status' => 'pending',
         ]);
 
-        $this->attachAssignee($user, $firstTask, 1);
-        $this->attachAssignee($user, $secondTask, 2);
-        $this->attachAssignee($user, $thirdTask, 3);
+        $this->attachAssignee($user, $board, $firstTask, 1);
+        $this->attachAssignee($user, $board, $secondTask, 2);
+        $this->attachAssignee($user, $board, $thirdTask, 3);
 
         $response = $this->actingAs($user)->patchJson(
-            route('tasks.reorder', $thirdTask),
+            route('tasks.reorder', ['board' => $board, 'task' => $thirdTask]),
             [
                 'status' => 'pending',
                 'before_id' => $firstTask->id,
@@ -284,18 +329,21 @@ class TaskBoardTest extends TestCase
         $this->assertDatabaseHas('task_user', [
             'task_id' => $thirdTask->id,
             'user_id' => $user->id,
+            'board_id' => $board->id,
             'role' => 'assignee',
             'sort_order' => 1,
         ]);
         $this->assertDatabaseHas('task_user', [
             'task_id' => $firstTask->id,
             'user_id' => $user->id,
+            'board_id' => $board->id,
             'role' => 'assignee',
             'sort_order' => 2,
         ]);
         $this->assertDatabaseHas('task_user', [
             'task_id' => $secondTask->id,
             'user_id' => $user->id,
+            'board_id' => $board->id,
             'role' => 'assignee',
             'sort_order' => 3,
         ]);
@@ -304,6 +352,7 @@ class TaskBoardTest extends TestCase
     public function test_assignee_can_move_a_task_to_another_column_and_place_it_before_another_task(): void
     {
         $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
         $pendingTask = Task::factory()->create([
             'status' => 'pending',
         ]);
@@ -314,12 +363,12 @@ class TaskBoardTest extends TestCase
             'status' => 'in-progress',
         ]);
 
-        $this->attachAssignee($user, $pendingTask, 1);
-        $this->attachAssignee($user, $inProgressTask, 1);
-        $this->attachAssignee($user, $anotherInProgressTask, 2);
+        $this->attachAssignee($user, $board, $pendingTask, 1);
+        $this->attachAssignee($user, $board, $inProgressTask, 1);
+        $this->attachAssignee($user, $board, $anotherInProgressTask, 2);
 
         $response = $this->actingAs($user)->patchJson(
-            route('tasks.reorder', $pendingTask),
+            route('tasks.reorder', ['board' => $board, 'task' => $pendingTask]),
             [
                 'status' => 'in-progress',
                 'before_id' => $inProgressTask->id,
@@ -339,18 +388,21 @@ class TaskBoardTest extends TestCase
         $this->assertDatabaseHas('task_user', [
             'task_id' => $pendingTask->id,
             'user_id' => $user->id,
+            'board_id' => $board->id,
             'role' => 'assignee',
             'sort_order' => 1,
         ]);
         $this->assertDatabaseHas('task_user', [
             'task_id' => $inProgressTask->id,
             'user_id' => $user->id,
+            'board_id' => $board->id,
             'role' => 'assignee',
             'sort_order' => 2,
         ]);
         $this->assertDatabaseHas('task_user', [
             'task_id' => $anotherInProgressTask->id,
             'user_id' => $user->id,
+            'board_id' => $board->id,
             'role' => 'assignee',
             'sort_order' => 3,
         ]);
@@ -359,15 +411,17 @@ class TaskBoardTest extends TestCase
     public function test_task_board_update_requires_valid_data(): void
     {
         $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
         $task = Task::factory()->create();
 
         $task->users()->attach($user->id, [
+            'board_id' => $board->id,
             'role' => 'assignee',
         ]);
 
-        $response = $this->from(route('tasks.board'))
+        $response = $this->from(route('tasks.board', ['board' => $board]))
             ->actingAs($user)
-            ->patch(route('tasks.update', $task), [
+            ->patch(route('tasks.update', ['board' => $board, 'task' => $task]), [
                 'title' => '   ',
                 'description' => str_repeat('a', 1001),
                 'status' => 'blocked',
@@ -376,7 +430,7 @@ class TaskBoardTest extends TestCase
             ]);
 
         $response
-            ->assertRedirect(route('tasks.board'))
+            ->assertRedirect(route('tasks.board', ['board' => $board]))
             ->assertSessionHasErrors([
                 'title',
                 'description',
@@ -389,9 +443,10 @@ class TaskBoardTest extends TestCase
     public function test_board_column_labels_require_valid_data(): void
     {
         $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
 
         $response = $this->actingAs($user)->patchJson(
-            route('tasks.status-labels.update', 'blocked'),
+            route('tasks.status-labels.update', ['board' => $board, 'status' => 'blocked']),
             ['label' => '   '],
         );
 
@@ -400,9 +455,20 @@ class TaskBoardTest extends TestCase
             ->assertJsonValidationErrors(['status', 'label']);
     }
 
-    private function attachAssignee(User $user, Task $task, int $sortOrder): void
+    private function defaultBoardFor(User $user): Board
+    {
+        return Board::ensureDefaultForUser($user);
+    }
+
+    private function attachAssignee(
+        User $user,
+        Board $board,
+        Task $task,
+        int $sortOrder,
+    ): void
     {
         $task->users()->attach($user->id, [
+            'board_id' => $board->id,
             'role' => 'assignee',
             'sort_order' => $sortOrder,
         ]);
