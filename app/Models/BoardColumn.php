@@ -29,6 +29,7 @@ class BoardColumn extends Model
      */
     protected $fillable = [
         'user_id',
+        'board_id',
         'status',
         'label',
         'position',
@@ -43,11 +44,19 @@ class BoardColumn extends Model
     }
 
     /**
-     * Ensure the user has the default board columns.
+     * Get the board that owns the column.
      */
-    public static function ensureDefaultsForUser(User $user): void
+    public function board(): BelongsTo
     {
-        $existingStatuses = $user->boardColumns()
+        return $this->belongsTo(Board::class);
+    }
+
+    /**
+     * Ensure the board has the default board columns.
+     */
+    public static function ensureDefaultsForBoard(Board $board): void
+    {
+        $existingStatuses = $board->columns()
             ->pluck('status')
             ->all();
 
@@ -60,7 +69,8 @@ class BoardColumn extends Model
             }
 
             $rows[] = [
-                'user_id' => $user->id,
+                'user_id' => $board->user_id,
+                'board_id' => $board->id,
                 'status' => $column['status'],
                 'label' => $column['label'],
                 'position' => $index + 1,
@@ -77,72 +87,126 @@ class BoardColumn extends Model
     }
 
     /**
-     * Get the ordered board columns for the user.
+     * Ensure the user has a default board with columns.
      */
-    public static function orderedForUser(User $user): Collection
+    public static function ensureDefaultsForUser(User $user): void
     {
-        self::ensureDefaultsForUser($user);
+        self::ensureDefaultsForBoard(Board::ensureDefaultForUser($user));
+    }
 
-        return $user->boardColumns()
+    /**
+     * Get the ordered board columns for the board.
+     */
+    public static function orderedForBoard(Board $board): Collection
+    {
+        self::ensureDefaultsForBoard($board);
+
+        return $board->columns()
             ->orderBy('position')
             ->orderBy('id')
             ->get();
     }
 
     /**
-     * Get the available statuses for the user.
+     * Get the ordered board columns for the user's primary board.
+     */
+    public static function orderedForUser(User $user): Collection
+    {
+        return self::orderedForBoard(Board::ensureDefaultForUser($user));
+    }
+
+    /**
+     * Get the available statuses for the board.
      *
      * @return array<int, string>
      */
-    public static function statusesForUser(User $user): array
+    public static function statusesForBoard(Board $board): array
     {
-        return self::orderedForUser($user)
+        return self::orderedForBoard($board)
             ->pluck('status')
             ->all();
     }
 
     /**
-     * Get the display labels for the user's board columns.
+     * Get the available statuses for the user's primary board.
+     *
+     * @return array<int, string>
+     */
+    public static function statusesForUser(User $user): array
+    {
+        return self::statusesForBoard(Board::ensureDefaultForUser($user));
+    }
+
+    /**
+     * Get the display labels for the board's columns.
      *
      * @return array<string, string>
      */
-    public static function labelsForUser(User $user): array
+    public static function labelsForBoard(Board $board): array
     {
-        return self::orderedForUser($user)
+        return self::orderedForBoard($board)
             ->pluck('label', 'status')
             ->map(fn (string $label): string => trim($label))
             ->all();
     }
 
     /**
-     * Determine the next column position for the user.
+     * Get the display labels for the user's primary board columns.
+     *
+     * @return array<string, string>
      */
-    public static function nextPositionForUser(User $user): int
+    public static function labelsForUser(User $user): array
     {
-        self::ensureDefaultsForUser($user);
-
-        return ((int) $user->boardColumns()->max('position')) + 1;
+        return self::labelsForBoard(Board::ensureDefaultForUser($user));
     }
 
     /**
-     * Persist an ordered list of statuses for the user.
+     * Determine the next column position for the board.
+     */
+    public static function nextPositionForBoard(Board $board): int
+    {
+        self::ensureDefaultsForBoard($board);
+
+        return ((int) $board->columns()->max('position')) + 1;
+    }
+
+    /**
+     * Determine the next column position for the user's primary board.
+     */
+    public static function nextPositionForUser(User $user): int
+    {
+        return self::nextPositionForBoard(Board::ensureDefaultForUser($user));
+    }
+
+    /**
+     * Persist an ordered list of statuses for the board.
      *
      * @param  array<int, string>  $statuses
      */
-    public static function syncOrderForUser(User $user, array $statuses): void
+    public static function syncOrderForBoard(Board $board, array $statuses): void
     {
-        self::ensureDefaultsForUser($user);
+        self::ensureDefaultsForBoard($board);
 
         $timestamp = now();
 
         foreach (array_values($statuses) as $index => $status) {
             self::query()
-                ->where('user_id', $user->id)
+                ->where('board_id', $board->id)
                 ->where('status', $status)
                 ->update([
                     'position' => $index + 1,
                     'updated_at' => $timestamp,
                 ]);
         }
+    }
+
+    /**
+     * Persist an ordered list of statuses for the user's primary board.
+     *
+     * @param  array<int, string>  $statuses
+     */
+    public static function syncOrderForUser(User $user, array $statuses): void
+    {
+        self::syncOrderForBoard(Board::ensureDefaultForUser($user), $statuses);
     }
 }

@@ -50,6 +50,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the boards owned by the user.
+     */
+    public function boards(): HasMany
+    {
+        return $this->hasMany(Board::class);
+    }
+
+    /**
      * Get the saved board column settings for the user.
      */
     public function boardColumns(): HasMany
@@ -63,7 +71,7 @@ class User extends Authenticatable
     public function tasks(): BelongsToMany
     {
         return $this->belongsToMany(Task::class)
-            ->withPivot('role', 'sort_order')
+            ->withPivot('board_id', 'role', 'sort_order')
             ->withTimestamps();
     }
 
@@ -73,7 +81,7 @@ class User extends Authenticatable
     public function assignedTasks(): BelongsToMany
     {
         return $this->belongsToMany(Task::class)
-            ->withPivot('role', 'sort_order')
+            ->withPivot('board_id', 'role', 'sort_order')
             ->withTimestamps()
             ->wherePivot('role', 'assignee');
     }
@@ -84,7 +92,7 @@ class User extends Authenticatable
     public function reviewingTasks(): BelongsToMany
     {
         return $this->belongsToMany(Task::class)
-            ->withPivot('role', 'sort_order')
+            ->withPivot('board_id', 'role', 'sort_order')
             ->withTimestamps()
             ->wherePivot('role', 'reviewer');
     }
