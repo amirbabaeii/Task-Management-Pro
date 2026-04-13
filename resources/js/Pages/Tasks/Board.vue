@@ -46,10 +46,14 @@ const sortTaskList = (taskList) =>
 
 const tasks = ref(props.tasks.map(normalizeTask));
 const updatingId = ref(null);
+const movingColumnStatus = ref(null);
 const draggedTaskId = ref(null);
 const dragOverStatus = ref(null);
 const dragOverTaskId = ref(null);
 const dragInsertPosition = ref('before');
+const draggedColumnStatus = ref(null);
+const columnDragOverStatus = ref(null);
+const columnDragInsertPosition = ref('before');
 const editingStatusLabel = ref(null);
 const statusLabelDraft = ref('');
 const savingStatusLabel = ref(null);
@@ -61,9 +65,13 @@ const showingEditModal = ref(false);
 const selectedTaskId = ref(null);
 const editingTaskId = ref(null);
 const errorMessage = ref('');
-const defaultStatus = props.statuses.includes('pending')
+const fallbackBoardStatuses = ['pending', 'in-progress', 'completed'];
+const normalizeBoardStatuses = (statuses = []) =>
+    statuses.length ? [...statuses] : [...fallbackBoardStatuses];
+const boardStatuses = ref(normalizeBoardStatuses(props.statuses));
+const defaultStatus = boardStatuses.value.includes('pending')
     ? 'pending'
-    : (props.statuses[0] ?? 'pending');
+    : (boardStatuses.value[0] ?? 'pending');
 const defaultPriority = props.priorities.includes('medium')
     ? 'medium'
     : (props.priorities[0] ?? 'medium');
@@ -102,11 +110,6 @@ const buildStatusLabels = (labels = {}) => ({
     ),
 });
 
-const boardStatuses = computed(() =>
-    props.statuses.length
-        ? props.statuses
-        : ['pending', 'in-progress', 'completed'],
-);
 const boardStatusLabels = ref(buildStatusLabels(props.statusLabels));
 const priorityOptions = computed(() =>
     props.priorities.length
@@ -118,6 +121,14 @@ watch(
     () => props.tasks,
     (nextTasks) => {
         tasks.value = nextTasks.map(normalizeTask);
+    },
+);
+
+watch(
+    () => props.statuses,
+    (nextStatuses) => {
+        boardStatuses.value = normalizeBoardStatuses(nextStatuses);
+        boardStatusLabels.value = buildStatusLabels(props.statusLabels);
     },
 );
 
@@ -306,6 +317,200 @@ const saveStatusLabel = async (status) => {
             cancelStatusLabelEdit();
         }
     }
+};
+
+const isDraggingColumn = (status) => draggedColumnStatus.value === status;
+
+const isColumnReorderDropTarget = (status, position) =>
+    draggedColumnStatus.value !== null &&
+    columnDragOverStatus.value === status &&
+    columnDragInsertPosition.value === position;
+
+const resetColumnDragState = () => {
+    draggedColumnStatus.value = null;
+    columnDragOverStatus.value = null;
+    columnDragInsertPosition.value = 'before';
+};
+
+const moveColumnLocally = (status, beforeStatus = null) => {
+    if (!boardStatuses.value.includes(status)) {
+        return false;
+    }
+
+    const reorderedStatuses = boardStatuses.value.filter(
+        (candidate) => candidate !== status,
+    );
+    const insertAt = beforeStatus === null
+        ? reorderedStatuses.length
+        : reorderedStatuses.findIndex((candidate) => candidate === beforeStatus);
+
+    reorderedStatuses.splice(
+        insertAt === -1 ? reorderedStatuses.length : insertAt,
+        0,
+        status,
+    );
+
+    if (
+        reorderedStatuses.length === boardStatuses.value.length &&
+        reorderedStatuses.every(
+            (candidate, index) => candidate === boardStatuses.value[index],
+        )
+    ) {
+        return false;
+    }
+
+    boardStatuses.value = reorderedStatuses;
+
+    return true;
+};
+
+const getBeforeStatusForColumnDrop = (targetStatus, position) => {
+    const destinationStatuses = boardStatuses.value.filter(
+        (status) => status !== draggedColumnStatus.value,
+    );
+    const targetIndex = destinationStatuses.findIndex(
+        (status) => status === targetStatus,
+    );
+
+    if (targetIndex === -1) {
+        return null;
+    }
+
+    if (position === 'before') {
+        return targetStatus;
+    }
+
+    return destinationStatuses[targetIndex + 1] ?? null;
+};
+
+const reorderBoardColumn = async (status, beforeStatus = null) => {
+    if (movingColumnStatus.value || !status) {
+        return;
+    }
+
+    errorMessage.value = '';
+    movingColumnStatus.value = status;
+    const previousStatuses = [...boardStatuses.value];
+    const moved = moveColumnLocally(status, beforeStatus);
+
+    if (!moved) {
+        movingColumnStatus.value = null;
+        resetColumnDragState();
+        return;
+    }
+
+    try {
+        const response = await axios.patch(
+            route('tasks.columns.reorder', status),
+            { before_status: beforeStatus },
+        );
+
+        if (Array.isArray(response?.data?.statuses)) {
+            boardStatuses.value = response.data.statuses;
+        }
+
+        if (response?.data?.status_labels) {
+            boardStatusLabels.value = buildStatusLabels(
+                response.data.status_labels,
+            );
+        }
+    } catch (error) {
+        boardStatuses.value = previousStatuses;
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to reorder board columns. Please try again.';
+    } finally {
+        movingColumnStatus.value = null;
+        resetColumnDragState();
+    }
+};
+
+const onBoardColumnDragStart = (event, status) => {
+    if (movingColumnStatus.value || updatingId.value) {
+        event.preventDefault();
+        return;
+    }
+
+    draggedColumnStatus.value = status;
+    columnDragOverStatus.value = status;
+    columnDragInsertPosition.value = 'before';
+
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', status);
+    }
+};
+
+const onBoardColumnDragEnd = () => {
+    resetColumnDragState();
+};
+
+const onBoardSectionDragOver = (event, status) => {
+    if (draggedColumnStatus.value !== null) {
+        event.preventDefault();
+
+        if (draggedColumnStatus.value === status) {
+            columnDragOverStatus.value = status;
+            columnDragInsertPosition.value = 'before';
+            return;
+        }
+
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const midpoint = bounds.left + bounds.width / 2;
+
+        columnDragOverStatus.value = status;
+        columnDragInsertPosition.value =
+            event.clientX < midpoint ? 'before' : 'after';
+
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = 'move';
+        }
+
+        return;
+    }
+
+    onColumnDragOver(event, status);
+};
+
+const onBoardSectionDrop = async (status) => {
+    if (draggedColumnStatus.value !== null) {
+        if (draggedColumnStatus.value === status) {
+            resetColumnDragState();
+            return;
+        }
+
+        const beforeStatus = getBeforeStatusForColumnDrop(
+            status,
+            columnDragInsertPosition.value,
+        );
+
+        await reorderBoardColumn(draggedColumnStatus.value, beforeStatus);
+        return;
+    }
+
+    await onColumnDrop(status);
+};
+
+const onBoardLaneDragOver = (event) => {
+    if (draggedColumnStatus.value === null) {
+        return;
+    }
+
+    event.preventDefault();
+    columnDragOverStatus.value = null;
+    columnDragInsertPosition.value = 'after';
+
+    if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move';
+    }
+};
+
+const onBoardLaneDrop = async () => {
+    if (draggedColumnStatus.value === null) {
+        return;
+    }
+
+    await reorderBoardColumn(draggedColumnStatus.value, null);
 };
 
 const openTaskDetails = (task) => {
@@ -704,41 +909,74 @@ const submitTaskUpdate = () => {
         <div class="min-h-[calc(100vh-9rem)] py-8">
             <div class="w-full px-4 sm:px-6 lg:px-8">
                 <div class="h-full overflow-x-auto overflow-y-hidden pb-2">
-                    <div class="flex min-h-[calc(100vh-13rem)] w-max min-w-full items-stretch justify-center gap-6">
+                    <div
+                        class="flex min-h-[calc(100vh-13rem)] w-max min-w-full items-stretch justify-center gap-6"
+                        @dragover="onBoardLaneDragOver"
+                        @drop.stop.prevent="onBoardLaneDrop"
+                    >
                         <section
                             v-for="status in boardStatuses"
                             :key="status"
                             class="task-column flex h-full w-80 min-w-80 shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm transition"
                             :class="{
                                 'task-column--drop-target': isColumnDropTarget(status),
+                                'task-column--dragging': isDraggingColumn(status),
+                                'task-column--drop-before': isColumnReorderDropTarget(status, 'before'),
+                                'task-column--drop-after': isColumnReorderDropTarget(status, 'after'),
+                                'task-column--moving': movingColumnStatus === status,
                             }"
-                            @dragover="onColumnDragOver($event, status)"
-                            @drop.prevent="onColumnDrop(status)"
+                            @dragover.stop="onBoardSectionDragOver($event, status)"
+                            @drop.stop.prevent="onBoardSectionDrop(status)"
                         >
                             <div
                                 class="flex items-center justify-between border-b border-gray-100 px-4 py-3"
                             >
-                                <div class="min-w-0 flex-1 pr-3">
-                                    <input
-                                        v-if="editingStatusLabel === status"
-                                        :ref="setStatusLabelInput"
-                                        v-model="statusLabelDraft"
-                                        type="text"
-                                        maxlength="40"
-                                        class="block w-full rounded-md border-gray-300 px-2 py-1 text-sm font-semibold text-gray-700 shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                        @click.stop
-                                        @keydown.enter.prevent="saveStatusLabel(status)"
-                                        @keydown.esc.prevent="cancelStatusLabelEdit"
-                                        @blur="saveStatusLabel(status)"
-                                    />
+                                <div class="flex min-w-0 flex-1 items-center gap-2 pr-3">
                                     <button
-                                        v-else
                                         type="button"
-                                        class="block max-w-full truncate rounded-md px-2 py-1 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                                        @click.stop="startStatusLabelEdit(status)"
+                                        class="column-drag-handle flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                        title="Drag column"
+                                        draggable="true"
+                                        @click.stop
+                                        @dragstart.stop="onBoardColumnDragStart($event, status)"
+                                        @dragend.stop="onBoardColumnDragEnd"
                                     >
-                                        {{ formatStatus(status) }}
+                                        <svg
+                                            class="h-4 w-4"
+                                            viewBox="0 0 16 16"
+                                            fill="currentColor"
+                                            aria-hidden="true"
+                                        >
+                                            <circle cx="5" cy="4" r="1.25" />
+                                            <circle cx="11" cy="4" r="1.25" />
+                                            <circle cx="5" cy="8" r="1.25" />
+                                            <circle cx="11" cy="8" r="1.25" />
+                                            <circle cx="5" cy="12" r="1.25" />
+                                            <circle cx="11" cy="12" r="1.25" />
+                                        </svg>
                                     </button>
+                                    <div class="min-w-0 flex-1">
+                                        <input
+                                            v-if="editingStatusLabel === status"
+                                            :ref="setStatusLabelInput"
+                                            v-model="statusLabelDraft"
+                                            type="text"
+                                            maxlength="40"
+                                            class="block w-full rounded-md border-gray-300 px-2 py-1 text-sm font-semibold text-gray-700 shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                            @click.stop
+                                            @keydown.enter.prevent="saveStatusLabel(status)"
+                                            @keydown.esc.prevent="cancelStatusLabelEdit"
+                                            @blur="saveStatusLabel(status)"
+                                        />
+                                        <button
+                                            v-else
+                                            type="button"
+                                            class="block max-w-full truncate rounded-md px-2 py-1 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                            @click.stop="startStatusLabelEdit(status)"
+                                        >
+                                            {{ formatStatus(status) }}
+                                        </button>
+                                    </div>
                                 </div>
                                 <span
                                     class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
@@ -764,7 +1002,7 @@ const submitTaskUpdate = () => {
                                     }"
                                     role="button"
                                     tabindex="0"
-                                    :draggable="updatingId !== task.id"
+                                    :draggable="updatingId !== task.id && movingColumnStatus === null"
                                     @click="openTaskDetails(task)"
                                     @keydown.enter.prevent="openTaskDetails(task)"
                                     @keydown.space.prevent="openTaskDetails(task)"
@@ -1337,10 +1575,38 @@ const submitTaskUpdate = () => {
 </template>
 
 <style scoped>
+.column-drag-handle {
+    cursor: grab;
+}
+
+.column-drag-handle:active {
+    cursor: grabbing;
+}
+
 .task-column--drop-target {
     border-color: rgb(55 65 81);
     background: rgb(249 250 251);
     box-shadow: inset 0 0 0 1px rgb(55 65 81 / 0.1);
+}
+
+.task-column--moving {
+    opacity: 0.75;
+}
+
+.task-column--dragging {
+    opacity: 0.55;
+}
+
+.task-column--drop-before {
+    box-shadow:
+        inset 4px 0 0 rgb(31 41 55),
+        0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+.task-column--drop-after {
+    box-shadow:
+        inset -4px 0 0 rgb(31 41 55),
+        0 1px 2px rgb(15 23 42 / 0.08);
 }
 
 .task-card {

@@ -74,6 +74,52 @@ class TaskBoardController extends Controller
         return redirect()->route('tasks.board');
     }
 
+    public function reorderColumn(Request $request, string $status): JsonResponse
+    {
+        $user = $request->user();
+        $availableStatuses = BoardColumn::statusesForUser($user);
+
+        $validated = validator(
+            [
+                'status' => $status,
+                'before_status' => $request->input('before_status'),
+            ],
+            [
+                'status' => ['required', 'string', Rule::in($availableStatuses)],
+                'before_status' => ['nullable', 'string', Rule::in($availableStatuses)],
+            ],
+        )->after(function ($validator) use ($status, $request): void {
+            if ($status === $request->input('before_status')) {
+                $validator->errors()->add(
+                    'before_status',
+                    'A column cannot be reordered relative to itself.',
+                );
+            }
+        })->validate();
+
+        $reorderedStatuses = array_values(array_filter(
+            $availableStatuses,
+            fn (string $availableStatus): bool => $availableStatus !== $validated['status'],
+        ));
+
+        $insertAt = $validated['before_status'] === null
+            ? count($reorderedStatuses)
+            : array_search($validated['before_status'], $reorderedStatuses, true);
+
+        if ($insertAt === false) {
+            $insertAt = count($reorderedStatuses);
+        }
+
+        array_splice($reorderedStatuses, $insertAt, 0, [$validated['status']]);
+
+        BoardColumn::syncOrderForUser($user, $reorderedStatuses);
+
+        return response()->json([
+            'statuses' => BoardColumn::statusesForUser($user->fresh()),
+            'status_labels' => $this->statusLabelsForUser($user->fresh()),
+        ]);
+    }
+
     public function update(UpdateTaskRequest $request, Task $task): RedirectResponse
     {
         $validated = $request->validated();

@@ -123,4 +123,26 @@ class BoardColumn extends Model
 
         return ((int) $user->boardColumns()->max('position')) + 1;
     }
+
+    /**
+     * Persist an ordered list of statuses for the user.
+     *
+     * @param  array<int, string>  $statuses
+     */
+    public static function syncOrderForUser(User $user, array $statuses): void
+    {
+        self::ensureDefaultsForUser($user);
+
+        $timestamp = now();
+
+        foreach (array_values($statuses) as $index => $status) {
+            self::query()
+                ->where('user_id', $user->id)
+                ->where('status', $status)
+                ->update([
+                    'position' => $index + 1,
+                    'updated_at' => $timestamp,
+                ]);
+        }
+    }
 }
