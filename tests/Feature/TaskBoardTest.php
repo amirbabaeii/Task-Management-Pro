@@ -181,6 +181,40 @@ class TaskBoardTest extends TestCase
         $this->assertStringStartsWith('column-', $column->status);
     }
 
+    public function test_authenticated_user_can_reorder_board_columns(): void
+    {
+        $user = User::factory()->create();
+
+        BoardColumn::ensureDefaultsForUser($user);
+
+        $response = $this->actingAs($user)->patchJson(
+            route('tasks.columns.reorder', 'completed'),
+            ['before_status' => 'pending'],
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('statuses.0', 'completed')
+            ->assertJsonPath('statuses.1', 'pending')
+            ->assertJsonPath('statuses.2', 'in-progress');
+
+        $this->assertDatabaseHas('board_columns', [
+            'user_id' => $user->id,
+            'status' => 'completed',
+            'position' => 1,
+        ]);
+        $this->assertDatabaseHas('board_columns', [
+            'user_id' => $user->id,
+            'status' => 'pending',
+            'position' => 2,
+        ]);
+        $this->assertDatabaseHas('board_columns', [
+            'user_id' => $user->id,
+            'status' => 'in-progress',
+            'position' => 3,
+        ]);
+    }
+
     public function test_assignee_can_move_a_task_to_a_custom_board_column(): void
     {
         $user = User::factory()->create();
