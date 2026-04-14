@@ -232,6 +232,7 @@ class TaskBoardTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('boards.store'), [
             'name' => 'Roadmap',
+            'description' => 'Quarterly planning and delivery priorities.',
         ]);
 
         $board = Board::query()
@@ -248,6 +249,7 @@ class TaskBoardTest extends TestCase
         $this->assertDatabaseHas('boards', [
             'id' => $board->id,
             'user_id' => $user->id,
+            'description' => 'Quarterly planning and delivery priorities.',
             'position' => 2,
         ]);
         $this->assertDatabaseHas('board_columns', [

@@ -31,6 +31,7 @@ class TaskBoardController extends Controller
             'currentBoard' => [
                 'id' => $board->id,
                 'name' => $board->name,
+                'description' => $board->description,
             ],
             'tasks' => $this->boardTasksForUser($user, $board),
             'statuses' => BoardColumn::statusesForBoard($board),
@@ -45,14 +46,19 @@ class TaskBoardController extends Controller
         $validated = validator(
             [
                 'name' => trim((string) $request->input('name')),
+                'description' => $request->filled('description')
+                    ? trim((string) $request->input('description'))
+                    : null,
             ],
             [
                 'name' => ['required', 'string', 'max:100'],
+                'description' => ['nullable', 'string', 'max:280'],
             ],
         )->validate();
 
         $board = $user->boards()->create([
             'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
             'position' => Board::nextPositionForUser($user),
         ]);
 

@@ -57,6 +57,7 @@ class HandleInertiaRequests extends Middleware
             ->map(fn (Board $board): array => [
                 'id' => $board->id,
                 'name' => $board->name,
+                'description' => $board->description,
             ])
             ->values()
             ->all();
@@ -84,6 +85,7 @@ class HandleInertiaRequests extends Middleware
         return [
             'id' => $board->id,
             'name' => $board->name,
+            'description' => $board->description,
         ];
     }
 }
