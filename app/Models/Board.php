@@ -12,9 +12,12 @@ class Board extends Model
 {
     use HasFactory;
 
+    public const DEFAULT_DESCRIPTION = 'Drag tasks between columns and reorder them within each status.';
+
     protected $fillable = [
         'user_id',
         'name',
+        'description',
         'position',
     ];
 
@@ -38,6 +41,7 @@ class Board extends Model
         if (!$board) {
             $board = $user->boards()->create([
                 'name' => 'My Board',
+                'description' => self::DEFAULT_DESCRIPTION,
                 'position' => 1,
             ]);
         }

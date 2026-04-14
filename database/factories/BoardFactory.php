@@ -18,6 +18,7 @@ class BoardFactory extends Factory
         return [
             'user_id' => User::factory(),
             'name' => fake()->words(2, true),
+            'description' => fake()->sentence(),
             'position' => 1,
         ];
     }
