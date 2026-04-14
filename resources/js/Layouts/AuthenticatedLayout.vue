@@ -73,37 +73,36 @@ const submitBoard = () => {
                                 >
                                     Dashboard
                                 </NavLink>
-                                <div class="flex items-center">
-                                    <Dropdown align="left" width="64" content-classes="bg-white">
-                                        <template #trigger>
-                                            <button
-                                                type="button"
-                                                class="inline-flex items-center gap-2 border-b-2 px-1 pt-1 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none"
-                                                :class="boardMenuActive
-                                                    ? 'border-indigo-400 text-gray-900 focus:border-indigo-700'
-                                                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 focus:border-gray-300 focus:text-gray-700'"
+                                <Dropdown align="left" width="64" content-classes="bg-white">
+                                    <template #trigger>
+                                        <button
+                                            type="button"
+                                            class="inline-flex h-full items-center gap-2 border-b-2 px-1 pt-1 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none"
+                                            :class="boardMenuActive
+                                                ? 'border-indigo-400 text-gray-900 focus:border-indigo-700'
+                                                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 focus:border-gray-300 focus:text-gray-700'"
+                                        >
+                                            <span class="max-w-[11rem] truncate">
+                                                {{ currentBoardName }}
+                                            </span>
+                                            <svg
+                                                class="h-4 w-4"
+                                                viewBox="0 0 20 20"
+                                                fill="currentColor"
+                                                aria-hidden="true"
                                             >
-                                                <span class="max-w-[11rem] truncate">
-                                                    {{ currentBoardName }}
-                                                </span>
-                                                <svg
-                                                    class="h-4 w-4"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
-                                                    aria-hidden="true"
-                                                >
-                                                    <path
-                                                        fill-rule="evenodd"
-                                                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                                                        clip-rule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                        </template>
+                                                <path
+                                                    fill-rule="evenodd"
+                                                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                                                    clip-rule="evenodd"
+                                                />
+                                            </svg>
+                                        </button>
+                                    </template>
 
-                                        <template #content>
-                                            <div class="flex max-h-80 flex-col">
-                                                <div class="overflow-y-auto py-1">
+                                    <template #content>
+                                        <div class="flex max-h-80 flex-col">
+                                            <div class="overflow-y-auto py-1">
                                                 <Link
                                                     v-for="board in boards"
                                                     :key="board.id"
@@ -115,31 +114,29 @@ const submitBoard = () => {
                                                 >
                                                     {{ board.name }}
                                                 </Link>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    class="flex w-full items-center gap-2 border-t border-gray-100 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none"
-                                                    @click="showingBoardModal = true"
-                                                >
-                                                    <svg
-                                                        class="h-4 w-4 shrink-0"
-                                                        viewBox="0 0 20 20"
-                                                        fill="currentColor"
-                                                        aria-hidden="true"
-                                                    >
-                                                        <path
-                                                            fill-rule="evenodd"
-                                                            d="M10 4.25a.75.75 0 01.75.75v4.25H15a.75.75 0 010 1.5h-4.25V15a.75.75 0 01-1.5 0v-4.25H5a.75.75 0 010-1.5h4.25V5a.75.75 0 01.75-.75z"
-                                                            clip-rule="evenodd"
-                                                        />
-                                                    </svg>
-                                                    <span>Create board</span>
-                                                </button>
                                             </div>
-                                        </template>
-                                    </Dropdown>
-
-                                </div>
+                                            <button
+                                                type="button"
+                                                class="flex w-full items-center gap-2 border-t border-gray-100 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none"
+                                                @click="showingBoardModal = true"
+                                            >
+                                                <svg
+                                                    class="h-4 w-4 shrink-0"
+                                                    viewBox="0 0 20 20"
+                                                    fill="currentColor"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path
+                                                        fill-rule="evenodd"
+                                                        d="M10 4.25a.75.75 0 01.75.75v4.25H15a.75.75 0 010 1.5h-4.25V15a.75.75 0 01-1.5 0v-4.25H5a.75.75 0 010-1.5h4.25V5a.75.75 0 01.75-.75z"
+                                                        clip-rule="evenodd"
+                                                    />
+                                                </svg>
+                                                <span>Create board</span>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </Dropdown>
                             </div>
                         </div>
 
