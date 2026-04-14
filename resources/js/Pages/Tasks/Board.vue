@@ -117,6 +117,7 @@ const buildStatusLabels = (labels = {}) => ({
 const boardStatusLabels = ref(buildStatusLabels(props.statusLabels));
 const currentBoardId = computed(() => props.currentBoard?.id ?? null);
 const currentBoardName = computed(() => props.currentBoard?.name ?? 'Task Board');
+const currentBoardDescription = computed(() => props.currentBoard?.description ?? '');
 const priorityOptions = computed(() =>
     props.priorities.length
         ? props.priorities
@@ -912,8 +913,11 @@ const submitTaskUpdate = () => {
                     <h2 class="text-xl font-semibold leading-tight text-gray-800">
                         {{ currentBoardName }}
                     </h2>
-                    <p class="text-sm text-gray-500">
-                        Drag tasks between columns and reorder them within each status.
+                    <p
+                        v-if="currentBoardDescription"
+                        class="text-sm text-gray-500"
+                    >
+                        {{ currentBoardDescription }}
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">

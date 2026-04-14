@@ -18,6 +18,7 @@ const showingBoardModal = ref(false);
 const page = usePage();
 const boardForm = useForm({
     name: '',
+    description: '',
 });
 
 const boards = computed(() => page.props.boards ?? []);
@@ -358,6 +359,25 @@ const submitBoard = () => {
                         <InputError
                             class="mt-2"
                             :message="boardForm.errors.name"
+                        />
+                    </div>
+
+                    <div>
+                        <InputLabel
+                            for="layout-board-description"
+                            value="Description"
+                        />
+                        <textarea
+                            id="layout-board-description"
+                            v-model="boardForm.description"
+                            rows="3"
+                            maxlength="280"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            placeholder="Describe what this board is for."
+                        />
+                        <InputError
+                            class="mt-2"
+                            :message="boardForm.errors.description"
                         />
                     </div>
 
