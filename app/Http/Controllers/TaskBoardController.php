@@ -67,6 +67,33 @@ class TaskBoardController extends Controller
         return redirect()->route('tasks.board', ['board' => $board]);
     }
 
+    public function updateBoard(Request $request, Board $board): JsonResponse
+    {
+        $user = $request->user();
+        $board = $this->resolveBoard($user, $board);
+        $validated = validator(
+            [
+                'name' => trim((string) $request->input('name')),
+            ],
+            [
+                'name' => ['required', 'string', 'max:100'],
+            ],
+        )->validate();
+
+        $board->update([
+            'name' => $validated['name'],
+        ]);
+
+        return response()->json([
+            'board' => [
+                'id' => $board->id,
+                'name' => $board->name,
+                'description' => $board->description,
+            ],
+            'boards' => $this->boardListForUser($user),
+        ]);
+    }
+
     public function store(StoreTaskRequest $request, Board $board): RedirectResponse
     {
         $user = $request->user();

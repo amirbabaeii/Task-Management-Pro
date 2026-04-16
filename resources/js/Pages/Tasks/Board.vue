@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
@@ -62,6 +62,10 @@ const editingStatusLabel = ref(null);
 const statusLabelDraft = ref('');
 const savingStatusLabel = ref(null);
 const statusLabelInput = ref(null);
+const editingBoardName = ref(false);
+const boardNameDraft = ref('');
+const savingBoardName = ref(false);
+const boardNameInput = ref(null);
 const showingColumnModal = ref(false);
 const showingCreateModal = ref(false);
 const showingDetailsModal = ref(false);
@@ -116,12 +120,20 @@ const buildStatusLabels = (labels = {}) => ({
 
 const boardStatusLabels = ref(buildStatusLabels(props.statusLabels));
 const currentBoardId = computed(() => props.currentBoard?.id ?? null);
-const currentBoardName = computed(() => props.currentBoard?.name ?? 'Task Board');
-const currentBoardDescription = computed(() => props.currentBoard?.description ?? '');
+const currentBoardName = ref(props.currentBoard?.name ?? 'Task Board');
+const currentBoardDescription = ref(props.currentBoard?.description ?? '');
 const priorityOptions = computed(() =>
     props.priorities.length
         ? props.priorities
         : ['low', 'medium', 'high'],
+);
+
+watch(
+    () => props.currentBoard,
+    (nextBoard) => {
+        currentBoardName.value = nextBoard?.name ?? 'Task Board';
+        currentBoardDescription.value = nextBoard?.description ?? '';
+    },
 );
 
 watch(
@@ -250,6 +262,75 @@ const closeColumnModal = () => {
 
 const setStatusLabelInput = (element) => {
     statusLabelInput.value = element;
+};
+
+const setBoardNameInput = (element) => {
+    boardNameInput.value = element;
+};
+
+const cancelBoardNameEdit = () => {
+    editingBoardName.value = false;
+    boardNameDraft.value = '';
+};
+
+const startBoardNameEdit = async () => {
+    if (savingBoardName.value || !currentBoardId.value) {
+        return;
+    }
+
+    editingBoardName.value = true;
+    boardNameDraft.value = currentBoardName.value;
+
+    await nextTick();
+
+    boardNameInput.value?.focus();
+    boardNameInput.value?.select();
+};
+
+const saveBoardName = async () => {
+    if (!editingBoardName.value || savingBoardName.value || !currentBoardId.value) {
+        return;
+    }
+
+    const nextName = boardNameDraft.value.trim();
+
+    if (!nextName) {
+        errorMessage.value = 'Board title cannot be empty.';
+        return;
+    }
+
+    if (nextName === currentBoardName.value) {
+        cancelBoardNameEdit();
+        return;
+    }
+
+    errorMessage.value = '';
+    savingBoardName.value = true;
+
+    try {
+        const response = await axios.patch(
+            route('boards.update', {
+                board: currentBoardId.value,
+            }),
+            { name: nextName },
+        );
+
+        currentBoardName.value = response?.data?.board?.name ?? nextName;
+        currentBoardDescription.value = response?.data?.board?.description ?? currentBoardDescription.value;
+
+        cancelBoardNameEdit();
+        router.reload({
+            only: ['boards', 'currentBoard'],
+            preserveScroll: true,
+            preserveState: true,
+        });
+    } catch (error) {
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to update board title. Please try again.';
+    } finally {
+        savingBoardName.value = false;
+    }
 };
 
 const cancelStatusLabelEdit = () => {
@@ -910,9 +991,27 @@ const submitTaskUpdate = () => {
                 class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
             >
                 <div class="space-y-1">
-                    <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                        {{ currentBoardName }}
-                    </h2>
+                    <input
+                        v-if="editingBoardName"
+                        :ref="setBoardNameInput"
+                        v-model="boardNameDraft"
+                        type="text"
+                        maxlength="100"
+                        class="block w-full max-w-lg rounded-md border-gray-300 px-2 py-1 text-xl font-semibold leading-tight text-gray-800 shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                        @keydown.enter.prevent="saveBoardName"
+                        @keydown.esc.prevent="cancelBoardNameEdit"
+                        @blur="saveBoardName"
+                    />
+                    <button
+                        v-else
+                        type="button"
+                        class="-mx-2 block max-w-full rounded-md px-2 py-1 text-left text-xl font-semibold leading-tight text-gray-800 transition hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        @click="startBoardNameEdit"
+                    >
+                        <span class="block truncate">
+                            {{ currentBoardName }}
+                        </span>
+                    </button>
                     <p
                         v-if="currentBoardDescription"
                         class="text-sm text-gray-500"
