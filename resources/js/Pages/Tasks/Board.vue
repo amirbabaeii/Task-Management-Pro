@@ -66,6 +66,10 @@ const editingBoardName = ref(false);
 const boardNameDraft = ref('');
 const savingBoardName = ref(false);
 const boardNameInput = ref(null);
+const editingBoardDescription = ref(false);
+const boardDescriptionDraft = ref('');
+const savingBoardDescription = ref(false);
+const boardDescriptionInput = ref(null);
 const showingColumnModal = ref(false);
 const showingCreateModal = ref(false);
 const showingDetailsModal = ref(false);
@@ -268,16 +272,25 @@ const setBoardNameInput = (element) => {
     boardNameInput.value = element;
 };
 
+const setBoardDescriptionInput = (element) => {
+    boardDescriptionInput.value = element;
+};
+
 const cancelBoardNameEdit = () => {
     editingBoardName.value = false;
     boardNameDraft.value = '';
 };
 
 const startBoardNameEdit = async () => {
-    if (savingBoardName.value || !currentBoardId.value) {
+    if (
+        savingBoardName.value ||
+        savingBoardDescription.value ||
+        !currentBoardId.value
+    ) {
         return;
     }
 
+    cancelBoardDescriptionEdit();
     editingBoardName.value = true;
     boardNameDraft.value = currentBoardName.value;
 
@@ -285,6 +298,30 @@ const startBoardNameEdit = async () => {
 
     boardNameInput.value?.focus();
     boardNameInput.value?.select();
+};
+
+const cancelBoardDescriptionEdit = () => {
+    editingBoardDescription.value = false;
+    boardDescriptionDraft.value = '';
+};
+
+const startBoardDescriptionEdit = async () => {
+    if (
+        savingBoardName.value ||
+        savingBoardDescription.value ||
+        !currentBoardId.value
+    ) {
+        return;
+    }
+
+    cancelBoardNameEdit();
+    editingBoardDescription.value = true;
+    boardDescriptionDraft.value = currentBoardDescription.value;
+
+    await nextTick();
+
+    boardDescriptionInput.value?.focus();
+    boardDescriptionInput.value?.select();
 };
 
 const saveBoardName = async () => {
@@ -330,6 +367,51 @@ const saveBoardName = async () => {
             'Unable to update board title. Please try again.';
     } finally {
         savingBoardName.value = false;
+    }
+};
+
+const saveBoardDescription = async () => {
+    if (
+        !editingBoardDescription.value ||
+        savingBoardDescription.value ||
+        !currentBoardId.value
+    ) {
+        return;
+    }
+
+    const nextDescription = boardDescriptionDraft.value.trim();
+
+    if (nextDescription === currentBoardDescription.value) {
+        cancelBoardDescriptionEdit();
+        return;
+    }
+
+    errorMessage.value = '';
+    savingBoardDescription.value = true;
+
+    try {
+        const response = await axios.patch(
+            route('boards.update', {
+                board: currentBoardId.value,
+            }),
+            { description: nextDescription },
+        );
+
+        currentBoardName.value = response?.data?.board?.name ?? currentBoardName.value;
+        currentBoardDescription.value = response?.data?.board?.description ?? '';
+
+        cancelBoardDescriptionEdit();
+        router.reload({
+            only: ['boards', 'currentBoard'],
+            preserveScroll: true,
+            preserveState: true,
+        });
+    } catch (error) {
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to update board description. Please try again.';
+    } finally {
+        savingBoardDescription.value = false;
     }
 };
 
@@ -988,9 +1070,9 @@ const submitTaskUpdate = () => {
     <AuthenticatedLayout>
         <template #header>
             <div
-                class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+                class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
             >
-                <div class="space-y-1">
+                <div class="min-w-0 flex-1 space-y-1">
                     <input
                         v-if="editingBoardName"
                         :ref="setBoardNameInput"
@@ -1012,14 +1094,37 @@ const submitTaskUpdate = () => {
                             {{ currentBoardName }}
                         </span>
                     </button>
-                    <p
-                        v-if="currentBoardDescription"
-                        class="text-sm text-gray-500"
+                    <textarea
+                        v-if="editingBoardDescription"
+                        :ref="setBoardDescriptionInput"
+                        v-model="boardDescriptionDraft"
+                        rows="3"
+                        maxlength="280"
+                        class="block w-full max-w-none resize-y rounded-md border-gray-300 px-3 py-2 text-sm text-gray-600 shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                        placeholder="Add board description"
+                        @keydown.ctrl.enter.prevent="saveBoardDescription"
+                        @keydown.meta.enter.prevent="saveBoardDescription"
+                        @keydown.esc.prevent="cancelBoardDescriptionEdit"
+                        @blur="saveBoardDescription"
+                    />
+                    <button
+                        v-else
+                        type="button"
+                        class="-mx-2 block max-w-full rounded-md px-2 py-1 text-left text-sm transition hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        :class="currentBoardDescription
+                            ? 'text-gray-500'
+                            : 'text-gray-400'"
+                        @click="startBoardDescriptionEdit"
                     >
-                        {{ currentBoardDescription }}
-                    </p>
+                        <span class="board-description-preview block break-words">
+                            {{
+                                currentBoardDescription ||
+                                    'Add board description'
+                            }}
+                        </span>
+                    </button>
                 </div>
-                <div class="flex flex-wrap items-center gap-3">
+                <div class="flex shrink-0 flex-wrap items-center gap-3">
                     <SecondaryButton @click="showingColumnModal = true">
                         Add Column
                     </SecondaryButton>
@@ -1814,6 +1919,14 @@ const submitTaskUpdate = () => {
     border-radius: 9999px;
     background: rgb(31 41 55);
     box-shadow: 0 1px 3px rgb(15 23 42 / 0.25);
+}
+
+.board-description-preview {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
 }
 
 </style>

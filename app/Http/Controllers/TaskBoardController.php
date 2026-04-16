@@ -71,18 +71,42 @@ class TaskBoardController extends Controller
     {
         $user = $request->user();
         $board = $this->resolveBoard($user, $board);
-        $validated = validator(
-            [
-                'name' => trim((string) $request->input('name')),
-            ],
-            [
-                'name' => ['required', 'string', 'max:100'],
-            ],
-        )->validate();
+        $payload = [];
 
-        $board->update([
-            'name' => $validated['name'],
-        ]);
+        if ($request->has('name')) {
+            $payload['name'] = trim((string) $request->input('name'));
+        }
+
+        if ($request->has('description')) {
+            $payload['description'] = trim((string) $request->input('description')) ?: null;
+        }
+
+        $validated = validator(
+            $payload,
+            [
+                'name' => ['sometimes', 'required', 'string', 'max:100'],
+                'description' => ['sometimes', 'nullable', 'string', 'max:280'],
+            ],
+        )->after(function ($validator) use ($request): void {
+            if (!$request->has('name') && !$request->has('description')) {
+                $validator->errors()->add(
+                    'board',
+                    'Provide a board name or description to update.',
+                );
+            }
+        })->validate();
+
+        $updates = [];
+
+        if ($request->has('name')) {
+            $updates['name'] = $validated['name'];
+        }
+
+        if ($request->has('description')) {
+            $updates['description'] = $validated['description'] ?? null;
+        }
+
+        $board->update($updates);
 
         return response()->json([
             'board' => [
