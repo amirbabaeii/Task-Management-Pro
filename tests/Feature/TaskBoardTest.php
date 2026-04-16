@@ -282,6 +282,28 @@ class TaskBoardTest extends TestCase
         ]);
     }
 
+    public function test_authenticated_user_can_update_a_board_description(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+
+        $response = $this->actingAs($user)->patchJson(
+            route('boards.update', ['board' => $board]),
+            ['description' => 'Track roadmap work and cross-team handoffs.'],
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('board.id', $board->id)
+            ->assertJsonPath('board.description', 'Track roadmap work and cross-team handoffs.');
+
+        $this->assertDatabaseHas('boards', [
+            'id' => $board->id,
+            'user_id' => $user->id,
+            'description' => 'Track roadmap work and cross-team handoffs.',
+        ]);
+    }
+
     public function test_assignee_can_move_a_task_to_a_custom_board_column(): void
     {
         $user = User::factory()->create();
