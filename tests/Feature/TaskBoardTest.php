@@ -259,6 +259,29 @@ class TaskBoardTest extends TestCase
         ]);
     }
 
+    public function test_authenticated_user_can_update_a_board_name(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+
+        $response = $this->actingAs($user)->patchJson(
+            route('boards.update', ['board' => $board]),
+            ['name' => 'Product Planning'],
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('board.id', $board->id)
+            ->assertJsonPath('board.name', 'Product Planning')
+            ->assertJsonPath('boards.0.name', 'Product Planning');
+
+        $this->assertDatabaseHas('boards', [
+            'id' => $board->id,
+            'user_id' => $user->id,
+            'name' => 'Product Planning',
+        ]);
+    }
+
     public function test_assignee_can_move_a_task_to_a_custom_board_column(): void
     {
         $user = User::factory()->create();
