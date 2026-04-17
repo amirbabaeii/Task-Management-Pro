@@ -455,6 +455,63 @@ class TaskBoardTest extends TestCase
         ]);
     }
 
+    public function test_authenticated_user_can_add_a_comment_to_a_task(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+        $task = Task::factory()->create([
+            'status' => 'pending',
+        ]);
+
+        $this->attachAssignee($user, $board, $task, 1);
+
+        $response = $this->actingAs($user)->postJson(
+            route('tasks.comments.store', ['task' => $task]),
+            ['content' => 'I will handle this one after standup.'],
+        );
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('comment.content', 'I will handle this one after standup.')
+            ->assertJsonPath('comment.user.id', $user->id)
+            ->assertJsonPath('comment.user.name', $user->name);
+
+        $this->assertDatabaseHas('task_comments', [
+            'task_id' => $task->id,
+            'user_id' => $user->id,
+            'content' => 'I will handle this one after standup.',
+        ]);
+    }
+
+    public function test_non_assignee_can_add_a_comment_to_a_task_for_now(): void
+    {
+        $owner = User::factory()->create();
+        $commenter = User::factory()->create();
+        $board = $this->defaultBoardFor($owner);
+        $task = Task::factory()->create([
+            'status' => 'pending',
+        ]);
+
+        $this->attachAssignee($owner, $board, $task, 1);
+
+        $response = $this->actingAs($commenter)->postJson(
+            route('tasks.comments.store', ['task' => $task]),
+            ['content' => 'Reviewed this and left a note.'],
+        );
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('comment.content', 'Reviewed this and left a note.')
+            ->assertJsonPath('comment.user.id', $commenter->id)
+            ->assertJsonPath('comment.user.name', $commenter->name);
+
+        $this->assertDatabaseHas('task_comments', [
+            'task_id' => $task->id,
+            'user_id' => $commenter->id,
+            'content' => 'Reviewed this and left a note.',
+        ]);
+    }
+
     public function test_task_board_update_requires_valid_data(): void
     {
         $user = User::factory()->create();
