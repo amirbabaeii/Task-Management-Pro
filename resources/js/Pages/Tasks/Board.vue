@@ -33,10 +33,22 @@ const props = defineProps({
     },
 });
 
+const normalizeComment = (comment) => ({
+    ...comment,
+    id: Number(comment.id ?? 0),
+    user: {
+        id: Number(comment.user?.id ?? 0),
+        name: comment.user?.name ?? 'Unknown user',
+    },
+});
+
 const normalizeTask = (task) => ({
     ...task,
     progress: Number(task.progress ?? 0),
     sort_order: Number(task.sort_order ?? 0),
+    comments: Array.isArray(task.comments)
+        ? task.comments.map(normalizeComment)
+        : [],
 });
 
 const cloneTasks = (taskList) => taskList.map((task) => ({ ...task }));
@@ -77,6 +89,9 @@ const showingEditModal = ref(false);
 const selectedTaskId = ref(null);
 const editingTaskId = ref(null);
 const errorMessage = ref('');
+const commentDraft = ref('');
+const commentErrors = ref({});
+const submittingComment = ref(false);
 const fallbackBoardStatuses = ['pending', 'in-progress', 'completed'];
 const normalizeBoardStatuses = (statuses = []) =>
     statuses.length ? [...statuses] : [...fallbackBoardStatuses];
@@ -250,6 +265,12 @@ const setTaskFormValues = (taskForm, values = {}) => {
     taskForm.priority = values.priority ?? defaultPriority;
     taskForm.progress = values.progress ?? 0;
     taskForm.deadline_at = values.deadline_at ?? '';
+};
+
+const resetCommentForm = () => {
+    commentDraft.value = '';
+    commentErrors.value = {};
+    submittingComment.value = false;
 };
 
 const closeCreateModal = () => {
@@ -690,6 +711,7 @@ const onBoardLaneDrop = async () => {
 };
 
 const openTaskDetails = (task) => {
+    resetCommentForm();
     selectedTaskId.value = task.id;
     showingDetailsModal.value = true;
 };
@@ -697,6 +719,7 @@ const openTaskDetails = (task) => {
 const closeTaskDetails = () => {
     showingDetailsModal.value = false;
     selectedTaskId.value = null;
+    resetCommentForm();
 };
 
 const openEditModal = (task) => {
@@ -1033,6 +1056,57 @@ const onColumnDrop = async (status) => {
     );
 
     await reorderTask(task, status, null);
+};
+
+const appendCommentToTask = (taskId, comment) => {
+    const normalizedComment = normalizeComment(comment);
+
+    tasks.value = tasks.value.map((task) => {
+        if (task.id !== taskId) {
+            return task;
+        }
+
+        return normalizeTask({
+            ...task,
+            comments: [...(task.comments ?? []), normalizedComment],
+        });
+    });
+};
+
+const submitTaskComment = async () => {
+    if (!activeTask.value || submittingComment.value) {
+        return;
+    }
+
+    submittingComment.value = true;
+    commentErrors.value = {};
+    errorMessage.value = '';
+
+    try {
+        const response = await axios.post(
+            route('tasks.comments.store', {
+                task: activeTask.value.id,
+            }),
+            { content: commentDraft.value },
+        );
+
+        if (response?.data?.comment) {
+            appendCommentToTask(activeTask.value.id, response.data.comment);
+        }
+
+        commentDraft.value = '';
+    } catch (error) {
+        if (error?.response?.status === 422) {
+            commentErrors.value = error.response.data.errors ?? {};
+            return;
+        }
+
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to add a comment right now. Please try again.';
+    } finally {
+        submittingComment.value = false;
+    }
 };
 
 const submitTask = () => {
@@ -1487,6 +1561,94 @@ const submitTaskUpdate = () => {
                                             width: `${activeTask.progress}%`,
                                         }"
                                     />
+                                </div>
+                            </section>
+
+                            <section class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <h4 class="text-sm font-semibold text-gray-900">
+                                        Comments
+                                    </h4>
+                                    <span class="text-xs text-gray-500">
+                                        {{
+                                            activeTask.comments.length
+                                        }}
+                                        {{
+                                            activeTask.comments.length === 1
+                                                ? 'comment'
+                                                : 'comments'
+                                        }}
+                                    </span>
+                                </div>
+
+                                <form
+                                    class="space-y-3"
+                                    @submit.prevent="submitTaskComment"
+                                >
+                                    <textarea
+                                        v-model="commentDraft"
+                                        rows="3"
+                                        class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                        placeholder="Add a comment..."
+                                    />
+                                    <InputError
+                                        :message="commentErrors.content?.[0]"
+                                    />
+                                    <div class="flex justify-end">
+                                        <PrimaryButton
+                                            :class="{
+                                                'opacity-25':
+                                                    submittingComment ||
+                                                    !commentDraft.trim(),
+                                            }"
+                                            :disabled="
+                                                submittingComment ||
+                                                !commentDraft.trim()
+                                            "
+                                        >
+                                            {{
+                                                submittingComment
+                                                    ? 'Posting...'
+                                                    : 'Post Comment'
+                                            }}
+                                        </PrimaryButton>
+                                    </div>
+                                </form>
+
+                                <div
+                                    v-if="activeTask.comments.length"
+                                    class="space-y-3"
+                                >
+                                    <article
+                                        v-for="comment in activeTask.comments"
+                                        :key="comment.id"
+                                        class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
+                                    >
+                                        <div
+                                            class="flex flex-wrap items-center justify-between gap-2"
+                                        >
+                                            <div class="text-sm font-semibold text-gray-800">
+                                                {{ comment.user.name }}
+                                            </div>
+                                            <div class="text-xs text-gray-500">
+                                                {{
+                                                    formatDateTime(comment.created_at) ||
+                                                    'Just now'
+                                                }}
+                                            </div>
+                                        </div>
+                                        <p
+                                            class="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600"
+                                        >
+                                            {{ comment.content }}
+                                        </p>
+                                    </article>
+                                </div>
+                                <div
+                                    v-else
+                                    class="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-500"
+                                >
+                                    No comments yet.
                                 </div>
                             </section>
                         </div>
