@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Tasks\ReorderTaskRequest;
+use App\Http\Requests\Tasks\StoreTaskCommentRequest;
 use App\Http\Requests\Tasks\StoreTaskRequest;
 use App\Http\Requests\Tasks\UpdateTaskRequest;
 use App\Models\Board;
 use App\Models\BoardColumn;
 use App\Models\Task;
+use App\Models\TaskComment;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -139,6 +141,22 @@ class TaskBoardController extends Controller
         });
 
         return redirect()->route('tasks.board', ['board' => $board]);
+    }
+
+    public function storeComment(
+        StoreTaskCommentRequest $request,
+        Task $task,
+    ): JsonResponse {
+        $comment = $task->comments()->create([
+            'user_id' => $request->user()->id,
+            'content' => $request->validated('content'),
+        ]);
+
+        $comment->load('user:id,name');
+
+        return response()->json([
+            'comment' => $this->commentPayload($comment),
+        ], 201);
     }
 
     public function storeColumn(Request $request, Board $board): RedirectResponse
@@ -431,6 +449,12 @@ class TaskBoardController extends Controller
                 'tasks.progress',
                 'tasks.created_at',
             ])
+            ->with([
+                'comments' => fn ($query) => $query
+                    ->with('user:id,name')
+                    ->orderBy('created_at')
+                    ->orderBy('id'),
+            ])
             ->orderBy('task_user.sort_order')
             ->orderBy('tasks.id')
             ->get()
@@ -445,6 +469,10 @@ class TaskBoardController extends Controller
                     'progress' => $task->progress,
                     'created_at' => $task->created_at,
                     'sort_order' => (int) $task->pivot->sort_order,
+                    'comments' => $task->comments
+                        ->map(fn (TaskComment $comment): array => $this->commentPayload($comment))
+                        ->values()
+                        ->all(),
                 ];
             })
             ->values()
@@ -663,6 +691,19 @@ class TaskBoardController extends Controller
                 ];
             })
             ->all();
+    }
+
+    private function commentPayload(TaskComment $comment): array
+    {
+        return [
+            'id' => $comment->id,
+            'content' => $comment->content,
+            'created_at' => $comment->created_at,
+            'user' => [
+                'id' => $comment->user?->id,
+                'name' => $comment->user?->name ?? 'Unknown user',
+            ],
+        ];
     }
 
     private function userHasTaskOnBoard(

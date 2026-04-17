@@ -26,6 +26,8 @@ Route::middleware('auth')->group(function () {
         ->name('boards.store');
     Route::patch('/boards/{board}', [TaskBoardController::class, 'updateBoard'])
         ->name('boards.update');
+    Route::post('/tasks/{task}/comments', [TaskBoardController::class, 'storeComment'])
+        ->name('tasks.comments.store');
     Route::post('/tasks/board/{board}/tasks', [TaskBoardController::class, 'store'])
         ->name('tasks.store');
     Route::post('/tasks/board/{board}/columns', [TaskBoardController::class, 'storeColumn'])
