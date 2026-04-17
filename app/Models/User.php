@@ -96,4 +96,9 @@ class User extends Authenticatable
             ->withTimestamps()
             ->wherePivot('role', 'reviewer');
     }
+
+    public function taskComments(): HasMany
+    {
+        return $this->hasMany(TaskComment::class);
+    }
 }
