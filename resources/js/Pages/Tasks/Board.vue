@@ -53,6 +53,11 @@ const normalizeTask = (task) => ({
     ...task,
     progress: Number(task.progress ?? 0),
     sort_order: Number(task.sort_order ?? 0),
+    tags: Array.isArray(task.tags)
+        ? task.tags
+              .map((tag) => `${tag ?? ''}`.trim())
+              .filter(Boolean)
+        : [],
     comments: Array.isArray(task.comments)
         ? task.comments.map(normalizeComment)
         : [],
@@ -119,6 +124,7 @@ const blankTaskData = () => ({
     description: '',
     status: defaultStatus,
     priority: defaultPriority,
+    tags: '',
     progress: 0,
     deadline_at: '',
 });
@@ -198,6 +204,11 @@ const formatPriority = (priority) => {
 
     return `${priority.charAt(0).toUpperCase()}${priority.slice(1)}`;
 };
+
+const visibleTags = (tags = [], limit = 3) => tags.slice(0, limit);
+
+const hiddenTagCount = (tags = [], limit = 3) =>
+    Math.max(tags.length - limit, 0);
 
 const priorityBadgeClass = (priority) => {
     if (priority === 'low') {
@@ -280,6 +291,7 @@ const setTaskFormValues = (taskForm, values = {}) => {
     taskForm.description = values.description ?? '';
     taskForm.status = values.status ?? defaultStatus;
     taskForm.priority = values.priority ?? defaultPriority;
+    taskForm.tags = Array.isArray(values.tags) ? values.tags.join(', ') : '';
     taskForm.progress = values.progress ?? 0;
     taskForm.deadline_at = values.deadline_at ?? '';
 };
@@ -750,6 +762,7 @@ const openEditModal = (task) => {
         description: task.description ?? '',
         status: task.status,
         priority: task.priority,
+        tags: task.tags ?? [],
         progress: task.progress ?? 0,
         deadline_at: formatDateInput(task.deadline_at),
     });
@@ -1476,6 +1489,24 @@ const submitTaskUpdate = () => {
 
                                     <div class="mt-3">
                                         <div
+                                            v-if="task.tags.length"
+                                            class="mb-3 flex flex-wrap gap-1.5"
+                                        >
+                                            <span
+                                                v-for="tag in visibleTags(task.tags)"
+                                                :key="`${task.id}-${tag}`"
+                                                class="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700"
+                                            >
+                                                {{ tag }}
+                                            </span>
+                                            <span
+                                                v-if="hiddenTagCount(task.tags)"
+                                                class="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500"
+                                            >
+                                                +{{ hiddenTagCount(task.tags) }}
+                                            </span>
+                                        </div>
+                                        <div
                                             class="h-2 w-full rounded-full bg-gray-200"
                                         >
                                             <div
@@ -1676,6 +1707,36 @@ const submitTaskUpdate = () => {
                                         activeTask.description ||
                                         'No description provided.'
                                     }}
+                                </p>
+                            </section>
+
+                            <section class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <h4 class="text-sm font-semibold text-gray-900">
+                                        Tags
+                                    </h4>
+                                    <span class="text-xs text-gray-500">
+                                        {{ activeTask.tags.length }}
+                                        {{ activeTask.tags.length === 1 ? 'tag' : 'tags' }}
+                                    </span>
+                                </div>
+                                <div
+                                    v-if="activeTask.tags.length"
+                                    class="flex flex-wrap gap-2"
+                                >
+                                    <span
+                                        v-for="tag in activeTask.tags"
+                                        :key="`${activeTask.id}-tag-${tag}`"
+                                        class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-700"
+                                    >
+                                        {{ tag }}
+                                    </span>
+                                </div>
+                                <p
+                                    v-else
+                                    class="text-sm text-gray-500"
+                                >
+                                    No tags added.
                                 </p>
                             </section>
 
@@ -1977,6 +2038,26 @@ const submitTaskUpdate = () => {
                                 />
                             </div>
 
+                            <div class="md:col-span-2">
+                                <InputLabel for="tags" value="Tags" />
+                                <TextInput
+                                    id="tags"
+                                    v-model="form.tags"
+                                    type="text"
+                                    class="mt-1 block w-full"
+                                    maxlength="340"
+                                    autocomplete="off"
+                                    placeholder="Comma separated tags, e.g. backend, sprint, onboarding"
+                                />
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Add up to 10 tags. Separate them with commas.
+                                </p>
+                                <InputError
+                                    class="mt-2"
+                                    :message="form.errors.tags || form.errors['tags.0']"
+                                />
+                            </div>
+
                             <div>
                                 <InputLabel
                                     for="deadline_at"
@@ -2114,6 +2195,26 @@ const submitTaskUpdate = () => {
                                 <InputError
                                     class="mt-2"
                                     :message="editForm.errors.description"
+                                />
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <InputLabel for="edit-tags" value="Tags" />
+                                <TextInput
+                                    id="edit-tags"
+                                    v-model="editForm.tags"
+                                    type="text"
+                                    class="mt-1 block w-full"
+                                    maxlength="340"
+                                    autocomplete="off"
+                                    placeholder="Comma separated tags, e.g. backend, sprint, onboarding"
+                                />
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Add up to 10 tags. Separate them with commas.
+                                </p>
+                                <InputError
+                                    class="mt-2"
+                                    :message="editForm.errors.tags || editForm.errors['tags.0']"
                                 />
                             </div>
 
