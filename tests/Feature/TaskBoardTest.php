@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Board;
 use App\Models\BoardColumn;
 use App\Models\Task;
+use App\Models\TaskComment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -510,6 +511,97 @@ class TaskBoardTest extends TestCase
             'user_id' => $commenter->id,
             'content' => 'Reviewed this and left a note.',
         ]);
+    }
+
+    public function test_authenticated_user_can_reply_to_a_task_comment(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+        $task = Task::factory()->create([
+            'status' => 'pending',
+        ]);
+        $parentComment = TaskComment::query()->create([
+            'task_id' => $task->id,
+            'user_id' => $user->id,
+            'content' => 'Initial comment.',
+        ]);
+
+        $this->attachAssignee($user, $board, $task, 1);
+
+        $response = $this->actingAs($user)->postJson(
+            route('tasks.comments.store', ['task' => $task]),
+            [
+                'content' => 'Replying with more detail.',
+                'parent_id' => $parentComment->id,
+            ],
+        );
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('comment.content', 'Replying with more detail.')
+            ->assertJsonPath('comment.parent_id', $parentComment->id)
+            ->assertJsonPath('comment.user.id', $user->id);
+
+        $this->assertDatabaseHas('task_comments', [
+            'task_id' => $task->id,
+            'user_id' => $user->id,
+            'parent_id' => $parentComment->id,
+            'content' => 'Replying with more detail.',
+        ]);
+    }
+
+    public function test_reply_must_target_a_top_level_comment_on_the_same_task(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+        $task = Task::factory()->create([
+            'status' => 'pending',
+        ]);
+        $anotherTask = Task::factory()->create([
+            'status' => 'pending',
+        ]);
+        $parentComment = TaskComment::query()->create([
+            'task_id' => $task->id,
+            'user_id' => $user->id,
+            'content' => 'Top-level comment.',
+        ]);
+        $replyComment = TaskComment::query()->create([
+            'task_id' => $task->id,
+            'user_id' => $user->id,
+            'parent_id' => $parentComment->id,
+            'content' => 'Existing reply.',
+        ]);
+        $foreignComment = TaskComment::query()->create([
+            'task_id' => $anotherTask->id,
+            'user_id' => $user->id,
+            'content' => 'Comment on another task.',
+        ]);
+
+        $this->attachAssignee($user, $board, $task, 1);
+
+        $nestedReplyResponse = $this->actingAs($user)->postJson(
+            route('tasks.comments.store', ['task' => $task]),
+            [
+                'content' => 'Trying to reply to a reply.',
+                'parent_id' => $replyComment->id,
+            ],
+        );
+
+        $nestedReplyResponse
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['parent_id']);
+
+        $crossTaskReplyResponse = $this->actingAs($user)->postJson(
+            route('tasks.comments.store', ['task' => $task]),
+            [
+                'content' => 'Trying to reply across tasks.',
+                'parent_id' => $foreignComment->id,
+            ],
+        );
+
+        $crossTaskReplyResponse
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['parent_id']);
     }
 
     public function test_task_board_update_requires_valid_data(): void
