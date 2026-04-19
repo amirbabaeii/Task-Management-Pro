@@ -148,11 +148,12 @@ class TaskBoardController extends Controller
         Task $task,
     ): JsonResponse {
         $comment = $task->comments()->create([
+            'parent_id' => $request->validated('parent_id'),
             'user_id' => $request->user()->id,
             'content' => $request->validated('content'),
         ]);
 
-        $comment->load('user:id,name');
+        $comment->load('user:id,name', 'replies.user:id,name');
 
         return response()->json([
             'comment' => $this->commentPayload($comment),
@@ -451,7 +452,11 @@ class TaskBoardController extends Controller
             ])
             ->with([
                 'comments' => fn ($query) => $query
-                    ->with('user:id,name')
+                    ->whereNull('parent_id')
+                    ->with([
+                        'user:id,name',
+                        'replies.user:id,name',
+                    ])
                     ->orderBy('created_at')
                     ->orderBy('id'),
             ])
@@ -697,12 +702,19 @@ class TaskBoardController extends Controller
     {
         return [
             'id' => $comment->id,
+            'parent_id' => $comment->parent_id,
             'content' => $comment->content,
             'created_at' => $comment->created_at,
             'user' => [
                 'id' => $comment->user?->id,
                 'name' => $comment->user?->name ?? 'Unknown user',
             ],
+            'replies' => $comment->relationLoaded('replies')
+                ? $comment->replies
+                    ->map(fn (TaskComment $reply): array => $this->commentPayload($reply))
+                    ->values()
+                    ->all()
+                : [],
         ];
     }
 
