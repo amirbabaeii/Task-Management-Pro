@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class Task extends Model
 {
@@ -23,6 +24,7 @@ class Task extends Model
         'progress',
         'deadline_at',
         'priority',
+        'tags',
     ];
 
     /**
@@ -33,6 +35,7 @@ class Task extends Model
     protected $casts = [
         'deadline_at' => 'datetime',
         'progress' => 'integer',
+        'tags' => 'array',
     ];
 
 
@@ -57,6 +60,12 @@ class Task extends Model
         'medium',
         'high',
     ];
+
+    /**
+     * Limits for task tags.
+     */
+    public const MAX_TAGS = 10;
+    public const MAX_TAG_LENGTH = 30;
 
     /**
      * Get the users associated with the task.
@@ -95,5 +104,25 @@ class Task extends Model
         return $this->hasMany(TaskComment::class)
             ->orderBy('created_at')
             ->orderBy('id');
+    }
+
+    /**
+     * Normalize tag input from request payloads or persisted data.
+     *
+     * @param  array<int, mixed>|string|null  $tags
+     * @return array<int, string>
+     */
+    public static function normalizeTags(array|string|null $tags): array
+    {
+        if (is_string($tags)) {
+            $tags = preg_split('/[\r\n,]+/', $tags) ?: [];
+        }
+
+        return Collection::make($tags ?? [])
+            ->map(fn ($tag): string => preg_replace('/\s+/', ' ', trim((string) $tag)) ?: '')
+            ->filter()
+            ->unique(fn (string $tag): string => strtolower($tag))
+            ->values()
+            ->all();
     }
 }
