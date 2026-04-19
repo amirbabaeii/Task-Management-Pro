@@ -25,6 +25,7 @@ class UpdateTaskRequest extends FormRequest
             'title' => trim((string) $this->input('title')),
             'description' => filled($description) ? trim((string) $description) : null,
             'deadline_at' => $this->input('deadline_at') ?: null,
+            'tags' => Task::normalizeTags($this->input('tags')),
         ]);
     }
 
@@ -43,6 +44,8 @@ class UpdateTaskRequest extends FormRequest
             'priority' => ['required', 'string', Rule::in(Task::PRIORITIES)],
             'progress' => ['required', 'integer', 'min:0', 'max:100'],
             'deadline_at' => ['nullable', 'date'],
+            'tags' => ['nullable', 'array', 'max:'.Task::MAX_TAGS],
+            'tags.*' => ['string', 'max:'.Task::MAX_TAG_LENGTH],
         ];
     }
 }

@@ -17,6 +17,17 @@ class StoreTaskRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $description = $this->input('description');
+
+        $this->merge([
+            'title' => trim((string) $this->input('title')),
+            'description' => filled($description) ? trim((string) $description) : null,
+            'tags' => Task::normalizeTags($this->input('tags')),
+        ]);
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -29,6 +40,8 @@ class StoreTaskRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:1000'],
             'status' => ['nullable', 'string', Rule::in(BoardColumn::statusesForUser($this->user()))],
             'priority' => ['nullable', 'string', Rule::in(Task::PRIORITIES)],
+            'tags' => ['nullable', 'array', 'max:'.Task::MAX_TAGS],
+            'tags.*' => ['string', 'max:'.Task::MAX_TAG_LENGTH],
         ];
     }
 
