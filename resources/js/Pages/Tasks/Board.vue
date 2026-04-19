@@ -36,10 +36,17 @@ const props = defineProps({
 const normalizeComment = (comment) => ({
     ...comment,
     id: Number(comment.id ?? 0),
+    parent_id:
+        comment.parent_id === null || comment.parent_id === undefined
+            ? null
+            : Number(comment.parent_id),
     user: {
         id: Number(comment.user?.id ?? 0),
         name: comment.user?.name ?? 'Unknown user',
     },
+    replies: Array.isArray(comment.replies)
+        ? comment.replies.map(normalizeComment)
+        : [],
 });
 
 const normalizeTask = (task) => ({
@@ -92,6 +99,10 @@ const errorMessage = ref('');
 const commentDraft = ref('');
 const commentErrors = ref({});
 const submittingComment = ref(false);
+const activeReplyCommentId = ref(null);
+const replyDraft = ref('');
+const replyErrors = ref({});
+const replyingCommentId = ref(null);
 const fallbackBoardStatuses = ['pending', 'in-progress', 'completed'];
 const normalizeBoardStatuses = (statuses = []) =>
     statuses.length ? [...statuses] : [...fallbackBoardStatuses];
@@ -236,6 +247,12 @@ const formatDateTime = (value) => {
     }).format(date);
 };
 
+const commentCount = (comments = []) =>
+    comments.reduce(
+        (count, comment) => count + 1 + commentCount(comment.replies ?? []),
+        0,
+    );
+
 const activeTask = computed(() =>
     tasks.value.find((task) => task.id === selectedTaskId.value) ?? null,
 );
@@ -271,6 +288,10 @@ const resetCommentForm = () => {
     commentDraft.value = '';
     commentErrors.value = {};
     submittingComment.value = false;
+    activeReplyCommentId.value = null;
+    replyDraft.value = '';
+    replyErrors.value = {};
+    replyingCommentId.value = null;
 };
 
 const closeCreateModal = () => {
@@ -1073,13 +1094,58 @@ const appendCommentToTask = (taskId, comment) => {
     });
 };
 
-const submitTaskComment = async () => {
-    if (!activeTask.value || submittingComment.value) {
-        return;
+const appendReplyToComments = (comments, parentId, reply) =>
+    comments.map((comment) => {
+        if (comment.id !== parentId) {
+            return comment;
+        }
+
+        return normalizeComment({
+            ...comment,
+            replies: [...(comment.replies ?? []), reply],
+        });
+    });
+
+const appendReplyToTask = (taskId, parentId, comment) => {
+    const normalizedReply = normalizeComment(comment);
+
+    tasks.value = tasks.value.map((task) => {
+        if (task.id !== taskId) {
+            return task;
+        }
+
+        return normalizeTask({
+            ...task,
+            comments: appendReplyToComments(
+                task.comments ?? [],
+                parentId,
+                normalizedReply,
+            ),
+        });
+    });
+};
+
+const submitComment = async ({ content, parentId = null }) => {
+    if (!activeTask.value) {
+        return false;
     }
 
-    submittingComment.value = true;
-    commentErrors.value = {};
+    if (parentId === null && submittingComment.value) {
+        return false;
+    }
+
+    if (parentId !== null && replyingCommentId.value === parentId) {
+        return false;
+    }
+
+    if (parentId === null) {
+        submittingComment.value = true;
+        commentErrors.value = {};
+    } else {
+        replyingCommentId.value = parentId;
+        replyErrors.value = {};
+    }
+
     errorMessage.value = '';
 
     try {
@@ -1087,25 +1153,95 @@ const submitTaskComment = async () => {
             route('tasks.comments.store', {
                 task: activeTask.value.id,
             }),
-            { content: commentDraft.value },
+            {
+                content,
+                parent_id: parentId,
+            },
         );
 
         if (response?.data?.comment) {
-            appendCommentToTask(activeTask.value.id, response.data.comment);
+            if (parentId === null) {
+                appendCommentToTask(activeTask.value.id, response.data.comment);
+            } else {
+                appendReplyToTask(
+                    activeTask.value.id,
+                    parentId,
+                    response.data.comment,
+                );
+            }
         }
 
-        commentDraft.value = '';
+        return true;
     } catch (error) {
         if (error?.response?.status === 422) {
-            commentErrors.value = error.response.data.errors ?? {};
-            return;
+            const errors = error.response.data.errors ?? {};
+
+            if (parentId === null) {
+                commentErrors.value = errors;
+            } else {
+                replyErrors.value = errors;
+            }
+
+            return false;
         }
 
         errorMessage.value =
             error?.response?.data?.message ||
             'Unable to add a comment right now. Please try again.';
+
+        return false;
     } finally {
-        submittingComment.value = false;
+        if (parentId === null) {
+            submittingComment.value = false;
+        } else {
+            replyingCommentId.value = null;
+        }
+    }
+};
+
+const submitTaskComment = async () => {
+    if (!activeTask.value) {
+        return;
+    }
+
+    const success = await submitComment({
+        content: commentDraft.value,
+    });
+
+    if (success) {
+        commentDraft.value = '';
+    }
+};
+
+const startReply = async (comment) => {
+    if (activeReplyCommentId.value === comment.id) {
+        activeReplyCommentId.value = null;
+        replyDraft.value = '';
+        replyErrors.value = {};
+        return;
+    }
+
+    activeReplyCommentId.value = comment.id;
+    replyDraft.value = '';
+    replyErrors.value = {};
+
+    await nextTick();
+};
+
+const cancelReply = () => {
+    activeReplyCommentId.value = null;
+    replyDraft.value = '';
+    replyErrors.value = {};
+};
+
+const submitReply = async (comment) => {
+    const success = await submitComment({
+        content: replyDraft.value,
+        parentId: comment.id,
+    });
+
+    if (success) {
+        cancelReply();
     }
 };
 
@@ -1571,10 +1707,11 @@ const submitTaskUpdate = () => {
                                     </h4>
                                     <span class="text-xs text-gray-500">
                                         {{
-                                            activeTask.comments.length
+                                            commentCount(activeTask.comments)
                                         }}
                                         {{
-                                            activeTask.comments.length === 1
+                                            commentCount(activeTask.comments) ===
+                                            1
                                                 ? 'comment'
                                                 : 'comments'
                                         }}
@@ -1642,6 +1779,91 @@ const submitTaskUpdate = () => {
                                         >
                                             {{ comment.content }}
                                         </p>
+                                        <div class="mt-3 flex items-center justify-end">
+                                            <button
+                                                type="button"
+                                                class="rounded-md px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                                @click="startReply(comment)"
+                                            >
+                                                {{
+                                                    activeReplyCommentId ===
+                                                    comment.id
+                                                        ? 'Cancel Reply'
+                                                        : 'Reply'
+                                                }}
+                                            </button>
+                                        </div>
+
+                                        <form
+                                            v-if="activeReplyCommentId === comment.id"
+                                            class="mt-3 space-y-3 border-t border-gray-200 pt-3"
+                                            @submit.prevent="submitReply(comment)"
+                                        >
+                                            <textarea
+                                                v-model="replyDraft"
+                                                rows="3"
+                                                class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                                :placeholder="`Reply to ${comment.user.name}...`"
+                                            />
+                                            <InputError
+                                                :message="replyErrors.content?.[0]"
+                                            />
+                                            <div class="flex justify-end gap-3">
+                                                <SecondaryButton @click="cancelReply">
+                                                    Cancel
+                                                </SecondaryButton>
+                                                <PrimaryButton
+                                                    :class="{
+                                                        'opacity-25':
+                                                            replyingCommentId ===
+                                                                comment.id ||
+                                                            !replyDraft.trim(),
+                                                    }"
+                                                    :disabled="
+                                                        replyingCommentId ===
+                                                            comment.id ||
+                                                        !replyDraft.trim()
+                                                    "
+                                                >
+                                                    {{
+                                                        replyingCommentId ===
+                                                        comment.id
+                                                            ? 'Posting...'
+                                                            : 'Post Reply'
+                                                    }}
+                                                </PrimaryButton>
+                                            </div>
+                                        </form>
+
+                                        <div
+                                            v-if="comment.replies.length"
+                                            class="mt-4 space-y-3 border-l-2 border-gray-200 pl-4"
+                                        >
+                                            <article
+                                                v-for="reply in comment.replies"
+                                                :key="reply.id"
+                                                class="rounded-lg border border-gray-200 bg-white px-4 py-3"
+                                            >
+                                                <div
+                                                    class="flex flex-wrap items-center justify-between gap-2"
+                                                >
+                                                    <div class="text-sm font-semibold text-gray-800">
+                                                        {{ reply.user.name }}
+                                                    </div>
+                                                    <div class="text-xs text-gray-500">
+                                                        {{
+                                                            formatDateTime(reply.created_at) ||
+                                                            'Just now'
+                                                        }}
+                                                    </div>
+                                                </div>
+                                                <p
+                                                    class="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600"
+                                                >
+                                                    {{ reply.content }}
+                                                </p>
+                                            </article>
+                                        </div>
                                     </article>
                                 </div>
                                 <div
