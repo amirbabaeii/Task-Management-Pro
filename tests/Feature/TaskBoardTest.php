@@ -24,6 +24,7 @@ class TaskBoardTest extends TestCase
             'description' => 'Allow task creation directly from the board.',
             'status' => 'pending',
             'priority' => 'medium',
+            'tags' => 'frontend, inertia, board',
             'deadline_at' => '2026-04-15',
         ]);
 
@@ -38,6 +39,7 @@ class TaskBoardTest extends TestCase
         $this->assertNotNull($task);
         $this->assertSame('pending', $task->status);
         $this->assertSame('medium', $task->priority);
+        $this->assertSame(['frontend', 'inertia', 'board'], $task->tags);
         $this->assertSame('2026-04-15', $task->deadline_at?->toDateString());
 
         $this->assertDatabaseHas('task_user', [
@@ -60,11 +62,14 @@ class TaskBoardTest extends TestCase
                 'title' => '   ',
                 'status' => 'blocked',
                 'priority' => 'urgent',
+                'tags' => collect(range(1, Task::MAX_TAGS + 1))
+                    ->map(fn (int $index): string => "tag-{$index}")
+                    ->all(),
             ]);
 
         $response
             ->assertRedirect(route('tasks.board', ['board' => $board]))
-            ->assertSessionHasErrors(['title', 'status', 'priority']);
+            ->assertSessionHasErrors(['title', 'status', 'priority', 'tags']);
 
         $this->assertDatabaseCount('tasks', 0);
     }
@@ -123,6 +128,7 @@ class TaskBoardTest extends TestCase
                 'description' => 'Updated description',
                 'status' => 'in-progress',
                 'priority' => 'high',
+                'tags' => 'backend, api, release',
                 'progress' => 70,
                 'deadline_at' => '2026-04-20',
             ]);
@@ -139,6 +145,10 @@ class TaskBoardTest extends TestCase
             'priority' => 'high',
             'progress' => 70,
         ]);
+        $this->assertSame(
+            ['backend', 'api', 'release'],
+            $task->fresh()->tags,
+        );
 
         $this->assertSame(
             '2026-04-20',
@@ -622,6 +632,7 @@ class TaskBoardTest extends TestCase
                 'description' => str_repeat('a', 1001),
                 'status' => 'blocked',
                 'priority' => 'urgent',
+                'tags' => [str_repeat('x', Task::MAX_TAG_LENGTH + 1)],
                 'progress' => 120,
             ]);
 
@@ -632,6 +643,7 @@ class TaskBoardTest extends TestCase
                 'description',
                 'status',
                 'priority',
+                'tags.0',
                 'progress',
             ]);
     }
