@@ -129,24 +129,24 @@ const handleKeydown = (event) => {
 </script>
 
 <template>
-    <div class="mt-1 space-y-3">
+    <div class="mt-1 space-y-2">
         <div
-            class="flex min-h-24 flex-wrap gap-2 rounded-lg border border-gray-300 bg-white p-3"
+            class="flex min-h-8 flex-wrap gap-1.5 rounded-lg bg-white "
         >
             <span
                 v-for="tag in tags"
                 :key="tag"
-                class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700"
+                class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-sm font-medium text-slate-700"
             >
                 {{ tag }}
                 <button
                     type="button"
-                    class="inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-200 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                    class="inline-flex h-4 w-4 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-200 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
                     :aria-label="`Remove ${tag} tag`"
                     @click="removeTag(tag)"
                 >
                     <svg
-                        class="h-3 w-3"
+                        class="h-2.5 w-2.5"
                         viewBox="0 0 12 12"
                         fill="none"
                         stroke="currentColor"
