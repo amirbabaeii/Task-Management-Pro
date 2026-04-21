@@ -7,6 +7,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import TagInput from '@/Components/TagInput.vue';
 import TextInput from '@/Components/TextInput.vue';
 import axios from 'axios';
 
@@ -118,13 +119,15 @@ const defaultStatus = boardStatuses.value.includes('pending')
 const defaultPriority = props.priorities.includes('medium')
     ? 'medium'
     : (props.priorities[0] ?? 'medium');
+const maxTaskTags = 10;
+const maxTaskTagLength = 30;
 
 const blankTaskData = () => ({
     title: '',
     description: '',
     status: defaultStatus,
     priority: defaultPriority,
-    tags: '',
+    tags: [],
     progress: 0,
     deadline_at: '',
 });
@@ -291,10 +294,15 @@ const setTaskFormValues = (taskForm, values = {}) => {
     taskForm.description = values.description ?? '';
     taskForm.status = values.status ?? defaultStatus;
     taskForm.priority = values.priority ?? defaultPriority;
-    taskForm.tags = Array.isArray(values.tags) ? values.tags.join(', ') : '';
+    taskForm.tags = Array.isArray(values.tags) ? [...values.tags] : [];
     taskForm.progress = values.progress ?? 0;
     taskForm.deadline_at = values.deadline_at ?? '';
 };
+
+const resolveFieldError = (errors = {}, field) =>
+    errors[field] ??
+    Object.entries(errors).find(([key]) => key.startsWith(`${field}.`))?.[1] ??
+    '';
 
 const resetCommentForm = () => {
     commentDraft.value = '';
@@ -2040,21 +2048,13 @@ const submitTaskUpdate = () => {
 
                             <div class="md:col-span-2">
                                 <InputLabel for="tags" value="Tags" />
-                                <TextInput
+                                <TagInput
                                     id="tags"
                                     v-model="form.tags"
-                                    type="text"
-                                    class="mt-1 block w-full"
-                                    maxlength="340"
-                                    autocomplete="off"
-                                    placeholder="Comma separated tags, e.g. backend, sprint, onboarding"
-                                />
-                                <p class="mt-1 text-xs text-gray-500">
-                                    Add up to 10 tags. Separate them with commas.
-                                </p>
-                                <InputError
-                                    class="mt-2"
-                                    :message="form.errors.tags || form.errors['tags.0']"
+                                    placeholder="Add a tag, e.g. backend"
+                                    :max-tags="maxTaskTags"
+                                    :max-tag-length="maxTaskTagLength"
+                                    :error="resolveFieldError(form.errors, 'tags')"
                                 />
                             </div>
 
@@ -2200,21 +2200,13 @@ const submitTaskUpdate = () => {
 
                             <div class="md:col-span-2">
                                 <InputLabel for="edit-tags" value="Tags" />
-                                <TextInput
+                                <TagInput
                                     id="edit-tags"
                                     v-model="editForm.tags"
-                                    type="text"
-                                    class="mt-1 block w-full"
-                                    maxlength="340"
-                                    autocomplete="off"
-                                    placeholder="Comma separated tags, e.g. backend, sprint, onboarding"
-                                />
-                                <p class="mt-1 text-xs text-gray-500">
-                                    Add up to 10 tags. Separate them with commas.
-                                </p>
-                                <InputError
-                                    class="mt-2"
-                                    :message="editForm.errors.tags || editForm.errors['tags.0']"
+                                    placeholder="Add a tag, e.g. backend"
+                                    :max-tags="maxTaskTags"
+                                    :max-tag-length="maxTaskTagLength"
+                                    :error="resolveFieldError(editForm.errors, 'tags')"
                                 />
                             </div>
 
