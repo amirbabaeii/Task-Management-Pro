@@ -2,17 +2,23 @@
 
 namespace App\Providers;
 
+use App\Exceptions\ApiExceptionHandler;
 use App\Models\Task;
 use App\Policies\TaskPolicy;
-use Illuminate\Support\Facades\Vite;
-use Illuminate\Support\Facades\Gate;
+use App\Repositories\Auth\AuthRepository;
+use App\Repositories\Interfaces\Auth\AuthRepositoryInterface;
+use App\Repositories\Interfaces\TaskRepositoryInterface;
+use App\Repositories\Interfaces\UserRepositoryInterface;
+use App\Repositories\TaskRepository;
+use App\Repositories\UserRepository;
 use App\Services\Auth\AuthService;
 use App\Services\Interfaces\Auth\AuthServiceInterface;
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Http\Resources\Json\JsonResource;
-use App\Exceptions\ApiExceptionHandler;
-use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use App\Services\UserService;
 use Illuminate\Contracts\Debug\ExceptionHandler as ExceptionHandlerContract;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Vite;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,10 +27,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
+        $this->app->bind(AuthRepositoryInterface::class, AuthRepository::class);
+        $this->app->bind(TaskRepositoryInterface::class, TaskRepository::class);
+
         $this->app->bind(AuthServiceInterface::class, AuthService::class);
-        
+        $this->app->singleton(UserService::class);
+
         $this->app->bind(ExceptionHandlerContract::class, ApiExceptionHandler::class);
-        
     }
 
     /**
@@ -34,6 +44,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Vite::prefetch(concurrency: 3);
         JsonResource::withoutWrapping();
+
         Gate::policy(Task::class, TaskPolicy::class);
     }
 }
