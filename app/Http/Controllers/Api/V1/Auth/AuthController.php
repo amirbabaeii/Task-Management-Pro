@@ -21,12 +21,12 @@ class AuthController extends ApiController
     public function login(LoginRequest $request): JsonResource
     {
         $request->authenticate();
-        
+
         $result = $this->authService->login([
             'email' => $request->email,
-            'password' => $request->password
+            'password' => $request->password,
         ]);
-        
+
         return new AuthResource(
             $result,
             'Login successful',
@@ -37,6 +37,7 @@ class AuthController extends ApiController
     public function logout(Request $request): JsonResource
     {
         $this->authService->logout($request->user());
+
         return new AuthResource(
             null,
             'Logged out successfully',
