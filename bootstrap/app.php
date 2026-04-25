@@ -11,7 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
-use Throwable;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -32,7 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'password_confirmation',
         ]);
 
-        $exceptions->report(function (Throwable $e) {
+        $exceptions->report(function (\Throwable $e) {
             if (! app()->bound('request') || ! app('request')->is('api/*')) {
                 return;
             }
@@ -66,7 +65,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return new ApiResource(null, $e->getMessage(), 401);
         });
 
-        $exceptions->render(function (Throwable $e, Request $request) {
+        $exceptions->render(function (\Throwable $e, Request $request) {
             if (! $request->is('api/*') || config('app.debug')) {
                 return null;
             }
