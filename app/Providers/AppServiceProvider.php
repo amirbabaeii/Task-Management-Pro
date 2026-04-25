@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Exceptions\ApiExceptionHandler;
 use App\Models\Task;
 use App\Policies\TaskPolicy;
 use App\Repositories\Auth\AuthRepository;
@@ -14,7 +13,6 @@ use App\Repositories\UserRepository;
 use App\Services\Auth\AuthService;
 use App\Services\Interfaces\Auth\AuthServiceInterface;
 use App\Services\UserService;
-use Illuminate\Contracts\Debug\ExceptionHandler as ExceptionHandlerContract;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
@@ -33,8 +31,6 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->bind(AuthServiceInterface::class, AuthService::class);
         $this->app->singleton(UserService::class);
-
-        $this->app->bind(ExceptionHandlerContract::class, ApiExceptionHandler::class);
     }
 
     /**
