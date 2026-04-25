@@ -4,25 +4,16 @@ namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Auth\LoginRequest;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\ValidationException;
-use App\Services\Interfaces\Auth\AuthServiceInterface;
 use App\Http\Resources\Auth\AuthResource;
-use Illuminate\Auth\AuthenticationException;
+use App\Services\Interfaces\Auth\AuthServiceInterface;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Log;
 
 class AuthController extends ApiController
 {
-    private AuthServiceInterface $authService;
-
-    public function __construct(AuthServiceInterface $authService)
-    {
-        $this->middleware('auth:sanctum')->except(['login']);
-        $this->authService = $authService;
-    }
+    public function __construct(
+        private readonly AuthServiceInterface $authService,
+    ) {}
 
     /**
      * Handle user login
