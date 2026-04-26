@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\TaskPriority;
 use App\Models\Board;
 use App\Models\BoardColumn;
 use App\Models\Task;
@@ -38,7 +39,7 @@ class TaskBoardTest extends TestCase
 
         $this->assertNotNull($task);
         $this->assertSame('pending', $task->status);
-        $this->assertSame('medium', $task->priority);
+        $this->assertSame(TaskPriority::Medium, $task->priority);
         $this->assertSame(['frontend', 'inertia', 'board'], $task->tags);
         $this->assertSame('2026-04-15', $task->deadline_at?->toDateString());
 

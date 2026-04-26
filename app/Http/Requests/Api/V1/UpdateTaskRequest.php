@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\TaskPriority;
 use App\Models\BoardColumn;
 use App\Models\Task;
 use Illuminate\Foundation\Http\FormRequest;
@@ -53,7 +54,7 @@ class UpdateTaskRequest extends FormRequest
             'status' => ['sometimes', 'required', 'string', Rule::in(BoardColumn::statusesForUser($this->user()))],
             'progress' => ['sometimes', 'integer', 'min:0', 'max:100'],
             'deadline_at' => ['sometimes', 'nullable', 'date'],
-            'priority' => ['sometimes', 'required', 'string', Rule::in(Task::PRIORITIES)],
+            'priority' => ['sometimes', 'required', Rule::enum(TaskPriority::class)],
             'tags' => ['sometimes', 'nullable', 'array', 'max:'.Task::MAX_TAGS],
             'tags.*' => ['string', 'max:'.Task::MAX_TAG_LENGTH],
         ];

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\V1;
 
+use App\Enums\TaskPriority;
 use App\Models\Task;
 use App\Models\User;
 use Tests\TestCase;
@@ -247,7 +248,7 @@ class TaskCRUDTest extends TestCase
         // Add assertion to verify exact record
         $updatedTask = Task::find($task->id);
         $this->assertEquals(50, $updatedTask->progress);
-        $this->assertEquals('high', $updatedTask->priority);
+        $this->assertSame(TaskPriority::High, $updatedTask->priority);
     }
 
     public function test_cannot_update_task_with_invalid_data()

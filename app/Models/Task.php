@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Enums\TaskPriority;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
@@ -35,9 +36,9 @@ class Task extends Model
     protected $casts = [
         'deadline_at' => 'datetime',
         'progress' => 'integer',
+        'priority' => TaskPriority::class,
         'tags' => 'array',
     ];
-
 
     /**
      * Default status values available on new boards.
@@ -47,18 +48,7 @@ class Task extends Model
     public const STATUSES = [
         'pending',
         'in-progress',
-        'completed'
-    ];
-
-    /**
-     * Valid priority values for the task.
-     *
-     * @var array<string>
-     */
-    public const PRIORITIES = [
-        'low',
-        'medium',
-        'high',
+        'completed',
     ];
 
     /**

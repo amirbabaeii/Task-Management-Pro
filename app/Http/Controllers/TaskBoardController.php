@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TaskPriority;
 use App\Http\Requests\Tasks\ReorderTaskRequest;
 use App\Http\Requests\Tasks\StoreTaskCommentRequest;
 use App\Http\Requests\Tasks\StoreTaskRequest;
@@ -38,7 +39,7 @@ class TaskBoardController extends Controller
             'tasks' => $this->boardTasksForUser($user, $board),
             'statuses' => BoardColumn::statusesForBoard($board),
             'statusLabels' => $this->statusLabelsForBoard($board),
-            'priorities' => Task::PRIORITIES,
+            'priorities' => TaskPriority::values(),
         ]);
     }
 

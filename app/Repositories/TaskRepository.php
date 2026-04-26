@@ -2,17 +2,19 @@
 
 namespace App\Repositories;
 
+use App\Enums\TaskPriority;
 use App\Models\Task;
 use App\Repositories\Interfaces\TaskRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+
 class TaskRepository implements TaskRepositoryInterface
 {
     public function list(int $limit, array $filters = []): Collection|LengthAwarePaginator
     {
         $query = Task::query();
 
-        if (! empty($filters['priority']) && in_array($filters['priority'], Task::PRIORITIES, true)) {
+        if (! empty($filters['priority']) && in_array($filters['priority'], TaskPriority::values(), true)) {
             $query->where('priority', $filters['priority']);
         }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\TaskPriority;
 use App\Models\BoardColumn;
 use App\Models\Task;
 use Illuminate\Foundation\Http\FormRequest;
@@ -39,7 +40,7 @@ class StoreTaskRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'status' => ['nullable', 'string', Rule::in(BoardColumn::statusesForUser($this->user()))],
-            'priority' => ['nullable', 'string', Rule::in(Task::PRIORITIES)],
+            'priority' => ['nullable', Rule::enum(TaskPriority::class)],
             'tags' => ['nullable', 'array', 'max:'.Task::MAX_TAGS],
             'tags.*' => ['string', 'max:'.Task::MAX_TAG_LENGTH],
         ];
