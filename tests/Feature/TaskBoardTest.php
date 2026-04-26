@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Enums\TaskPriority;
 use App\Models\Board;
 use App\Models\BoardColumn;
@@ -666,7 +667,7 @@ class TaskBoardTest extends TestCase
 
     private function defaultBoardFor(User $user): Board
     {
-        return Board::ensureDefaultForUser($user);
+        return app(EnsureUserHasDefaultBoardAction::class)->execute($user);
     }
 
     private function attachAssignee(

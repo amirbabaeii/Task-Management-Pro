@@ -31,30 +31,11 @@ class Board extends Model
         return $this->hasMany(BoardColumn::class);
     }
 
-    public static function ensureDefaultForUser(User $user): self
-    {
-        $board = $user->boards()
-            ->orderBy('position')
-            ->orderBy('id')
-            ->first();
-
-        if (!$board) {
-            $board = $user->boards()->create([
-                'name' => 'My Board',
-                'description' => self::DEFAULT_DESCRIPTION,
-                'position' => 1,
-            ]);
-        }
-
-        BoardColumn::ensureDefaultsForBoard($board);
-
-        return $board;
-    }
-
+    /**
+     * Boards owned by the user, ordered by position.
+     */
     public static function orderedForUser(User $user): Collection
     {
-        self::ensureDefaultForUser($user);
-
         return $user->boards()
             ->orderBy('position')
             ->orderBy('id')
@@ -63,8 +44,6 @@ class Board extends Model
 
     public static function nextPositionForUser(User $user): int
     {
-        self::ensureDefaultForUser($user);
-
         return ((int) $user->boards()->max('position')) + 1;
     }
 }

@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\BoardColumns\EnsureBoardHasDefaultColumnsAction;
+use App\Actions\BoardColumns\SyncBoardColumnOrderAction;
+use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Enums\TaskPriority;
 use App\Http\Requests\Tasks\ReorderTaskRequest;
 use App\Http\Requests\Tasks\StoreTaskCommentRequest;
@@ -24,6 +27,12 @@ use Inertia\Response;
 
 class TaskBoardController extends Controller
 {
+    public function __construct(
+        private readonly EnsureUserHasDefaultBoardAction $ensureUserHasDefaultBoard,
+        private readonly EnsureBoardHasDefaultColumnsAction $ensureBoardHasDefaultColumns,
+        private readonly SyncBoardColumnOrderAction $syncBoardColumnOrder,
+    ) {}
+
     public function index(Request $request, ?Board $board = null): Response
     {
         $user = $request->user();
@@ -65,7 +74,7 @@ class TaskBoardController extends Controller
             'position' => Board::nextPositionForUser($user),
         ]);
 
-        BoardColumn::ensureDefaultsForBoard($board);
+        $this->ensureBoardHasDefaultColumns->execute($board);
 
         return redirect()->route('tasks.board', ['board' => $board]);
     }
@@ -225,7 +234,7 @@ class TaskBoardController extends Controller
 
         array_splice($reorderedStatuses, $insertAt, 0, [$validated['status']]);
 
-        BoardColumn::syncOrderForBoard($board, $reorderedStatuses);
+        $this->syncBoardColumnOrder->execute($board, $reorderedStatuses);
 
         return response()->json([
             'statuses' => BoardColumn::statusesForBoard($board->fresh()),
@@ -417,11 +426,13 @@ class TaskBoardController extends Controller
 
     private function resolveBoard(User $user, ?Board $board): Board
     {
-        $board = $board ?? Board::ensureDefaultForUser($user);
+        if ($board === null) {
+            return $this->ensureUserHasDefaultBoard->execute($user);
+        }
 
         abort_unless((int) $board->user_id === (int) $user->id, 404);
 
-        BoardColumn::ensureDefaultsForBoard($board);
+        $this->ensureBoardHasDefaultColumns->execute($board);
 
         return $board;
     }
