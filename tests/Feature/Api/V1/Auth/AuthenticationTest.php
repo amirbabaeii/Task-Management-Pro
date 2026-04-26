@@ -14,12 +14,12 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => bcrypt('password123')
+            'password' => bcrypt('password123'),
         ]);
 
         $response = $this->postJson(route('api.v1.auth.login'), [
             'email' => 'test@example.com',
-            'password' => 'password123'
+            'password' => 'password123',
         ]);
 
         $response
@@ -33,11 +33,11 @@ class AuthenticationTest extends TestCase
                         'name',
                         'email',
                     ],
-                    'token'
-                ]
+                    'token',
+                ],
             ])
             ->assertJson([
-                'type' => "success",
+                'type' => 'success',
             ]);
 
         $this->assertAuthenticated();
@@ -62,7 +62,7 @@ class AuthenticationTest extends TestCase
         $token = $user->createToken('test-token')->plainTextToken;
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $token,
+            'Authorization' => 'Bearer '.$token,
         ])->postJson(route('api.v1.auth.logout'));
 
         $response->assertStatus(200);

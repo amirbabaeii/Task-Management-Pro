@@ -38,13 +38,13 @@ class StoreTaskCommentRequest extends FormRequest
         $validator->after(function (Validator $validator): void {
             $task = $this->route('task');
 
-            if (!$task instanceof Task || !$this->filled('parent_id')) {
+            if (! $task instanceof Task || ! $this->filled('parent_id')) {
                 return;
             }
 
             $parent = TaskComment::query()->find($this->integer('parent_id'));
 
-            if (!$parent) {
+            if (! $parent) {
                 return;
             }
 

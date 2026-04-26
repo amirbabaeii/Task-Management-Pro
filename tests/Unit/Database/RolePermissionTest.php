@@ -1,25 +1,25 @@
 <?php
+
 // database/tests/Unit/RolePermissionTest.php
 
 namespace Tests\Unit\Database;
 
 use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
+use Tests\TestCase;
 
 class RolePermissionTest extends TestCase
 {
     use RefreshDatabase;
-    public function setUp(): void
+
+    protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(RoleAndPermissionSeeder::class);
     }
 
-    
     public function test_normal_user_permissions()
     {
         $normalUser = Role::findByName('normal-user');

@@ -16,4 +16,4 @@ class UserRepository implements UserRepositoryInterface
             'password' => Hash::make($data['password']),
         ]);
     }
-} 
+}

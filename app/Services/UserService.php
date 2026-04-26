@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Services\Interfaces\UserServiceInterface;
 use App\Repositories\Interfaces\UserRepositoryInterface;
+use App\Services\Interfaces\UserServiceInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -20,16 +20,17 @@ class UserService implements UserServiceInterface
     {
         try {
             DB::beginTransaction();
-            
+
             $user = $this->userRepository->create($data);
-            
+
             DB::commit();
+
             return $user;
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('User registration failed: ' . $e->getMessage());
+            Log::error('User registration failed: '.$e->getMessage());
             throw $e;
         }
     }
-} 
+}

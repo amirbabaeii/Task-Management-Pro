@@ -3,13 +3,12 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\ApiController;
-use App\Http\Resources\TaskResource;
-use App\Repositories\Interfaces\TaskRepositoryInterface;
-use App\Repositories\TaskRepository;
-use Illuminate\Http\Request;
 use App\Http\Requests\Api\V1\StoreTaskRequest;
 use App\Http\Requests\Api\V1\UpdateTaskRequest;
+use App\Http\Resources\TaskResource;
 use App\Models\Task;
+use App\Repositories\Interfaces\TaskRepositoryInterface;
+use Illuminate\Http\Request;
 
 class TaskController extends ApiController
 {
@@ -27,7 +26,8 @@ class TaskController extends ApiController
     {
         $filters = $request->only(['priority']);
         $list = $this->taskRepository->list(10, array_filter($filters));
-        return new TaskResource($list, "List of tasks successfully received", 200);
+
+        return new TaskResource($list, 'List of tasks successfully received', 200);
     }
 
     /**
@@ -44,7 +44,8 @@ class TaskController extends ApiController
     public function store(StoreTaskRequest $request): TaskResource
     {
         $task = $this->taskRepository->create($request->validated());
-        return new TaskResource($task, "Task successfully created", 201);
+
+        return new TaskResource($task, 'Task successfully created', 201);
     }
 
     /**
@@ -69,7 +70,8 @@ class TaskController extends ApiController
     public function update(UpdateTaskRequest $request, Task $task): TaskResource
     {
         $task = $this->taskRepository->update($task->id, $request->validated());
-        return new TaskResource($task, "Task successfully updated", 200);
+
+        return new TaskResource($task, 'Task successfully updated', 200);
     }
 
     /**

@@ -675,8 +675,7 @@ class TaskBoardTest extends TestCase
         Board $board,
         Task $task,
         int $sortOrder,
-    ): void
-    {
+    ): void {
         $task->users()->attach($user->id, [
             'board_id' => $board->id,
             'role' => 'assignee',

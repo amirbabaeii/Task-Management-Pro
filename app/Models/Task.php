@@ -44,6 +44,7 @@ class Task extends Model
      * Limits for task tags.
      */
     public const MAX_TAGS = 10;
+
     public const MAX_TAG_LENGTH = 30;
 
     /**

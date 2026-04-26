@@ -19,8 +19,8 @@ class TaskPolicy
         return $task->users()
             ->where('user_id', $user->id)
             ->where('role', 'assignee')
-            ->exists() 
+            ->exists()
             ? Response::allow()
             : Response::deny('This task is not assigned to you.');
     }
-} 
+}

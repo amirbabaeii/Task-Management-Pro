@@ -100,7 +100,7 @@ class TaskBoardController extends Controller
                 'description' => ['sometimes', 'nullable', 'string', 'max:280'],
             ],
         )->after(function ($validator) use ($request): void {
-            if (!$request->has('name') && !$request->has('description')) {
+            if (! $request->has('name') && ! $request->has('description')) {
                 $validator->errors()->add(
                     'board',
                     'Provide a board name or description to update.',
@@ -295,7 +295,7 @@ class TaskBoardController extends Controller
             ]);
         }
 
-        if ($beforeTaskId !== null && !$this->userHasTaskInStatus(
+        if ($beforeTaskId !== null && ! $this->userHasTaskInStatus(
             $user->id,
             $board->id,
             $beforeTaskId,

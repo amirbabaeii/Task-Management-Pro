@@ -16,6 +16,7 @@ class UpdateTaskRequest extends FormRequest
     public function authorize(): bool
     {
         $task = Task::findOrFail($this->route('task')->id);
+
         return $this->user()->can('update', $task);
     }
 

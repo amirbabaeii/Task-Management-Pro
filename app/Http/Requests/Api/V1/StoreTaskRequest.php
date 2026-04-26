@@ -45,5 +45,4 @@ class StoreTaskRequest extends FormRequest
             'tags.*' => ['string', 'max:'.Task::MAX_TAG_LENGTH],
         ];
     }
-
 }

@@ -2,10 +2,10 @@
 
 namespace Tests\Unit\Models;
 
-use Tests\TestCase;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class TaskModelTest extends TestCase
 {
@@ -35,7 +35,7 @@ class TaskModelTest extends TestCase
 
         $this->task->users()->attach([
             $assignee->id => ['role' => 'assignee'],
-            $reviewer->id => ['role' => 'reviewer']
+            $reviewer->id => ['role' => 'reviewer'],
         ]);
 
         $this->assertTrue($this->task->assignees->contains($assignee));
@@ -50,7 +50,7 @@ class TaskModelTest extends TestCase
 
         $this->task->users()->attach([
             $assignee->id => ['role' => 'assignee'],
-            $reviewer->id => ['role' => 'reviewer']
+            $reviewer->id => ['role' => 'reviewer'],
         ]);
 
         $this->assertTrue($this->task->reviewers->contains($reviewer));
@@ -61,7 +61,7 @@ class TaskModelTest extends TestCase
     public function test_task_can_have_multiple_assignees()
     {
         $assignees = User::factory()->count(3)->create();
-        
+
         foreach ($assignees as $assignee) {
             $this->task->users()->attach($assignee->id, ['role' => 'assignee']);
         }
@@ -73,7 +73,7 @@ class TaskModelTest extends TestCase
     public function test_task_can_have_multiple_reviewers()
     {
         $reviewers = User::factory()->count(3)->create();
-        
+
         foreach ($reviewers as $reviewer) {
             $this->task->users()->attach($reviewer->id, ['role' => 'reviewer']);
         }
@@ -81,4 +81,4 @@ class TaskModelTest extends TestCase
         $this->assertEquals(3, $this->task->reviewers->count());
         $this->assertEquals(0, $this->task->assignees->count());
     }
-} 
+}

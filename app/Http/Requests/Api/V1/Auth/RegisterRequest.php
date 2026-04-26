@@ -17,14 +17,14 @@ class RegisterRequest extends FormRequest
             'name' => [
                 'required',
                 'string',
-                'max:255'
+                'max:255',
             ],
             'email' => [
                 'required',
                 'string',
                 'email:rfc,strict,spoof,filter',
                 'max:255',
-                'unique:users'
+                'unique:users',
             ],
             'password' => [
                 'required',
@@ -32,9 +32,8 @@ class RegisterRequest extends FormRequest
                 'min:8',
                 'max:255',
                 'confirmed',
-                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/'
+                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/',
             ],
         ];
     }
-
-} 
+}

@@ -3,8 +3,8 @@
 namespace App\Repositories\Auth;
 
 use App\Models\User;
-use Illuminate\Support\Facades\Auth;
 use App\Repositories\Interfaces\Auth\AuthRepositoryInterface;
+use Illuminate\Support\Facades\Auth;
 
 class AuthRepository implements AuthRepositoryInterface
 {
@@ -13,6 +13,7 @@ class AuthRepository implements AuthRepositoryInterface
         if (Auth::attempt($credentials)) {
             return Auth::user();
         }
+
         return null;
     }
 

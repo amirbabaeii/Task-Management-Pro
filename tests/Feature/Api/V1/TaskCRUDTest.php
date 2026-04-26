@@ -5,14 +5,15 @@ namespace Tests\Feature\Api\V1;
 use App\Enums\TaskPriority;
 use App\Models\Task;
 use App\Models\User;
-use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class TaskCRUDTest extends TestCase
 {
     use RefreshDatabase;
 
     private $user;
+
     private $token;
 
     protected function setUp(): void
@@ -30,7 +31,7 @@ class TaskCRUDTest extends TestCase
 
         // Act
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
+            'Authorization' => 'Bearer '.$this->token,
         ])->getJson(route('api.v1.tasks.index'));
 
         // Assert
@@ -45,14 +46,14 @@ class TaskCRUDTest extends TestCase
                             'priority',
                             'created_at',
                             'updated_at',
-                        ]
+                        ],
                     ],
                     'current_page',
                     'total',
                     'per_page',
                 ],
                 'message',
-                'type'
+                'type',
             ])
             ->assertJsonPath('data.per_page', 10)
             ->assertJsonPath('message', 'List of tasks successfully received')
@@ -70,7 +71,7 @@ class TaskCRUDTest extends TestCase
 
         // Act
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
+            'Authorization' => 'Bearer '.$this->token,
         ])->postJson(route('api.v1.tasks.store'), $taskData);
 
         // Assert
@@ -85,7 +86,7 @@ class TaskCRUDTest extends TestCase
                     'updated_at',
                 ],
                 'message',
-                'type'
+                'type',
             ])
             ->assertJsonPath('message', 'Task successfully created')
             ->assertJsonPath('type', 'success')
@@ -107,7 +108,7 @@ class TaskCRUDTest extends TestCase
         ];
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
+            'Authorization' => 'Bearer '.$this->token,
         ])->postJson(route('api.v1.tasks.store'), $invalidData);
 
         $response->assertStatus(422)
@@ -115,16 +116,16 @@ class TaskCRUDTest extends TestCase
                 'data',
                 'message',
                 'data' => [
-                    'errors'=> [
+                    'errors' => [
                         'title',
                         'status',
                         'priority',
-                    ]
+                    ],
                 ],
-                'type'
+                'type',
             ])
             ->assertJson([
-                'type' => 'error'
+                'type' => 'error',
             ]);
 
     }
@@ -139,7 +140,7 @@ class TaskCRUDTest extends TestCase
         ];
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
+            'Authorization' => 'Bearer '.$this->token,
         ])->postJson(route('api.v1.tasks.store'), $taskData);
 
         $response->assertStatus(201)
@@ -154,7 +155,7 @@ class TaskCRUDTest extends TestCase
                     'updated_at',
                 ],
                 'message',
-                'type'
+                'type',
             ])
             ->assertJsonPath('data.priority', 'medium');
 
@@ -213,7 +214,7 @@ class TaskCRUDTest extends TestCase
 
         // Act
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
+            'Authorization' => 'Bearer '.$this->token,
         ])->putJson(route('api.v1.tasks.update', $task->id), $updateData);
 
         // Assert
@@ -230,7 +231,7 @@ class TaskCRUDTest extends TestCase
                     'updated_at',
                 ],
                 'message',
-                'type'
+                'type',
             ])
             ->assertJsonPath('message', 'Task successfully updated')
             ->assertJsonPath('type', 'success');
@@ -265,7 +266,7 @@ class TaskCRUDTest extends TestCase
 
         // Act
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
+            'Authorization' => 'Bearer '.$this->token,
         ])->putJson(route('api.v1.tasks.update', $task->id), $invalidData);
 
         // Assert
@@ -275,14 +276,14 @@ class TaskCRUDTest extends TestCase
                     'errors' => [
                         'status',
                         'progress',
-                        'priority'
-                    ]
+                        'priority',
+                    ],
                 ],
                 'message',
-                'type'
+                'type',
             ])
             ->assertJson([
-                'type' => 'error'
+                'type' => 'error',
             ]);
     }
 
@@ -314,7 +315,7 @@ class TaskCRUDTest extends TestCase
 
         // Act
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
+            'Authorization' => 'Bearer '.$this->token,
         ])->putJson(route('api.v1.tasks.update', $task->id), $updateData);
 
         // Assert
@@ -338,7 +339,7 @@ class TaskCRUDTest extends TestCase
 
         // Act
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
+            'Authorization' => 'Bearer '.$this->token,
         ])->putJson(route('api.v1.tasks.update', $task->id), $partialUpdate);
 
         // Assert
@@ -359,24 +360,23 @@ class TaskCRUDTest extends TestCase
         Task::factory()->count(2)->create(['priority' => 'high']);
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
+            'Authorization' => 'Bearer '.$this->token,
         ])->getJson(route('api.v1.tasks.index', ['priority' => 'high']));
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'data' => [
                     'data' => [
                         '*' => [
-                            'priority'
-                        ]
+                            'priority',
                         ],
-                        'total'
+                    ],
+                    'total',
                 ],
                 'message',
-                'type'
+                'type',
             ])
             ->assertJsonPath('data.data.*.priority', array_fill(0, 2, 'high'))
             ->assertJsonPath('data.total', 2)
             ->assertJsonPath('message', 'List of tasks successfully received');
     }
 }
-

@@ -49,7 +49,7 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return [];
         }
 
@@ -67,7 +67,7 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return null;
         }
 
@@ -78,7 +78,7 @@ class HandleInertiaRequests extends Middleware
             ? $routeBoard
             : $boards->first();
 
-        if (!$board) {
+        if (! $board) {
             return null;
         }
 

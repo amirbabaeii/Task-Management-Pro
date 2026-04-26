@@ -2,10 +2,10 @@
 
 namespace Tests\Unit\Models;
 
-use Tests\TestCase;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class UserModelTest extends TestCase
 {
@@ -35,7 +35,7 @@ class UserModelTest extends TestCase
 
         $this->user->tasks()->attach([
             $assignedTask->id => ['role' => 'assignee'],
-            $reviewTask->id => ['role' => 'reviewer']
+            $reviewTask->id => ['role' => 'reviewer'],
         ]);
 
         $this->assertTrue($this->user->assignedTasks->contains($assignedTask));
@@ -50,7 +50,7 @@ class UserModelTest extends TestCase
 
         $this->user->tasks()->attach([
             $assignedTask->id => ['role' => 'assignee'],
-            $reviewTask->id => ['role' => 'reviewer']
+            $reviewTask->id => ['role' => 'reviewer'],
         ]);
 
         $this->assertTrue($this->user->reviewingTasks->contains($reviewTask));
@@ -61,7 +61,7 @@ class UserModelTest extends TestCase
     public function test_user_can_be_assigned_to_multiple_tasks()
     {
         $tasks = Task::factory()->count(3)->create();
-        
+
         foreach ($tasks as $task) {
             $this->user->tasks()->attach($task->id, ['role' => 'assignee']);
         }
@@ -73,7 +73,7 @@ class UserModelTest extends TestCase
     public function test_user_can_review_multiple_tasks()
     {
         $tasks = Task::factory()->count(3)->create();
-        
+
         foreach ($tasks as $task) {
             $this->user->tasks()->attach($task->id, ['role' => 'reviewer']);
         }
@@ -86,11 +86,11 @@ class UserModelTest extends TestCase
     {
         $assignedTasks = Task::factory()->count(2)->create();
         $reviewTasks = Task::factory()->count(2)->create();
-        
+
         foreach ($assignedTasks as $task) {
             $this->user->tasks()->attach($task->id, ['role' => 'assignee']);
         }
-        
+
         foreach ($reviewTasks as $task) {
             $this->user->tasks()->attach($task->id, ['role' => 'reviewer']);
         }
@@ -99,4 +99,4 @@ class UserModelTest extends TestCase
         $this->assertEquals(2, $this->user->assignedTasks->count());
         $this->assertEquals(2, $this->user->reviewingTasks->count());
     }
-} 
+}

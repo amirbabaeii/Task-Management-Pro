@@ -20,6 +20,7 @@ class TaskRepository implements TaskRepositoryInterface
 
         return $query->paginate($limit);
     }
+
     public function create(array $data): Task
     {
         return Task::create($data);
@@ -43,5 +44,4 @@ class TaskRepository implements TaskRepositoryInterface
 
         return $task;
     }
-
 }

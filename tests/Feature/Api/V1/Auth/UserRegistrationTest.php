@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Api\V1\Auth;
 
-use Tests\TestCase;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class UserRegistrationTest extends TestCase
 {
@@ -16,7 +16,7 @@ class UserRegistrationTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@gmail.com',
             'password' => 'TestPass123!',
-            'password_confirmation' => 'TestPass123!'
+            'password_confirmation' => 'TestPass123!',
         ];
 
         $response = $this->postJson(route('api.v1.auth.register'), $userData);
@@ -30,8 +30,8 @@ class UserRegistrationTest extends TestCase
                         'name',
                         'email',
                     ],
-                    'token'
-                ]
+                    'token',
+                ],
             ]);
 
         $this->assertDatabaseHas('users', [
@@ -44,20 +44,20 @@ class UserRegistrationTest extends TestCase
     {
         // Create an existing user
         User::factory()->create([
-            'email' => 'test@example.com'
+            'email' => 'test@example.com',
         ]);
 
         $userData = [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => 'password123',
-            'password_confirmation' => 'password123'
+            'password_confirmation' => 'password123',
         ];
 
         $response = $this->postJson(route('api.v1.auth.register'), $userData);
 
         $response->assertStatus(422)
-            ->assertJsonStructure(['data' => ['errors' => [ 'email' ]]]);
+            ->assertJsonStructure(['data' => ['errors' => ['email']]]);
     }
 
     public function test_user_cannot_register_with_invalid_data()
@@ -66,13 +66,13 @@ class UserRegistrationTest extends TestCase
             'name' => '',
             'email' => 'invalid-email',
             'password' => 'short',
-            'password_confirmation' => 'different'
+            'password_confirmation' => 'different',
         ];
 
         $response = $this->postJson(route('api.v1.auth.register'), $userData);
 
         $response->assertStatus(422)
-            ->assertJsonStructure(['data' => ['errors' => [ 'name', 'email', 'password' ]]]);
+            ->assertJsonStructure(['data' => ['errors' => ['name', 'email', 'password']]]);
     }
 
     public function test_user_cannot_register_with_invalid_email_formats()
@@ -82,7 +82,7 @@ class UserRegistrationTest extends TestCase
             'missing@domain',
             '@nodomain.com',
             'spaces@ domain.com',
-            'double@@domain.com'
+            'double@@domain.com',
         ];
 
         foreach ($invalidEmails as $email) {
@@ -90,12 +90,12 @@ class UserRegistrationTest extends TestCase
                 'name' => 'Test User',
                 'email' => $email,
                 'password' => 'password123',
-                'password_confirmation' => 'password123'
+                'password_confirmation' => 'password123',
             ];
 
             $response = $this->postJson(route('api.v1.auth.register'), $userData);
             $response->assertStatus(422)
-                ->assertJsonStructure(['data' => ['errors' => [ 'email' ]]]);
+                ->assertJsonStructure(['data' => ['errors' => ['email']]]);
         }
     }
 
@@ -112,12 +112,12 @@ class UserRegistrationTest extends TestCase
                 'name' => $name,
                 'email' => 'test@example.com',
                 'password' => 'password123',
-                'password_confirmation' => 'password123'
+                'password_confirmation' => 'password123',
             ];
 
             $response = $this->postJson(route('api.v1.auth.register'), $userData);
             $response->assertStatus(422)
-                ->assertJsonStructure(['data' => ['errors' => [ 'name' ]]]);
+                ->assertJsonStructure(['data' => ['errors' => ['name']]]);
         }
     }
 
@@ -136,12 +136,12 @@ class UserRegistrationTest extends TestCase
                 'name' => 'Test User',
                 'email' => 'test@example.com',
                 'password' => $password,
-                'password_confirmation' => $password
+                'password_confirmation' => $password,
             ];
 
             $response = $this->postJson(route('api.v1.auth.register'), $userData);
             $response->assertStatus(422)
-                ->assertJsonStructure(['data' => ['errors' => [ 'password' ]]]);
+                ->assertJsonStructure(['data' => ['errors' => ['password']]]);
         }
     }
 
@@ -150,7 +150,7 @@ class UserRegistrationTest extends TestCase
         $response = $this->postJson(route('api.v1.auth.register'), []);
 
         $response->assertStatus(422)
-            ->assertJsonStructure(['data' => ['errors' => [ 'name', 'email', 'password' ]]]);
+            ->assertJsonStructure(['data' => ['errors' => ['name', 'email', 'password']]]);
     }
 
     public function test_user_cannot_register_with_null_values()
@@ -159,12 +159,12 @@ class UserRegistrationTest extends TestCase
             'name' => null,
             'email' => null,
             'password' => null,
-            'password_confirmation' => null
+            'password_confirmation' => null,
         ];
 
         $response = $this->postJson(route('api.v1.auth.register'), $userData);
 
         $response->assertStatus(422)
-            ->assertJsonStructure(['data' => ['errors' => [ 'name', 'email', 'password' ]]]);
+            ->assertJsonStructure(['data' => ['errors' => ['name', 'email', 'password']]]);
     }
 }
