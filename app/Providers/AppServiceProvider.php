@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\Task;
+use App\Models\User;
+use App\Observers\UserObserver;
 use App\Policies\TaskPolicy;
 use App\Repositories\Auth\AuthRepository;
 use App\Repositories\Interfaces\Auth\AuthRepositoryInterface;
@@ -42,5 +44,7 @@ class AppServiceProvider extends ServiceProvider
         JsonResource::withoutWrapping();
 
         Gate::policy(Task::class, TaskPolicy::class);
+
+        User::observe(UserObserver::class);
     }
 }
