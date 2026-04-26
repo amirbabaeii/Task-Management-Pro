@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TaskStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,17 +11,6 @@ use Illuminate\Support\Collection;
 class BoardColumn extends Model
 {
     use HasFactory;
-
-    /**
-     * Default board columns available to every user.
-     *
-     * @var array<int, array{status: string, label: string}>
-     */
-    public const DEFAULT_COLUMNS = [
-        ['status' => 'pending', 'label' => 'Pending'],
-        ['status' => 'in-progress', 'label' => 'In Progress'],
-        ['status' => 'completed', 'label' => 'Completed'],
-    ];
 
     /**
      * The attributes that are mass assignable.
@@ -34,6 +24,22 @@ class BoardColumn extends Model
         'label',
         'position',
     ];
+
+    /**
+     * Default board columns seeded onto every new board, derived from TaskStatus.
+     *
+     * @return list<array{status: string, label: string}>
+     */
+    public static function defaultColumns(): array
+    {
+        return array_map(
+            fn (TaskStatus $status): array => [
+                'status' => $status->value,
+                'label' => $status->label(),
+            ],
+            TaskStatus::cases(),
+        );
+    }
 
     /**
      * Get the user who owns the board column settings.
@@ -63,7 +69,7 @@ class BoardColumn extends Model
         $rows = [];
         $timestamp = now();
 
-        foreach (self::DEFAULT_COLUMNS as $index => $column) {
+        foreach (self::defaultColumns() as $index => $column) {
             if (in_array($column['status'], $existingStatuses, true)) {
                 continue;
             }

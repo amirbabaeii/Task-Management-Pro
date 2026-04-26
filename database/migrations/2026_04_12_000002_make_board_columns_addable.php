@@ -27,13 +27,13 @@ return new class extends Migration
     public function down(): void
     {
         DB::table('tasks')
-            ->whereNotIn('status', collect(BoardColumn::DEFAULT_COLUMNS)->pluck('status')->all())
+            ->whereNotIn('status', collect(BoardColumn::defaultColumns())->pluck('status')->all())
             ->update([
                 'status' => 'pending',
             ]);
 
         DB::table('board_columns')
-            ->whereNotIn('status', collect(BoardColumn::DEFAULT_COLUMNS)->pluck('status')->all())
+            ->whereNotIn('status', collect(BoardColumn::defaultColumns())->pluck('status')->all())
             ->delete();
 
         $this->restoreDefaultStatusColumns();
@@ -107,7 +107,7 @@ return new class extends Migration
 
     private function seedDefaultBoardColumns(): void
     {
-        $defaults = collect(BoardColumn::DEFAULT_COLUMNS);
+        $defaults = collect(BoardColumn::defaultColumns());
         $users = DB::table('users')
             ->select('id')
             ->orderBy('id')

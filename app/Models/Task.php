@@ -41,17 +41,6 @@ class Task extends Model
     ];
 
     /**
-     * Default status values available on new boards.
-     *
-     * @var array<string>
-     */
-    public const STATUSES = [
-        'pending',
-        'in-progress',
-        'completed',
-    ];
-
-    /**
      * Limits for task tags.
      */
     public const MAX_TAGS = 10;
