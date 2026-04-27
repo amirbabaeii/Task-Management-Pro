@@ -2,81 +2,60 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\TaskPriority;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\StoreTaskRequest;
 use App\Http\Requests\Api\V1\UpdateTaskRequest;
 use App\Http\Resources\TaskResource;
 use App\Models\Task;
-use App\Repositories\Interfaces\TaskRepositoryInterface;
 use Illuminate\Http\Request;
 
 class TaskController extends ApiController
 {
-    private TaskRepositoryInterface $taskRepository;
-
-    public function __construct(TaskRepositoryInterface $taskRepository)
-    {
-        $this->taskRepository = $taskRepository;
-    }
-
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request): TaskResource
     {
-        $filters = $request->only(['priority']);
-        $list = $this->taskRepository->list(10, array_filter($filters));
+        $priority = $request->input('priority');
 
-        return new TaskResource($list, 'List of tasks successfully received', 200);
+        $tasks = Task::query()
+            ->when(
+                in_array($priority, TaskPriority::values(), true),
+                fn ($query) => $query->where('priority', $priority),
+            )
+            ->paginate(10);
+
+        return new TaskResource($tasks, 'List of tasks successfully received', 200);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
         //
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(StoreTaskRequest $request): TaskResource
     {
-        $task = $this->taskRepository->create($request->validated());
+        $task = Task::create($request->validated());
 
         return new TaskResource($task, 'Task successfully created', 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(string $id)
     {
         //
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(string $id)
     {
         //
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(UpdateTaskRequest $request, Task $task): TaskResource
     {
-        $task = $this->taskRepository->update($task->id, $request->validated());
+        $task->fill($request->validated());
+        $task->save();
 
         return new TaskResource($task, 'Task successfully updated', 200);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id)
     {
         //
