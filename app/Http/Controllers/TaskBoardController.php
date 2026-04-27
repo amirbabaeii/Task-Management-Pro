@@ -7,7 +7,6 @@ use App\Actions\BoardColumns\SyncBoardColumnOrderAction;
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Enums\TaskPriority;
 use App\Http\Requests\Tasks\ReorderTaskRequest;
-use App\Http\Requests\Tasks\StoreTaskCommentRequest;
 use App\Http\Requests\Tasks\StoreTaskRequest;
 use App\Http\Requests\Tasks\UpdateTaskRequest;
 use App\Models\Board;
@@ -15,6 +14,7 @@ use App\Models\BoardColumn;
 use App\Models\Task;
 use App\Models\TaskComment;
 use App\Models\User;
+use App\Support\Presenters\TaskCommentPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -151,23 +151,6 @@ class TaskBoardController extends Controller
         });
 
         return redirect()->route('tasks.board', ['board' => $board]);
-    }
-
-    public function storeComment(
-        StoreTaskCommentRequest $request,
-        Task $task,
-    ): JsonResponse {
-        $comment = $task->comments()->create([
-            'parent_id' => $request->validated('parent_id'),
-            'user_id' => $request->user()->id,
-            'content' => $request->validated('content'),
-        ]);
-
-        $comment->load('user:id,name', 'replies.user:id,name');
-
-        return response()->json([
-            'comment' => $this->commentPayload($comment),
-        ], 201);
     }
 
     public function storeColumn(Request $request, Board $board): RedirectResponse
@@ -489,7 +472,7 @@ class TaskBoardController extends Controller
                     'created_at' => $task->created_at,
                     'sort_order' => (int) $task->pivot->sort_order,
                     'comments' => $task->comments
-                        ->map(fn (TaskComment $comment): array => $this->commentPayload($comment))
+                        ->map(fn (TaskComment $comment): array => TaskCommentPresenter::toArray($comment))
                         ->values()
                         ->all(),
                 ];
@@ -710,26 +693,6 @@ class TaskBoardController extends Controller
                 ];
             })
             ->all();
-    }
-
-    private function commentPayload(TaskComment $comment): array
-    {
-        return [
-            'id' => $comment->id,
-            'parent_id' => $comment->parent_id,
-            'content' => $comment->content,
-            'created_at' => $comment->created_at,
-            'user' => [
-                'id' => $comment->user?->id,
-                'name' => $comment->user?->name ?? 'Unknown user',
-            ],
-            'replies' => $comment->relationLoaded('replies')
-                ? $comment->replies
-                    ->map(fn (TaskComment $reply): array => $this->commentPayload($reply))
-                    ->values()
-                    ->all()
-                : [],
-        ];
     }
 
     private function userHasTaskOnBoard(

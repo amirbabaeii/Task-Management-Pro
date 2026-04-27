@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TaskBoardController;
+use App\Http\Controllers\TaskCommentController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -26,7 +27,7 @@ Route::middleware('auth')->group(function () {
         ->name('boards.store');
     Route::patch('/boards/{board}', [TaskBoardController::class, 'updateBoard'])
         ->name('boards.update');
-    Route::post('/tasks/{task}/comments', [TaskBoardController::class, 'storeComment'])
+    Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'store'])
         ->name('tasks.comments.store');
     Route::post('/tasks/board/{board}/tasks', [TaskBoardController::class, 'store'])
         ->name('tasks.store');
