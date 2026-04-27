@@ -2,14 +2,14 @@
 
 namespace App\Services\Interfaces;
 
+use App\Models\User;
+
 interface UserServiceInterface
 {
     /**
-     * Register a new user
+     * @param  array{name: string, email: string, password: string}  $data
      *
-     * @return mixed
-     *
-     * @throws \Exception
+     * @throws \Throwable
      */
-    public function register(array $data);
+    public function register(array $data): User;
 }

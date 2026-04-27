@@ -2,34 +2,28 @@
 
 namespace App\Services;
 
-use App\Repositories\Interfaces\UserRepositoryInterface;
+use App\Models\User;
 use App\Services\Interfaces\UserServiceInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class UserService implements UserServiceInterface
 {
-    protected $userRepository;
-
-    public function __construct(UserRepositoryInterface $userRepository)
-    {
-        $this->userRepository = $userRepository;
-    }
-
-    public function register(array $data)
+    /**
+     * @param  array{name: string, email: string, password: string}  $data
+     */
+    public function register(array $data): User
     {
         try {
-            DB::beginTransaction();
-
-            $user = $this->userRepository->create($data);
-
-            DB::commit();
-
-            return $user;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
+            return DB::transaction(fn (): User => User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => $data['password'],
+            ]));
+        } catch (Throwable $e) {
             Log::error('User registration failed: '.$e->getMessage());
+
             throw $e;
         }
     }
