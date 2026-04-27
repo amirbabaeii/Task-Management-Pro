@@ -4,24 +4,25 @@ namespace App\Services\Auth;
 
 use App\Exceptions\Auth\AuthenticationFailedException;
 use App\Models\User;
-use App\Repositories\Interfaces\Auth\AuthRepositoryInterface;
 use App\Services\Interfaces\Auth\AuthServiceInterface;
+use Illuminate\Support\Facades\Auth;
+use RuntimeException;
 
 class AuthService implements AuthServiceInterface
 {
-    public function __construct(
-        private AuthRepositoryInterface $authRepository
-    ) {}
-
+    /**
+     * @param  array{email: string, password: string}  $credentials
+     * @return array{token: string, user: User}
+     */
     public function login(array $credentials): array
     {
-        $user = $this->authRepository->authenticateUser($credentials);
-
-        if (! $user) {
+        if (! Auth::attempt($credentials)) {
             throw new AuthenticationFailedException('Invalid credentials');
         }
 
-        $token = $this->authRepository->createUserToken($user, 'auth-token');
+        /** @var User $user */
+        $user = Auth::user();
+        $token = $user->createToken('auth-token')->plainTextToken;
 
         return [
             'token' => $token,
@@ -31,8 +32,10 @@ class AuthService implements AuthServiceInterface
 
     public function logout(User $user): bool
     {
-        if (! $this->authRepository->deleteCurrentToken($user)) {
-            throw new \RuntimeException('Failed to logout user');
+        $token = $user->currentAccessToken();
+
+        if ($token === null || ! $token->delete()) {
+            throw new RuntimeException('Failed to logout user');
         }
 
         return true;
