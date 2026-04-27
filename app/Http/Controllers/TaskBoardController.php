@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Actions\BoardColumns\EnsureBoardHasDefaultColumnsAction;
-use App\Actions\BoardColumns\SyncBoardColumnOrderAction;
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Enums\TaskPriority;
 use App\Http\Requests\Tasks\ReorderTaskRequest;
@@ -30,7 +29,6 @@ class TaskBoardController extends Controller
     public function __construct(
         private readonly EnsureUserHasDefaultBoardAction $ensureUserHasDefaultBoard,
         private readonly EnsureBoardHasDefaultColumnsAction $ensureBoardHasDefaultColumns,
-        private readonly SyncBoardColumnOrderAction $syncBoardColumnOrder,
     ) {}
 
     public function index(Request $request, ?Board $board = null): Response
@@ -151,78 +149,6 @@ class TaskBoardController extends Controller
         });
 
         return redirect()->route('tasks.board', ['board' => $board]);
-    }
-
-    public function storeColumn(Request $request, Board $board): RedirectResponse
-    {
-        $board = $this->resolveBoard($request->user(), $board);
-        $validated = validator(
-            [
-                'label' => trim((string) $request->input('label')),
-            ],
-            [
-                'label' => ['required', 'string', 'max:40'],
-            ],
-        )->validate();
-
-        BoardColumn::query()->create([
-            'user_id' => $board->user_id,
-            'board_id' => $board->id,
-            'status' => 'column-'.Str::lower((string) Str::ulid()),
-            'label' => $validated['label'],
-            'position' => BoardColumn::nextPositionForBoard($board),
-        ]);
-
-        return redirect()->route('tasks.board', ['board' => $board]);
-    }
-
-    public function reorderColumn(
-        Request $request,
-        Board $board,
-        string $status,
-    ): JsonResponse {
-        $board = $this->resolveBoard($request->user(), $board);
-        $availableStatuses = BoardColumn::statusesForBoard($board);
-
-        $validated = validator(
-            [
-                'status' => $status,
-                'before_status' => $request->input('before_status'),
-            ],
-            [
-                'status' => ['required', 'string', Rule::in($availableStatuses)],
-                'before_status' => ['nullable', 'string', Rule::in($availableStatuses)],
-            ],
-        )->after(function ($validator) use ($status, $request): void {
-            if ($status === $request->input('before_status')) {
-                $validator->errors()->add(
-                    'before_status',
-                    'A column cannot be reordered relative to itself.',
-                );
-            }
-        })->validate();
-
-        $reorderedStatuses = array_values(array_filter(
-            $availableStatuses,
-            fn (string $availableStatus): bool => $availableStatus !== $validated['status'],
-        ));
-
-        $insertAt = $validated['before_status'] === null
-            ? count($reorderedStatuses)
-            : array_search($validated['before_status'], $reorderedStatuses, true);
-
-        if ($insertAt === false) {
-            $insertAt = count($reorderedStatuses);
-        }
-
-        array_splice($reorderedStatuses, $insertAt, 0, [$validated['status']]);
-
-        $this->syncBoardColumnOrder->execute($board, $reorderedStatuses);
-
-        return response()->json([
-            'statuses' => BoardColumn::statusesForBoard($board->fresh()),
-            'status_labels' => $this->statusLabelsForBoard($board->fresh()),
-        ]);
     }
 
     public function update(
@@ -374,36 +300,6 @@ class TaskBoardController extends Controller
                 $board->id,
                 [$originalStatus, $destinationStatus],
             ),
-        ]);
-    }
-
-    public function updateStatusLabel(
-        Request $request,
-        Board $board,
-        string $status,
-    ): JsonResponse {
-        $board = $this->resolveBoard($request->user(), $board);
-        $validated = validator(
-            [
-                'status' => $status,
-                'label' => trim((string) $request->input('label')),
-            ],
-            [
-                'status' => ['required', 'string', Rule::in(BoardColumn::statusesForBoard($board))],
-                'label' => ['required', 'string', 'max:40'],
-            ],
-        )->validate();
-
-        $board->columns()
-            ->where('status', $validated['status'])
-            ->update([
-                'label' => $validated['label'],
-            ]);
-
-        return response()->json([
-            'status' => $validated['status'],
-            'label' => $validated['label'],
-            'status_labels' => $this->statusLabelsForBoard($board->fresh()),
         ]);
     }
 

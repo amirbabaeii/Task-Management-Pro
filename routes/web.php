@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BoardColumnController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TaskBoardController;
 use App\Http\Controllers\TaskCommentController;
@@ -31,11 +32,11 @@ Route::middleware('auth')->group(function () {
         ->name('tasks.comments.store');
     Route::post('/tasks/board/{board}/tasks', [TaskBoardController::class, 'store'])
         ->name('tasks.store');
-    Route::post('/tasks/board/{board}/columns', [TaskBoardController::class, 'storeColumn'])
+    Route::post('/tasks/board/{board}/columns', [BoardColumnController::class, 'store'])
         ->name('tasks.columns.store');
-    Route::patch('/tasks/board/{board}/columns/{status}/reorder', [TaskBoardController::class, 'reorderColumn'])
+    Route::patch('/tasks/board/{board}/columns/{status}/reorder', [BoardColumnController::class, 'reorder'])
         ->name('tasks.columns.reorder');
-    Route::patch('/tasks/board/{board}/status-labels/{status}', [TaskBoardController::class, 'updateStatusLabel'])
+    Route::patch('/tasks/board/{board}/status-labels/{status}', [BoardColumnController::class, 'updateLabel'])
         ->name('tasks.status-labels.update');
     Route::patch('/tasks/board/{board}/tasks/{task}', [TaskBoardController::class, 'update'])
         ->name('tasks.update');
