@@ -6,12 +6,6 @@ use App\Models\Task;
 use App\Models\User;
 use App\Observers\UserObserver;
 use App\Policies\TaskPolicy;
-use App\Repositories\Auth\AuthRepository;
-use App\Repositories\Interfaces\Auth\AuthRepositoryInterface;
-use App\Repositories\Interfaces\TaskRepositoryInterface;
-use App\Repositories\Interfaces\UserRepositoryInterface;
-use App\Repositories\TaskRepository;
-use App\Repositories\UserRepository;
 use App\Services\Auth\AuthService;
 use App\Services\Interfaces\Auth\AuthServiceInterface;
 use App\Services\UserService;
@@ -27,10 +21,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
-        $this->app->bind(AuthRepositoryInterface::class, AuthRepository::class);
-        $this->app->bind(TaskRepositoryInterface::class, TaskRepository::class);
-
         $this->app->bind(AuthServiceInterface::class, AuthService::class);
         $this->app->singleton(UserService::class);
     }
