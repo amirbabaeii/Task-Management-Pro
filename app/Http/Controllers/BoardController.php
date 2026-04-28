@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Actions\BoardColumns\EnsureBoardHasDefaultColumnsAction;
+use App\Actions\Boards\CreateBoardAction;
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
+use App\Actions\Boards\UpdateBoardAction;
 use App\Enums\TaskPriority;
 use App\Models\Board;
 use App\Models\BoardColumn;
@@ -14,14 +16,17 @@ use App\Support\Presenters\TaskCommentPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Validator;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class TaskBoardController extends Controller
+class BoardController extends Controller
 {
     public function __construct(
         private readonly EnsureUserHasDefaultBoardAction $ensureUserHasDefaultBoard,
         private readonly EnsureBoardHasDefaultColumnsAction $ensureBoardHasDefaultColumns,
+        private readonly CreateBoardAction $createBoard,
+        private readonly UpdateBoardAction $updateBoard,
     ) {}
 
     public function index(Request $request, ?Board $board = null): Response
@@ -43,9 +48,8 @@ class TaskBoardController extends Controller
         ]);
     }
 
-    public function storeBoard(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
-        $user = $request->user();
         $validated = validator(
             [
                 'name' => trim((string) $request->input('name')),
@@ -59,21 +63,16 @@ class TaskBoardController extends Controller
             ],
         )->validate();
 
-        $board = $user->boards()->create([
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'position' => Board::nextPositionForUser($user),
-        ]);
-
-        $this->ensureBoardHasDefaultColumns->execute($board);
+        $board = $this->createBoard->execute($request->user(), $validated);
 
         return redirect()->route('tasks.board', ['board' => $board]);
     }
 
-    public function updateBoard(Request $request, Board $board): JsonResponse
+    public function update(Request $request, Board $board): JsonResponse
     {
         $user = $request->user();
         $board = $this->resolveBoard($user, $board);
+
         $payload = [];
 
         if ($request->has('name')) {
@@ -84,13 +83,13 @@ class TaskBoardController extends Controller
             $payload['description'] = trim((string) $request->input('description')) ?: null;
         }
 
-        $validated = validator(
+        validator(
             $payload,
             [
                 'name' => ['sometimes', 'required', 'string', 'max:100'],
                 'description' => ['sometimes', 'nullable', 'string', 'max:280'],
             ],
-        )->after(function ($validator) use ($request): void {
+        )->after(function (Validator $validator) use ($request): void {
             if (! $request->has('name') && ! $request->has('description')) {
                 $validator->errors()->add(
                     'board',
@@ -99,17 +98,7 @@ class TaskBoardController extends Controller
             }
         })->validate();
 
-        $updates = [];
-
-        if ($request->has('name')) {
-            $updates['name'] = $validated['name'];
-        }
-
-        if ($request->has('description')) {
-            $updates['description'] = $validated['description'] ?? null;
-        }
-
-        $board->update($updates);
+        $this->updateBoard->execute($board, $payload);
 
         return response()->json([
             'board' => [
