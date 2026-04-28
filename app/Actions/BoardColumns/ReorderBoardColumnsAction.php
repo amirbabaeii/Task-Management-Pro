@@ -14,7 +14,7 @@ class ReorderBoardColumnsAction
     /**
      * Move $movedStatus directly before $beforeStatus, or to the end when null.
      *
-     * @return list<string>  the resulting status order
+     * @return list<string> the resulting status order
      */
     public function execute(Board $board, string $movedStatus, ?string $beforeStatus): array
     {
