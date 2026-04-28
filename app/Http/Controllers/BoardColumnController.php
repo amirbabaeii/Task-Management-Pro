@@ -111,7 +111,7 @@ class BoardColumnController extends Controller
             return $this->ensureUserHasDefaultBoard->execute($user);
         }
 
-        abort_unless((int) $board->user_id === (int) $user->id, 404);
+        $this->authorize('view', $board);
 
         $this->ensureBoardHasDefaultColumns->execute($board);
 

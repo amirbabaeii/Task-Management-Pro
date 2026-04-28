@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\Board;
 use App\Models\Task;
 use App\Models\User;
 use App\Observers\UserObserver;
+use App\Policies\BoardPolicy;
 use App\Policies\TaskPolicy;
 use App\Services\Auth\AuthService;
 use App\Services\Interfaces\Auth\AuthServiceInterface;
@@ -33,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
         Vite::prefetch(concurrency: 3);
         JsonResource::withoutWrapping();
 
+        Gate::policy(Board::class, BoardPolicy::class);
         Gate::policy(Task::class, TaskPolicy::class);
 
         User::observe(UserObserver::class);
