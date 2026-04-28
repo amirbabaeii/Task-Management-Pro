@@ -2,15 +2,31 @@
 
 namespace App\Http\Resources;
 
-class TaskResource extends ApiResource
-{
-    public function __construct($resource, $message, $statusCode)
-    {
-        parent::__construct($resource, $message, $statusCode);
-    }
+use App\Models\Task;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 
-    public function toArray($request)
+/**
+ * @mixin Task
+ */
+class TaskResource extends JsonResource
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        return [
+            'id' => $this->id,
+            'title' => $this->title,
+            'description' => $this->description,
+            'status' => $this->status,
+            'priority' => $this->priority,
+            'progress' => $this->progress,
+            'tags' => $this->tags ?? [],
+            'deadline_at' => $this->deadline_at,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+        ];
     }
 }
