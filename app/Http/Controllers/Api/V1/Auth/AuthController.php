@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
+use App\Http\ApiResponse;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Resources\Auth\AuthResource;
+use App\Http\Resources\UserResource;
 use App\Services\Interfaces\Auth\AuthServiceInterface;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
 
 class AuthController extends ApiController
 {
@@ -15,10 +16,7 @@ class AuthController extends ApiController
         private readonly AuthServiceInterface $authService,
     ) {}
 
-    /**
-     * Handle user login
-     */
-    public function login(LoginRequest $request): JsonResource
+    public function login(LoginRequest $request): JsonResponse
     {
         $request->authenticate();
 
@@ -27,21 +25,16 @@ class AuthController extends ApiController
             'password' => $request->password,
         ]);
 
-        return new AuthResource(
-            $result,
-            'Login successful',
-            200
-        );
+        return ApiResponse::success([
+            'user' => new UserResource($result['user']),
+            'token' => $result['token'],
+        ], 'Login successful');
     }
 
-    public function logout(Request $request): JsonResource
+    public function logout(Request $request): JsonResponse
     {
         $this->authService->logout($request->user());
 
-        return new AuthResource(
-            null,
-            'Logged out successfully',
-            200
-        );
+        return ApiResponse::success(null, 'Logged out successfully');
     }
 }

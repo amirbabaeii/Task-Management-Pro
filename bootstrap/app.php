@@ -1,7 +1,7 @@
 <?php
 
+use App\Http\ApiResponse;
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Http\Resources\ApiResource;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -50,10 +50,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            return new ApiResource(
-                ['errors' => $e->errors()],
+            return ApiResponse::error(
                 $e->getMessage(),
                 422,
+                ['errors' => $e->errors()],
             );
         });
 
@@ -62,7 +62,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            return new ApiResource(null, $e->getMessage(), 401);
+            return ApiResponse::error($e->getMessage(), 401);
         });
 
         $exceptions->render(function (\Throwable $e, Request $request) {
@@ -72,8 +72,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
             $isHttpException = $e instanceof HttpExceptionInterface;
 
-            return new ApiResource(
-                null,
+            return ApiResponse::error(
                 $isHttpException ? $e->getMessage() : 'An unexpected error occurred',
                 $isHttpException ? $e->getStatusCode() : 500,
             );
