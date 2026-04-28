@@ -26,26 +26,11 @@ class TaskController extends ApiController
         return new TaskResource($tasks, 'List of tasks successfully received', 200);
     }
 
-    public function create()
-    {
-        //
-    }
-
     public function store(StoreTaskRequest $request): TaskResource
     {
         $task = Task::create($request->validated());
 
         return new TaskResource($task, 'Task successfully created', 201);
-    }
-
-    public function show(string $id)
-    {
-        //
-    }
-
-    public function edit(string $id)
-    {
-        //
     }
 
     public function update(UpdateTaskRequest $request, Task $task): TaskResource
@@ -54,10 +39,5 @@ class TaskController extends ApiController
         $task->save();
 
         return new TaskResource($task, 'Task successfully updated', 200);
-    }
-
-    public function destroy(string $id)
-    {
-        //
     }
 }
