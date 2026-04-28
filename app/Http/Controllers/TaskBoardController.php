@@ -5,9 +5,6 @@ namespace App\Http\Controllers;
 use App\Actions\BoardColumns\EnsureBoardHasDefaultColumnsAction;
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Enums\TaskPriority;
-use App\Http\Requests\Tasks\ReorderTaskRequest;
-use App\Http\Requests\Tasks\StoreTaskRequest;
-use App\Http\Requests\Tasks\UpdateTaskRequest;
 use App\Models\Board;
 use App\Models\BoardColumn;
 use App\Models\Task;
@@ -17,10 +14,6 @@ use App\Support\Presenters\TaskCommentPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -45,7 +38,7 @@ class TaskBoardController extends Controller
             ],
             'tasks' => $this->boardTasksForUser($user, $board),
             'statuses' => BoardColumn::statusesForBoard($board),
-            'statusLabels' => $this->statusLabelsForBoard($board),
+            'statusLabels' => BoardColumn::labelsForBoard($board),
             'priorities' => TaskPriority::values(),
         ]);
     }
@@ -128,181 +121,6 @@ class TaskBoardController extends Controller
         ]);
     }
 
-    public function store(StoreTaskRequest $request, Board $board): RedirectResponse
-    {
-        $user = $request->user();
-        $board = $this->resolveBoard($user, $board);
-        $validated = $request->validated();
-
-        DB::transaction(function () use ($user, $board, $validated): void {
-            $task = Task::create($validated);
-
-            $task->users()->attach($user->id, [
-                'board_id' => $board->id,
-                'role' => 'assignee',
-                'sort_order' => $this->nextSortOrderForUserStatus(
-                    $user->id,
-                    $board->id,
-                    $task->status,
-                ),
-            ]);
-        });
-
-        return redirect()->route('tasks.board', ['board' => $board]);
-    }
-
-    public function update(
-        UpdateTaskRequest $request,
-        Board $board,
-        Task $task,
-    ): RedirectResponse {
-        $board = $this->resolveBoard($request->user(), $board);
-        $this->ensureTaskIsOnBoardForUser($request->user(), $board, $task);
-
-        $validated = $request->validated();
-        $originalStatus = $task->status;
-
-        DB::transaction(function () use (
-            $board,
-            $task,
-            $validated,
-            $originalStatus,
-        ): void {
-            $task->fill($validated);
-            $task->save();
-
-            if ($originalStatus !== $task->status) {
-                $this->moveTaskToStatusForAssignees(
-                    $task,
-                    $originalStatus,
-                    $task->status,
-                    $board->id,
-                );
-            }
-        });
-
-        return redirect()->route('tasks.board', ['board' => $board]);
-    }
-
-    public function reorder(
-        ReorderTaskRequest $request,
-        Board $board,
-        Task $task,
-    ): JsonResponse {
-        $user = $request->user();
-        $board = $this->resolveBoard($user, $board);
-        $this->ensureTaskIsOnBoardForUser($user, $board, $task);
-
-        $validated = $request->validated();
-        $destinationStatus = $validated['status'];
-        $beforeTaskId = $validated['before_id'] ?? null;
-        $sourceStatus = $task->status;
-
-        if ($beforeTaskId === $task->id) {
-            throw ValidationException::withMessages([
-                'before_id' => 'A task cannot be reordered relative to itself.',
-            ]);
-        }
-
-        if ($beforeTaskId !== null && ! $this->userHasTaskInStatus(
-            $user->id,
-            $board->id,
-            $beforeTaskId,
-            $destinationStatus,
-        )) {
-            throw ValidationException::withMessages([
-                'before_id' => 'Choose a task from the destination column.',
-            ]);
-        }
-
-        DB::transaction(function () use (
-            $user,
-            $board,
-            $task,
-            $sourceStatus,
-            $destinationStatus,
-            $beforeTaskId,
-        ): void {
-            if ($sourceStatus !== $destinationStatus) {
-                $task->status = $destinationStatus;
-                $task->save();
-
-                $this->moveTaskToStatusForAssignees(
-                    $task,
-                    $sourceStatus,
-                    $destinationStatus,
-                    $board->id,
-                );
-            }
-
-            $this->reorderTaskForUser(
-                $user->id,
-                $board->id,
-                $task,
-                $destinationStatus,
-                $beforeTaskId,
-            );
-        });
-
-        return response()->json([
-            'task' => $this->taskPayloadForUser($task->fresh(), $user->id, $board->id),
-            'orders' => $this->userTaskOrderPayload($user->id, $board->id, [
-                $sourceStatus,
-                $destinationStatus,
-            ]),
-        ]);
-    }
-
-    public function updateStatus(
-        Request $request,
-        Board $board,
-        Task $task,
-    ): JsonResponse {
-        $this->authorize('update', $task);
-
-        $board = $this->resolveBoard($request->user(), $board);
-        $this->ensureTaskIsOnBoardForUser($request->user(), $board, $task);
-
-        $validated = $request->validate([
-            'status' => ['required', 'string', Rule::in(BoardColumn::statusesForBoard($board))],
-        ]);
-
-        $originalStatus = $task->status;
-        $destinationStatus = $validated['status'];
-
-        DB::transaction(function () use (
-            $board,
-            $task,
-            $originalStatus,
-            $destinationStatus,
-        ): void {
-            $task->status = $destinationStatus;
-            $task->save();
-
-            if ($originalStatus !== $destinationStatus) {
-                $this->moveTaskToStatusForAssignees(
-                    $task,
-                    $originalStatus,
-                    $destinationStatus,
-                    $board->id,
-                );
-            }
-        });
-
-        return response()->json([
-            'task' => $this->taskPayloadForUser(
-                $task->fresh(),
-                $request->user()->id,
-                $board->id,
-            ),
-            'orders' => $this->userTaskOrderPayload(
-                $request->user()->id,
-                $board->id,
-                [$originalStatus, $destinationStatus],
-            ),
-        ]);
-    }
-
     private function resolveBoard(User $user, ?Board $board): Board
     {
         if ($board === null) {
@@ -316,6 +134,9 @@ class TaskBoardController extends Controller
         return $board;
     }
 
+    /**
+     * @return list<array{id: int, name: string}>
+     */
     private function boardListForUser(User $user): array
     {
         return Board::orderedForUser($user)
@@ -327,6 +148,9 @@ class TaskBoardController extends Controller
             ->all();
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
     private function boardTasksForUser(User $user, Board $board): array
     {
         return $user->assignedTasks()
@@ -355,302 +179,23 @@ class TaskBoardController extends Controller
             ->orderBy('task_user.sort_order')
             ->orderBy('tasks.id')
             ->get()
-            ->map(function (Task $task): array {
-                return [
-                    'id' => $task->id,
-                    'title' => $task->title,
-                    'description' => $task->description,
-                    'status' => $task->status,
-                    'priority' => $task->priority,
-                    'tags' => $task->tags ?? [],
-                    'deadline_at' => $task->deadline_at,
-                    'progress' => $task->progress,
-                    'created_at' => $task->created_at,
-                    'sort_order' => (int) $task->pivot->sort_order,
-                    'comments' => $task->comments
-                        ->map(fn (TaskComment $comment): array => TaskCommentPresenter::toArray($comment))
-                        ->values()
-                        ->all(),
-                ];
-            })
+            ->map(fn (Task $task): array => [
+                'id' => $task->id,
+                'title' => $task->title,
+                'description' => $task->description,
+                'status' => $task->status,
+                'priority' => $task->priority,
+                'tags' => $task->tags ?? [],
+                'deadline_at' => $task->deadline_at,
+                'progress' => $task->progress,
+                'created_at' => $task->created_at,
+                'sort_order' => (int) $task->pivot->sort_order,
+                'comments' => $task->comments
+                    ->map(fn (TaskComment $comment): array => TaskCommentPresenter::toArray($comment))
+                    ->values()
+                    ->all(),
+            ])
             ->values()
             ->all();
-    }
-
-    private function statusLabelsForBoard(Board $board): array
-    {
-        return BoardColumn::labelsForBoard($board);
-    }
-
-    private function ensureTaskIsOnBoardForUser(
-        User $user,
-        Board $board,
-        Task $task,
-    ): void {
-        abort_unless(
-            $this->userHasTaskOnBoard($user->id, $board->id, $task->id),
-            404,
-        );
-    }
-
-    private function moveTaskToStatusForAssignees(
-        Task $task,
-        string $sourceStatus,
-        string $destinationStatus,
-        int $sourceBoardId,
-    ): void {
-        $assignments = DB::table('task_user')
-            ->where('task_id', $task->id)
-            ->where('role', 'assignee')
-            ->get(['user_id', 'board_id']);
-
-        foreach ($assignments as $assignment) {
-            if ($assignment->board_id === null) {
-                continue;
-            }
-
-            $userId = (int) $assignment->user_id;
-            $boardId = (int) $assignment->board_id;
-
-            $this->normalizeUserStatusOrder(
-                $userId,
-                $boardId,
-                $sourceStatus,
-                $task->id,
-            );
-
-            $this->ensureBoardColumnForBoardStatus(
-                $boardId,
-                $destinationStatus,
-                $sourceBoardId,
-            );
-
-            $destinationTaskIds = $this->assignedTaskIdsForStatus(
-                $userId,
-                $boardId,
-                $destinationStatus,
-                $task->id,
-            );
-
-            $destinationTaskIds[] = $task->id;
-
-            $this->syncUserTaskOrder($userId, $boardId, $destinationTaskIds);
-        }
-    }
-
-    private function reorderTaskForUser(
-        int $userId,
-        int $boardId,
-        Task $task,
-        string $status,
-        ?int $beforeTaskId,
-    ): void {
-        $destinationTaskIds = $this->assignedTaskIdsForStatus(
-            $userId,
-            $boardId,
-            $status,
-            $task->id,
-        );
-
-        $insertAt = $beforeTaskId === null
-            ? count($destinationTaskIds)
-            : array_search($beforeTaskId, $destinationTaskIds, true);
-
-        if ($insertAt === false) {
-            $insertAt = count($destinationTaskIds);
-        }
-
-        array_splice($destinationTaskIds, $insertAt, 0, [$task->id]);
-
-        $this->syncUserTaskOrder($userId, $boardId, $destinationTaskIds);
-    }
-
-    private function normalizeUserStatusOrder(
-        int $userId,
-        int $boardId,
-        string $status,
-        ?int $excludingTaskId = null,
-    ): void {
-        $this->syncUserTaskOrder(
-            $userId,
-            $boardId,
-            $this->assignedTaskIdsForStatus(
-                $userId,
-                $boardId,
-                $status,
-                $excludingTaskId,
-            ),
-        );
-    }
-
-    private function assignedTaskIdsForStatus(
-        int $userId,
-        int $boardId,
-        string $status,
-        ?int $excludingTaskId = null,
-    ): array {
-        return DB::table('task_user')
-            ->join('tasks', 'tasks.id', '=', 'task_user.task_id')
-            ->where('task_user.user_id', $userId)
-            ->where('task_user.board_id', $boardId)
-            ->where('task_user.role', 'assignee')
-            ->where('tasks.status', $status)
-            ->when($excludingTaskId !== null, function ($query) use ($excludingTaskId) {
-                $query->where('tasks.id', '!=', $excludingTaskId);
-            })
-            ->orderBy('task_user.sort_order')
-            ->orderBy('tasks.id')
-            ->pluck('tasks.id')
-            ->map(fn ($id): int => (int) $id)
-            ->all();
-    }
-
-    private function nextSortOrderForUserStatus(
-        int $userId,
-        int $boardId,
-        string $status,
-    ): int {
-        $sortOrder = DB::table('task_user')
-            ->join('tasks', 'tasks.id', '=', 'task_user.task_id')
-            ->where('task_user.user_id', $userId)
-            ->where('task_user.board_id', $boardId)
-            ->where('task_user.role', 'assignee')
-            ->where('tasks.status', $status)
-            ->max('task_user.sort_order');
-
-        return ((int) $sortOrder) + 1;
-    }
-
-    private function syncUserTaskOrder(
-        int $userId,
-        int $boardId,
-        array $taskIds,
-    ): void {
-        $timestamp = now();
-
-        foreach (array_values($taskIds) as $index => $taskId) {
-            DB::table('task_user')
-                ->where('user_id', $userId)
-                ->where('board_id', $boardId)
-                ->where('role', 'assignee')
-                ->where('task_id', $taskId)
-                ->update([
-                    'sort_order' => $index + 1,
-                    'updated_at' => $timestamp,
-                ]);
-        }
-    }
-
-    private function taskPayloadForUser(
-        Task $task,
-        int $userId,
-        int $boardId,
-    ): array {
-        $sortOrder = DB::table('task_user')
-            ->where('user_id', $userId)
-            ->where('board_id', $boardId)
-            ->where('role', 'assignee')
-            ->where('task_id', $task->id)
-            ->value('sort_order');
-
-        return [
-            'id' => $task->id,
-            'status' => $task->status,
-            'sort_order' => (int) $sortOrder,
-        ];
-    }
-
-    private function userTaskOrderPayload(
-        int $userId,
-        int $boardId,
-        array $statuses,
-    ): array {
-        $statuses = array_values(array_unique($statuses));
-
-        return DB::table('task_user')
-            ->join('tasks', 'tasks.id', '=', 'task_user.task_id')
-            ->where('task_user.user_id', $userId)
-            ->where('task_user.board_id', $boardId)
-            ->where('task_user.role', 'assignee')
-            ->whereIn('tasks.status', $statuses)
-            ->orderBy('tasks.status')
-            ->orderBy('task_user.sort_order')
-            ->orderBy('tasks.id')
-            ->get([
-                'tasks.id',
-                'tasks.status',
-                'task_user.sort_order',
-            ])
-            ->map(function (object $task): array {
-                return [
-                    'id' => (int) $task->id,
-                    'status' => $task->status,
-                    'sort_order' => (int) $task->sort_order,
-                ];
-            })
-            ->all();
-    }
-
-    private function userHasTaskOnBoard(
-        int $userId,
-        int $boardId,
-        int $taskId,
-    ): bool {
-        return DB::table('task_user')
-            ->where('user_id', $userId)
-            ->where('board_id', $boardId)
-            ->where('role', 'assignee')
-            ->where('task_id', $taskId)
-            ->exists();
-    }
-
-    private function userHasTaskInStatus(
-        int $userId,
-        int $boardId,
-        int $taskId,
-        string $status,
-    ): bool {
-        return DB::table('task_user')
-            ->join('tasks', 'tasks.id', '=', 'task_user.task_id')
-            ->where('task_user.user_id', $userId)
-            ->where('task_user.board_id', $boardId)
-            ->where('task_user.role', 'assignee')
-            ->where('tasks.id', $taskId)
-            ->where('tasks.status', $status)
-            ->exists();
-    }
-
-    private function ensureBoardColumnForBoardStatus(
-        int $boardId,
-        string $status,
-        int $sourceBoardId,
-    ): void {
-        $exists = BoardColumn::query()
-            ->where('board_id', $boardId)
-            ->where('status', $status)
-            ->exists();
-
-        if ($exists) {
-            return;
-        }
-
-        $sourceBoard = Board::query()->findOrFail($sourceBoardId);
-        $label = $sourceBoard->columns()
-            ->where('status', $status)
-            ->value('label')
-            ?? BoardColumn::query()
-                ->where('status', $status)
-                ->value('label')
-            ?? (string) Str::of($status)->replace('-', ' ')->title();
-
-        $targetBoard = Board::query()->findOrFail($boardId);
-
-        BoardColumn::query()->create([
-            'user_id' => $targetBoard->user_id,
-            'board_id' => $targetBoard->id,
-            'status' => $status,
-            'label' => trim((string) $label),
-            'position' => BoardColumn::nextPositionForBoard($targetBoard),
-        ]);
     }
 }
