@@ -11,16 +11,14 @@ use App\Actions\Tasks\UpdateTaskStatusAction;
 use App\Http\Requests\Tasks\ReorderTaskRequest;
 use App\Http\Requests\Tasks\StoreTaskRequest;
 use App\Http\Requests\Tasks\UpdateTaskRequest;
+use App\Http\Requests\Tasks\UpdateTaskStatusRequest;
 use App\Models\Board;
-use App\Models\BoardColumn;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\BoardTaskAssignments;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class TaskController extends Controller
@@ -89,20 +87,14 @@ class TaskController extends Controller
         ]);
     }
 
-    public function updateStatus(Request $request, Board $board, Task $task): JsonResponse
+    public function updateStatus(UpdateTaskStatusRequest $request, Board $board, Task $task): JsonResponse
     {
-        $this->authorize('update', $task);
-
         $user = $request->user();
         $board = $this->resolveBoard($user, $board);
         $this->ensureTaskIsOnBoard($user, $board, $task);
 
-        $validated = $request->validate([
-            'status' => ['required', 'string', Rule::in(BoardColumn::statusesForBoard($board))],
-        ]);
-
         $originalStatus = $task->status;
-        $destinationStatus = $validated['status'];
+        $destinationStatus = $request->validated('status');
 
         $this->updateTaskStatus->execute($board, $task, $destinationStatus);
 

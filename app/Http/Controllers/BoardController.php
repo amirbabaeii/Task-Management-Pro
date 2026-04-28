@@ -7,6 +7,8 @@ use App\Actions\Boards\CreateBoardAction;
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Actions\Boards\UpdateBoardAction;
 use App\Enums\TaskPriority;
+use App\Http\Requests\Boards\StoreBoardRequest;
+use App\Http\Requests\Boards\UpdateBoardRequest;
 use App\Models\Board;
 use App\Models\BoardColumn;
 use App\Models\Task;
@@ -16,7 +18,6 @@ use App\Support\Presenters\TaskCommentPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Validator;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,57 +49,19 @@ class BoardController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreBoardRequest $request): RedirectResponse
     {
-        $validated = validator(
-            [
-                'name' => trim((string) $request->input('name')),
-                'description' => $request->filled('description')
-                    ? trim((string) $request->input('description'))
-                    : null,
-            ],
-            [
-                'name' => ['required', 'string', 'max:100'],
-                'description' => ['nullable', 'string', 'max:280'],
-            ],
-        )->validate();
-
-        $board = $this->createBoard->execute($request->user(), $validated);
+        $board = $this->createBoard->execute($request->user(), $request->validated());
 
         return redirect()->route('tasks.board', ['board' => $board]);
     }
 
-    public function update(Request $request, Board $board): JsonResponse
+    public function update(UpdateBoardRequest $request, Board $board): JsonResponse
     {
         $user = $request->user();
         $board = $this->resolveBoard($user, $board);
 
-        $payload = [];
-
-        if ($request->has('name')) {
-            $payload['name'] = trim((string) $request->input('name'));
-        }
-
-        if ($request->has('description')) {
-            $payload['description'] = trim((string) $request->input('description')) ?: null;
-        }
-
-        validator(
-            $payload,
-            [
-                'name' => ['sometimes', 'required', 'string', 'max:100'],
-                'description' => ['sometimes', 'nullable', 'string', 'max:280'],
-            ],
-        )->after(function (Validator $validator) use ($request): void {
-            if (! $request->has('name') && ! $request->has('description')) {
-                $validator->errors()->add(
-                    'board',
-                    'Provide a board name or description to update.',
-                );
-            }
-        })->validate();
-
-        $this->updateBoard->execute($board, $payload);
+        $this->updateBoard->execute($board, $request->validated());
 
         return response()->json([
             'board' => [
