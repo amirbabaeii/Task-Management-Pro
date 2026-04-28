@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Tasks;
 
 use App\Enums\TaskPriority;
+use App\Http\Requests\Concerns\NormalizesTaskInput;
 use App\Models\Board;
 use App\Models\BoardColumn;
 use App\Models\Task;
@@ -11,6 +12,8 @@ use Illuminate\Validation\Rule;
 
 class StoreTaskRequest extends FormRequest
 {
+    use NormalizesTaskInput;
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -18,14 +21,7 @@ class StoreTaskRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $description = $this->input('description');
-
-        $this->merge([
-            'title' => trim((string) $this->input('title')),
-            'description' => filled($description) ? trim((string) $description) : null,
-            'deadline_at' => $this->input('deadline_at') ?: null,
-            'tags' => Task::normalizeTags($this->input('tags')),
-        ]);
+        $this->merge($this->normalizedTaskInput());
     }
 
     public function rules(): array

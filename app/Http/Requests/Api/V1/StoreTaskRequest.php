@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use App\Enums\TaskPriority;
+use App\Http\Requests\Concerns\NormalizesTaskInput;
 use App\Models\BoardColumn;
 use App\Models\Task;
 use Illuminate\Foundation\Http\FormRequest;
@@ -10,9 +11,8 @@ use Illuminate\Validation\Rule;
 
 class StoreTaskRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
+    use NormalizesTaskInput;
+
     public function authorize(): bool
     {
         return true;
@@ -20,19 +20,11 @@ class StoreTaskRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $description = $this->input('description');
-
-        $this->merge([
-            'title' => trim((string) $this->input('title')),
-            'description' => filled($description) ? trim((string) $description) : null,
-            'tags' => Task::normalizeTags($this->input('tags')),
-        ]);
+        $this->merge($this->normalizedTaskInput());
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, mixed>
      */
     public function rules(): array
     {
