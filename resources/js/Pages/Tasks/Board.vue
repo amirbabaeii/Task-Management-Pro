@@ -30,6 +30,7 @@ import {
     sortTaskList,
     visibleTags,
 } from '@/lib/task';
+import { useTaskDragDrop } from '@/composables/useTaskDragDrop';
 import axios from 'axios';
 
 const props = defineProps({
@@ -58,10 +59,6 @@ const props = defineProps({
 const tasks = ref(props.tasks.map(normalizeTask));
 const updatingId = ref(null);
 const movingColumnStatus = ref(null);
-const draggedTaskId = ref(null);
-const dragOverStatus = ref(null);
-const dragOverTaskId = ref(null);
-const dragInsertPosition = ref('before');
 const draggedColumnStatus = ref(null);
 const columnDragOverStatus = ref(null);
 const columnDragInsertPosition = ref('before');
@@ -687,18 +684,6 @@ const openEditFromDetails = () => {
     openEditModal(task);
 };
 
-const isDraggingTask = (taskId) => draggedTaskId.value === taskId;
-
-const isColumnDropTarget = (status) =>
-    draggedTaskId.value !== null &&
-    dragOverStatus.value === status &&
-    dragOverTaskId.value === null;
-
-const isTaskDropTarget = (taskId, position) =>
-    draggedTaskId.value !== null &&
-    dragOverTaskId.value === taskId &&
-    dragInsertPosition.value === position;
-
 const tasksByStatus = computed(() => {
     const grouped = {};
     boardStatuses.value.forEach((status) => {
@@ -806,68 +791,6 @@ const moveTaskLocally = (taskId, destinationStatus, beforeTaskId = null) => {
     return true;
 };
 
-const resetDragState = () => {
-    draggedTaskId.value = null;
-    dragOverStatus.value = null;
-    dragOverTaskId.value = null;
-    dragInsertPosition.value = 'before';
-};
-
-const onTaskDragStart = (event, task) => {
-    if (updatingId.value) {
-        event.preventDefault();
-        return;
-    }
-
-    draggedTaskId.value = task.id;
-    dragOverStatus.value = task.status;
-    dragOverTaskId.value = null;
-    dragInsertPosition.value = 'before';
-
-    if (event.dataTransfer) {
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', String(task.id));
-    }
-};
-
-const onTaskDragEnd = () => {
-    resetDragState();
-};
-
-const onColumnDragOver = (event, status) => {
-    if (draggedTaskId.value === null) {
-        return;
-    }
-
-    event.preventDefault();
-    dragOverStatus.value = status;
-    dragOverTaskId.value = null;
-    dragInsertPosition.value = 'after';
-
-    if (event.dataTransfer) {
-        event.dataTransfer.dropEffect = 'move';
-    }
-};
-
-const getBeforeTaskIdForDrop = (status, targetTaskId, position) => {
-    const destinationTasks = (tasksByStatus.value[status] ?? []).filter(
-        (task) => task.id !== draggedTaskId.value,
-    );
-    const targetIndex = destinationTasks.findIndex(
-        (task) => task.id === targetTaskId,
-    );
-
-    if (targetIndex === -1) {
-        return null;
-    }
-
-    if (position === 'before') {
-        return targetTaskId;
-    }
-
-    return destinationTasks[targetIndex + 1]?.id ?? null;
-};
-
 const reorderTask = async (task, destinationStatus, beforeTaskId = null) => {
     if (updatingId.value) {
         return;
@@ -912,58 +835,29 @@ const reorderTask = async (task, destinationStatus, beforeTaskId = null) => {
             'Unable to reorder task. Please try again.';
     } finally {
         updatingId.value = null;
-        resetDragState();
+        taskDragDrop.reset();
     }
 };
 
-const onTaskDragOver = (event, task) => {
-    if (draggedTaskId.value === null || draggedTaskId.value === task.id) {
-        return;
-    }
+const taskDragDrop = useTaskDragDrop({
+    tasks,
+    tasksByStatus,
+    isBusy: computed(() => updatingId.value !== null),
+    onReorder: reorderTask,
+});
 
-    event.preventDefault();
-
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const midpoint = bounds.top + bounds.height / 2;
-
-    dragOverStatus.value = task.status;
-    dragOverTaskId.value = task.id;
-    dragInsertPosition.value = event.clientY < midpoint ? 'before' : 'after';
-
-    if (event.dataTransfer) {
-        event.dataTransfer.dropEffect = 'move';
-    }
-};
-
-const onTaskDrop = async (task) => {
-    if (draggedTaskId.value === null || draggedTaskId.value === task.id) {
-        return;
-    }
-
-    const draggedTask = tasks.value.find(
-        (candidate) => candidate.id === draggedTaskId.value,
-    );
-
-    const beforeTaskId = getBeforeTaskIdForDrop(
-        task.status,
-        task.id,
-        dragInsertPosition.value,
-    );
-
-    await reorderTask(draggedTask, task.status, beforeTaskId);
-};
-
-const onColumnDrop = async (status) => {
-    if (draggedTaskId.value === null) {
-        return;
-    }
-
-    const task = tasks.value.find(
-        (candidate) => candidate.id === draggedTaskId.value,
-    );
-
-    await reorderTask(task, status, null);
-};
+const {
+    draggedTaskId,
+    isDraggingTask,
+    isColumnDropTarget,
+    isTaskDropTarget,
+    onTaskDragStart,
+    onTaskDragEnd,
+    onColumnDragOver,
+    onTaskDragOver,
+    onTaskDrop,
+    onColumnDrop,
+} = taskDragDrop;
 
 const appendCommentToTask = (taskId, comment) => {
     const normalizedComment = normalizeComment(comment);
