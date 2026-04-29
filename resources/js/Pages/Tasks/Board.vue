@@ -30,6 +30,7 @@ import {
     sortTaskList,
     visibleTags,
 } from '@/lib/task';
+import { useColumnDragDrop } from '@/composables/useColumnDragDrop';
 import { useTaskDragDrop } from '@/composables/useTaskDragDrop';
 import axios from 'axios';
 
@@ -59,9 +60,6 @@ const props = defineProps({
 const tasks = ref(props.tasks.map(normalizeTask));
 const updatingId = ref(null);
 const movingColumnStatus = ref(null);
-const draggedColumnStatus = ref(null);
-const columnDragOverStatus = ref(null);
-const columnDragInsertPosition = ref('before');
 const editingStatusLabel = ref(null);
 const statusLabelDraft = ref('');
 const savingStatusLabel = ref(null);
@@ -443,19 +441,6 @@ const saveStatusLabel = async (status) => {
     }
 };
 
-const isDraggingColumn = (status) => draggedColumnStatus.value === status;
-
-const isColumnReorderDropTarget = (status, position) =>
-    draggedColumnStatus.value !== null &&
-    columnDragOverStatus.value === status &&
-    columnDragInsertPosition.value === position;
-
-const resetColumnDragState = () => {
-    draggedColumnStatus.value = null;
-    columnDragOverStatus.value = null;
-    columnDragInsertPosition.value = 'before';
-};
-
 const moveColumnLocally = (status, beforeStatus = null) => {
     if (!boardStatuses.value.includes(status)) {
         return false;
@@ -519,7 +504,7 @@ const reorderBoardColumn = async (status, beforeStatus = null) => {
 
     if (!moved) {
         movingColumnStatus.value = null;
-        resetColumnDragState();
+        columnDragDrop.reset();
         return;
     }
 
@@ -548,51 +533,30 @@ const reorderBoardColumn = async (status, beforeStatus = null) => {
             'Unable to reorder board columns. Please try again.';
     } finally {
         movingColumnStatus.value = null;
-        resetColumnDragState();
+        columnDragDrop.reset();
     }
 };
 
-const onBoardColumnDragStart = (event, status) => {
-    if (movingColumnStatus.value || updatingId.value) {
-        event.preventDefault();
-        return;
-    }
+const columnDragDrop = useColumnDragDrop({
+    isBusy: computed(() => movingColumnStatus.value !== null || updatingId.value !== null),
+    computeBeforeStatus: getBeforeStatusForColumnDrop,
+    onReorder: reorderBoardColumn,
+});
 
-    draggedColumnStatus.value = status;
-    columnDragOverStatus.value = status;
-    columnDragInsertPosition.value = 'before';
+const {
+    draggedColumnStatus,
+    isDraggingColumn,
+    isColumnReorderDropTarget,
+    onColumnDragStart: onBoardColumnDragStart,
+    onColumnDragEnd: onBoardColumnDragEnd,
+    onLaneDragOver: onBoardLaneDragOver,
+    onLaneDrop: onBoardLaneDrop,
+} = columnDragDrop;
 
-    if (event.dataTransfer) {
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', status);
-    }
-};
-
-const onBoardColumnDragEnd = () => {
-    resetColumnDragState();
-};
-
+// Both task and column drags fire on the same board section. Column drag
+// takes precedence; otherwise we fall through to the task handlers.
 const onBoardSectionDragOver = (event, status) => {
-    if (draggedColumnStatus.value !== null) {
-        event.preventDefault();
-
-        if (draggedColumnStatus.value === status) {
-            columnDragOverStatus.value = status;
-            columnDragInsertPosition.value = 'before';
-            return;
-        }
-
-        const bounds = event.currentTarget.getBoundingClientRect();
-        const midpoint = bounds.left + bounds.width / 2;
-
-        columnDragOverStatus.value = status;
-        columnDragInsertPosition.value =
-            event.clientX < midpoint ? 'before' : 'after';
-
-        if (event.dataTransfer) {
-            event.dataTransfer.dropEffect = 'move';
-        }
-
+    if (columnDragDrop.onColumnDragOver(event, status)) {
         return;
     }
 
@@ -600,44 +564,11 @@ const onBoardSectionDragOver = (event, status) => {
 };
 
 const onBoardSectionDrop = async (status) => {
-    if (draggedColumnStatus.value !== null) {
-        if (draggedColumnStatus.value === status) {
-            resetColumnDragState();
-            return;
-        }
-
-        const beforeStatus = getBeforeStatusForColumnDrop(
-            status,
-            columnDragInsertPosition.value,
-        );
-
-        await reorderBoardColumn(draggedColumnStatus.value, beforeStatus);
+    if (await columnDragDrop.onColumnDrop(status)) {
         return;
     }
 
     await onColumnDrop(status);
-};
-
-const onBoardLaneDragOver = (event) => {
-    if (draggedColumnStatus.value === null) {
-        return;
-    }
-
-    event.preventDefault();
-    columnDragOverStatus.value = null;
-    columnDragInsertPosition.value = 'after';
-
-    if (event.dataTransfer) {
-        event.dataTransfer.dropEffect = 'move';
-    }
-};
-
-const onBoardLaneDrop = async () => {
-    if (draggedColumnStatus.value === null) {
-        return;
-    }
-
-    await reorderBoardColumn(draggedColumnStatus.value, null);
 };
 
 const openTaskDetails = (task) => {
