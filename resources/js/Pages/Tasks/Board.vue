@@ -18,6 +18,18 @@ import {
     formatStatus as formatStatusValue,
     priorityBadgeClass,
 } from '@/lib/format';
+import {
+    appendReplyToComments,
+    buildGroupedTasks as buildGroupedTasksFor,
+    cloneTasks,
+    commentCount,
+    flattenGroupedTasks as flattenGroupedTasksFor,
+    hiddenTagCount,
+    normalizeComment,
+    normalizeTask,
+    sortTaskList,
+    visibleTags,
+} from '@/lib/task';
 import axios from 'axios';
 
 const props = defineProps({
@@ -42,45 +54,6 @@ const props = defineProps({
         default: () => [],
     },
 });
-
-const normalizeComment = (comment) => ({
-    ...comment,
-    id: Number(comment.id ?? 0),
-    parent_id:
-        comment.parent_id === null || comment.parent_id === undefined
-            ? null
-            : Number(comment.parent_id),
-    user: {
-        id: Number(comment.user?.id ?? 0),
-        name: comment.user?.name ?? 'Unknown user',
-    },
-    replies: Array.isArray(comment.replies)
-        ? comment.replies.map(normalizeComment)
-        : [],
-});
-
-const normalizeTask = (task) => ({
-    ...task,
-    progress: Number(task.progress ?? 0),
-    sort_order: Number(task.sort_order ?? 0),
-    tags: Array.isArray(task.tags)
-        ? task.tags
-              .map((tag) => `${tag ?? ''}`.trim())
-              .filter(Boolean)
-        : [],
-    comments: Array.isArray(task.comments)
-        ? task.comments.map(normalizeComment)
-        : [],
-});
-
-const cloneTasks = (taskList) => taskList.map((task) => ({ ...task }));
-
-const sortTaskList = (taskList) =>
-    [...taskList].sort(
-        (left, right) =>
-            (left.sort_order ?? 0) - (right.sort_order ?? 0) ||
-            left.id - right.id,
-    );
 
 const tasks = ref(props.tasks.map(normalizeTask));
 const updatingId = ref(null);
@@ -203,17 +176,6 @@ watch(
 
 const formatStatus = (status) =>
     formatStatusValue(status, boardStatusLabels.value);
-
-const visibleTags = (tags = [], limit = 3) => tags.slice(0, limit);
-
-const hiddenTagCount = (tags = [], limit = 3) =>
-    Math.max(tags.length - limit, 0);
-
-const commentCount = (comments = []) =>
-    comments.reduce(
-        (count, comment) => count + 1 + commentCount(comment.replies ?? []),
-        0,
-    );
 
 const activeTask = computed(() =>
     tasks.value.find((task) => task.id === selectedTaskId.value) ?? null,
@@ -757,38 +719,11 @@ const tasksByStatus = computed(() => {
     return grouped;
 });
 
-const buildGroupedTasks = (taskList) => {
-    const grouped = {};
+const buildGroupedTasks = (taskList) =>
+    buildGroupedTasksFor(taskList, boardStatuses.value);
 
-    boardStatuses.value.forEach((status) => {
-        grouped[status] = [];
-    });
-
-    taskList.forEach((task) => {
-        if (!grouped[task.status]) {
-            grouped[task.status] = [];
-        }
-
-        grouped[task.status].push({ ...normalizeTask(task) });
-    });
-
-    Object.keys(grouped).forEach((status) => {
-        grouped[status] = sortTaskList(grouped[status]);
-    });
-
-    return grouped;
-};
-
-const flattenGroupedTasks = (grouped) => {
-    const orderedStatuses = [
-        ...boardStatuses.value,
-        ...Object.keys(grouped).filter(
-            (status) => !boardStatuses.value.includes(status),
-        ),
-    ];
-
-    return orderedStatuses.flatMap((status) => grouped[status] ?? []);
-};
+const flattenGroupedTasks = (grouped) =>
+    flattenGroupedTasksFor(grouped, boardStatuses.value);
 
 const applyTaskOrderUpdates = (orderUpdates) => {
     if (!Array.isArray(orderUpdates) || !orderUpdates.length) {
@@ -1044,18 +979,6 @@ const appendCommentToTask = (taskId, comment) => {
         });
     });
 };
-
-const appendReplyToComments = (comments, parentId, reply) =>
-    comments.map((comment) => {
-        if (comment.id !== parentId) {
-            return comment;
-        }
-
-        return normalizeComment({
-            ...comment,
-            replies: [...(comment.replies ?? []), reply],
-        });
-    });
 
 const appendReplyToTask = (taskId, parentId, comment) => {
     const normalizedReply = normalizeComment(comment);
