@@ -9,6 +9,15 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TagInput from '@/Components/TagInput.vue';
 import TextInput from '@/Components/TextInput.vue';
+import {
+    defaultStatusLabels,
+    formatDate,
+    formatDateInput,
+    formatDateTime,
+    formatPriority,
+    formatStatus as formatStatusValue,
+    priorityBadgeClass,
+} from '@/lib/format';
 import axios from 'axios';
 
 const props = defineProps({
@@ -138,11 +147,6 @@ const columnForm = useForm({
     label: '',
 });
 
-const defaultStatusLabels = {
-    pending: 'Pending',
-    'in-progress': 'In Progress',
-    completed: 'Completed',
-};
 const buildStatusLabels = (labels = {}) => ({
     ...defaultStatusLabels,
     ...Object.fromEntries(
@@ -198,68 +202,12 @@ watch(
 );
 
 const formatStatus = (status) =>
-    boardStatusLabels.value[status] ?? defaultStatusLabels[status] ?? status;
-
-const formatPriority = (priority) => {
-    if (!priority) {
-        return 'Unspecified';
-    }
-
-    return `${priority.charAt(0).toUpperCase()}${priority.slice(1)}`;
-};
+    formatStatusValue(status, boardStatusLabels.value);
 
 const visibleTags = (tags = [], limit = 3) => tags.slice(0, limit);
 
 const hiddenTagCount = (tags = [], limit = 3) =>
     Math.max(tags.length - limit, 0);
-
-const priorityBadgeClass = (priority) => {
-    if (priority === 'low') {
-        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-    }
-
-    if (priority === 'high') {
-        return 'border-rose-200 bg-rose-50 text-rose-700';
-    }
-
-    return 'border-amber-200 bg-amber-50 text-amber-700';
-};
-
-const formatDate = (value) => {
-    if (!value) {
-        return null;
-    }
-
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return null;
-    }
-
-    return new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-    }).format(date);
-};
-
-const formatDateTime = (value) => {
-    if (!value) {
-        return null;
-    }
-
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return null;
-    }
-
-    return new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-    }).format(date);
-};
 
 const commentCount = (comments = []) =>
     comments.reduce(
@@ -270,24 +218,6 @@ const commentCount = (comments = []) =>
 const activeTask = computed(() =>
     tasks.value.find((task) => task.id === selectedTaskId.value) ?? null,
 );
-
-const formatDateInput = (value) => {
-    if (!value) {
-        return '';
-    }
-
-    if (typeof value === 'string') {
-        return value.slice(0, 10);
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return '';
-    }
-
-    return date.toISOString().slice(0, 10);
-};
 
 const setTaskFormValues = (taskForm, values = {}) => {
     taskForm.title = values.title ?? '';
