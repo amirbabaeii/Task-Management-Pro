@@ -2,9 +2,9 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import BoardColumn from '@/Components/BoardColumn.vue';
 import CommentThread from '@/Components/CommentThread.vue';
 import InputError from '@/Components/InputError.vue';
-import TaskCard from '@/Components/TaskCard.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
@@ -1054,101 +1054,38 @@ const submitTaskUpdate = () => {
                         @dragover="onBoardLaneDragOver"
                         @drop.stop.prevent="onBoardLaneDrop"
                     >
-                        <section
+                        <BoardColumn
                             v-for="status in boardStatuses"
                             :key="status"
-                            class="task-column flex h-full w-80 min-w-80 shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm transition"
-                            :class="{
-                                'task-column--drop-target': isColumnDropTarget(status),
-                                'task-column--dragging': isDraggingColumn(status),
-                                'task-column--drop-before': isColumnReorderDropTarget(status, 'before'),
-                                'task-column--drop-after': isColumnReorderDropTarget(status, 'after'),
-                                'task-column--moving': movingColumnStatus === status,
-                            }"
-                            @dragover.stop="onBoardSectionDragOver($event, status)"
-                            @drop.stop.prevent="onBoardSectionDrop(status)"
-                        >
-                            <div
-                                class="flex items-center justify-between border-b border-gray-100 px-4 py-3"
-                            >
-                                <div class="flex min-w-0 flex-1 items-center gap-2 pr-3">
-                                    <button
-                                        type="button"
-                                        class="column-drag-handle flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                                        title="Drag column"
-                                        draggable="true"
-                                        @click.stop
-                                        @dragstart.stop="onBoardColumnDragStart($event, status)"
-                                        @dragend.stop="onBoardColumnDragEnd"
-                                    >
-                                        <svg
-                                            class="h-4 w-4"
-                                            viewBox="0 0 16 16"
-                                            fill="currentColor"
-                                            aria-hidden="true"
-                                        >
-                                            <circle cx="5" cy="4" r="1.25" />
-                                            <circle cx="11" cy="4" r="1.25" />
-                                            <circle cx="5" cy="8" r="1.25" />
-                                            <circle cx="11" cy="8" r="1.25" />
-                                            <circle cx="5" cy="12" r="1.25" />
-                                            <circle cx="11" cy="12" r="1.25" />
-                                        </svg>
-                                    </button>
-                                    <div class="min-w-0 flex-1">
-                                        <input
-                                            v-if="editingStatusLabel === status"
-                                            :ref="setStatusLabelInput"
-                                            v-model="statusLabelDraft"
-                                            type="text"
-                                            maxlength="40"
-                                            class="block w-full rounded-md border-gray-300 px-2 py-1 text-sm font-semibold text-gray-700 shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                            @click.stop
-                                            @keydown.enter.prevent="saveStatusLabel(status)"
-                                            @keydown.esc.prevent="cancelStatusLabelEdit"
-                                            @blur="saveStatusLabel(status)"
-                                        />
-                                        <button
-                                            v-else
-                                            type="button"
-                                            class="block max-w-full truncate rounded-md px-2 py-1 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                                            @click.stop="startStatusLabelEdit(status)"
-                                        >
-                                            {{ formatStatus(status) }}
-                                        </button>
-                                    </div>
-                                </div>
-                                <span
-                                    class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
-                                >
-                                    {{ tasksByStatus[status]?.length || 0 }}
-                                </span>
-                            </div>
-                            <div class="flex-1 space-y-4 p-4">
-                                <div
-                                    v-if="!tasksByStatus[status]?.length"
-                                    class="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-6 text-center text-xs text-gray-500"
-                                >
-                                    No tasks in this status.
-                                </div>
-                                <TaskCard
-                                    v-for="task in tasksByStatus[status]"
-                                    :key="task.id"
-                                    :task="task"
-                                    :is-dragging="isDraggingTask(task.id)"
-                                    :is-drop-before-target="isTaskDropTarget(task.id, 'before')"
-                                    :is-drop-after-target="isTaskDropTarget(task.id, 'after')"
-                                    :can-drag="updatingId !== task.id && movingColumnStatus === null"
-                                    :is-updating="updatingId === task.id"
-                                    @open-details="openTaskDetails"
-                                    @open-edit="openEditModal"
-                                    @drag-start="onTaskDragStart"
-                                    @drag-over="onTaskDragOver"
-                                    @drop="onTaskDrop"
-                                    @drag-end="onTaskDragEnd"
-                                />
-                            </div>
-                        </section>
+                            v-model:label-draft="statusLabelDraft"
+                            :status="status"
+                            :label="formatStatus(status)"
+                            :tasks="tasksByStatus[status] ?? []"
+                            :is-editing-label="editingStatusLabel === status"
+                            :is-dragging-column="isDraggingColumn(status)"
+                            :is-moving="movingColumnStatus === status"
+                            :is-task-drop-target="isColumnDropTarget(status)"
+                            :is-reorder-drop-before="isColumnReorderDropTarget(status, 'before')"
+                            :is-reorder-drop-after="isColumnReorderDropTarget(status, 'after')"
+                            :columns-busy="movingColumnStatus !== null"
+                            :updating-task-id="updatingId"
+                            :is-task-dragging="isDraggingTask"
+                            :is-task-drop-before="(taskId) => isTaskDropTarget(taskId, 'before')"
+                            :is-task-drop-after="(taskId) => isTaskDropTarget(taskId, 'after')"
+                            @section-drag-over="(event) => onBoardSectionDragOver(event, status)"
+                            @section-drop="onBoardSectionDrop(status)"
+                            @column-drag-start="(event) => onBoardColumnDragStart(event, status)"
+                            @column-drag-end="onBoardColumnDragEnd"
+                            @start-edit-label="startStatusLabelEdit(status)"
+                            @save-label="saveStatusLabel(status)"
+                            @cancel-edit-label="cancelStatusLabelEdit"
+                            @task-drag-start="onTaskDragStart"
+                            @task-drag-over="onTaskDragOver"
+                            @task-drag-end="onTaskDragEnd"
+                            @task-drop="onTaskDrop"
+                            @task-open-details="openTaskDetails"
+                            @task-open-edit="openEditModal"
+                        />
                     </div>
                 </div>
 
@@ -1776,40 +1713,6 @@ const submitTaskUpdate = () => {
 </template>
 
 <style scoped>
-.column-drag-handle {
-    cursor: grab;
-}
-
-.column-drag-handle:active {
-    cursor: grabbing;
-}
-
-.task-column--drop-target {
-    border-color: rgb(55 65 81);
-    background: rgb(249 250 251);
-    box-shadow: inset 0 0 0 1px rgb(55 65 81 / 0.1);
-}
-
-.task-column--moving {
-    opacity: 0.75;
-}
-
-.task-column--dragging {
-    opacity: 0.55;
-}
-
-.task-column--drop-before {
-    box-shadow:
-        inset 4px 0 0 rgb(31 41 55),
-        0 1px 2px rgb(15 23 42 / 0.08);
-}
-
-.task-column--drop-after {
-    box-shadow:
-        inset -4px 0 0 rgb(31 41 55),
-        0 1px 2px rgb(15 23 42 / 0.08);
-}
-
 .task-progress-slider {
     --task-progress: 0%;
     -webkit-appearance: none;
