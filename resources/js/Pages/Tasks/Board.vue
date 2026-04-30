@@ -1,16 +1,13 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
+import AddColumnModal from '@/Components/AddColumnModal.vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import BoardColumn from '@/Components/BoardColumn.vue';
-import CommentThread from '@/Components/CommentThread.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TagInput from '@/Components/TagInput.vue';
-import TextInput from '@/Components/TextInput.vue';
+import TaskDetailsModal from '@/Components/TaskDetailsModal.vue';
+import TaskFormModal from '@/Components/TaskFormModal.vue';
 import {
     defaultStatusLabels,
     formatDate,
@@ -24,13 +21,10 @@ import {
     appendReplyToComments,
     buildGroupedTasks as buildGroupedTasksFor,
     cloneTasks,
-    commentCount,
     flattenGroupedTasks as flattenGroupedTasksFor,
-    hiddenTagCount,
     normalizeComment,
     normalizeTask,
     sortTaskList,
-    visibleTags,
 } from '@/lib/task';
 import { useColumnDragDrop } from '@/composables/useColumnDragDrop';
 import { useTaskDragDrop } from '@/composables/useTaskDragDrop';
@@ -1096,679 +1090,65 @@ const submitTaskUpdate = () => {
                     {{ errorMessage }}
                 </p>
 
-                <Modal
+                <AddColumnModal
                     :show="showingColumnModal"
-                    max-width="lg"
+                    :form="columnForm"
                     @close="closeColumnModal"
-                >
-                    <div class="p-6">
-                        <div
-                            class="flex flex-col gap-1 border-b border-gray-100 pb-4"
-                        >
-                            <h3 class="text-lg font-semibold text-gray-900">
-                                Add a board column
-                            </h3>
-                            <p class="text-sm text-gray-500">
-                                Create a new status column for this board.
-                            </p>
-                        </div>
+                    @submit="submitColumn"
+                />
 
-                        <form
-                            class="mt-6 space-y-4"
-                            @submit.prevent="submitColumn"
-                        >
-                            <div>
-                                <InputLabel
-                                    for="column-label"
-                                    value="Column Title"
-                                />
-                                <TextInput
-                                    id="column-label"
-                                    v-model="columnForm.label"
-                                    type="text"
-                                    class="mt-1 block w-full"
-                                    required
-                                    maxlength="40"
-                                    autocomplete="off"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="columnForm.errors.label"
-                                />
-                            </div>
-
-                            <div
-                                class="flex items-center justify-end gap-3 pt-2"
-                            >
-                                <SecondaryButton @click="closeColumnModal">
-                                    Cancel
-                                </SecondaryButton>
-                                <PrimaryButton
-                                    :class="{
-                                        'opacity-25': columnForm.processing,
-                                    }"
-                                    :disabled="columnForm.processing"
-                                >
-                                    {{
-                                        columnForm.processing
-                                            ? 'Adding...'
-                                            : 'Add Column'
-                                    }}
-                                </PrimaryButton>
-                            </div>
-                        </form>
-                    </div>
-                </Modal>
-
-                <Modal
+                <TaskDetailsModal
                     :show="showingDetailsModal"
-                    max-width="2xl"
+                    :task="activeTask"
+                    :format-status="formatStatus"
+                    v-model:comment-draft="commentDraft"
+                    v-model:reply-draft="replyDraft"
+                    :comment-errors="commentErrors"
+                    :submitting-comment="submittingComment"
+                    :reply-errors="replyErrors"
+                    :active-reply-comment-id="activeReplyCommentId"
+                    :replying-comment-id="replyingCommentId"
                     @close="closeTaskDetails"
-                >
-                    <div
-                        v-if="activeTask"
-                        class="p-6"
-                    >
-                        <div
-                            class="flex flex-col gap-4 border-b border-gray-100 pb-4 sm:flex-row sm:items-start sm:justify-between"
-                        >
-                            <div class="space-y-2">
-                                <h3 class="text-lg font-semibold text-gray-900">
-                                    {{ activeTask.title }}
-                                </h3>
-                                <div class="flex flex-wrap gap-2 text-xs">
-                                    <span
-                                        class="rounded-full bg-gray-100 px-2.5 py-1 font-semibold uppercase tracking-wide text-gray-700"
-                                    >
-                                        {{ formatStatus(activeTask.status) }}
-                                    </span>
-                                    <span
-                                        class="rounded-full border px-2.5 py-1 font-semibold uppercase tracking-wide"
-                                        :class="priorityBadgeClass(activeTask.priority)"
-                                    >
-                                        {{ formatPriority(activeTask.priority) }}
-                                    </span>
-                                </div>
-                            </div>
-                            <SecondaryButton @click="openEditFromDetails">
-                                Edit Task
-                            </SecondaryButton>
-                        </div>
+                    @open-edit="openEditFromDetails"
+                    @submit-comment="submitTaskComment"
+                    @start-reply="startReply"
+                    @cancel-reply="cancelReply"
+                    @submit-reply="submitReply"
+                />
 
-                        <div class="mt-6 space-y-6">
-                            <section class="grid gap-4 sm:grid-cols-3">
-                                <div class="rounded-lg bg-gray-50 px-4 py-3">
-                                    <div
-                                        class="text-xs font-semibold uppercase tracking-wide text-gray-500"
-                                    >
-                                        Due Date
-                                    </div>
-                                    <div class="mt-1 text-sm text-gray-700">
-                                        {{
-                                            formatDate(activeTask.deadline_at) ||
-                                            'No deadline set'
-                                        }}
-                                    </div>
-                                </div>
-                                <div class="rounded-lg bg-gray-50 px-4 py-3">
-                                    <div
-                                        class="text-xs font-semibold uppercase tracking-wide text-gray-500"
-                                    >
-                                        Created At
-                                    </div>
-                                    <div class="mt-1 text-sm text-gray-700">
-                                        {{
-                                            formatDateTime(activeTask.created_at) ||
-                                            'Unavailable'
-                                        }}
-                                    </div>
-                                </div>
-                                <div class="rounded-lg bg-gray-50 px-4 py-3">
-                                    <div
-                                        class="text-xs font-semibold uppercase tracking-wide text-gray-500"
-                                    >
-                                        Task ID
-                                    </div>
-                                    <div class="mt-1 text-sm text-gray-700">
-                                        #{{ activeTask.id }}
-                                    </div>
-                                </div>
-                            </section>
-
-                            <section class="space-y-2">
-                                <h4 class="text-sm font-semibold text-gray-900">
-                                    Description
-                                </h4>
-                                <p class="text-sm leading-6 text-gray-600">
-                                    {{
-                                        activeTask.description ||
-                                        'No description provided.'
-                                    }}
-                                </p>
-                            </section>
-
-                            <section class="space-y-3">
-                                <div class="flex items-center justify-between">
-                                    <h4 class="text-sm font-semibold text-gray-900">
-                                        Tags
-                                    </h4>
-                                    <span class="text-xs text-gray-500">
-                                        {{ activeTask.tags.length }}
-                                        {{ activeTask.tags.length === 1 ? 'tag' : 'tags' }}
-                                    </span>
-                                </div>
-                                <div
-                                    v-if="activeTask.tags.length"
-                                    class="flex flex-wrap gap-2"
-                                >
-                                    <span
-                                        v-for="tag in activeTask.tags"
-                                        :key="`${activeTask.id}-tag-${tag}`"
-                                        class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-700"
-                                    >
-                                        {{ tag }}
-                                    </span>
-                                </div>
-                                <p
-                                    v-else
-                                    class="text-sm text-gray-500"
-                                >
-                                    No tags added.
-                                </p>
-                            </section>
-
-                            <section class="space-y-3">
-                                <div class="flex items-center justify-between">
-                                    <h4 class="text-sm font-semibold text-gray-900">
-                                        Progress
-                                    </h4>
-                                    <span class="text-sm text-gray-500">
-                                        {{ activeTask.progress }}%
-                                    </span>
-                                </div>
-                                <div
-                                    class="h-2 w-full rounded-full bg-gray-200"
-                                >
-                                    <div
-                                        class="h-2 rounded-full bg-gray-800"
-                                        :style="{
-                                            width: `${activeTask.progress}%`,
-                                        }"
-                                    />
-                                </div>
-                            </section>
-
-                            <section class="space-y-4">
-                                <div class="flex items-center justify-between">
-                                    <h4 class="text-sm font-semibold text-gray-900">
-                                        Comments
-                                    </h4>
-                                    <span class="text-xs text-gray-500">
-                                        {{
-                                            commentCount(activeTask.comments)
-                                        }}
-                                        {{
-                                            commentCount(activeTask.comments) ===
-                                            1
-                                                ? 'comment'
-                                                : 'comments'
-                                        }}
-                                    </span>
-                                </div>
-
-                                <form
-                                    class="space-y-3"
-                                    @submit.prevent="submitTaskComment"
-                                >
-                                    <textarea
-                                        v-model="commentDraft"
-                                        rows="3"
-                                        class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                        placeholder="Add a comment..."
-                                    />
-                                    <InputError
-                                        :message="commentErrors.content?.[0]"
-                                    />
-                                    <div class="flex justify-end">
-                                        <PrimaryButton
-                                            :class="{
-                                                'opacity-25':
-                                                    submittingComment ||
-                                                    !commentDraft.trim(),
-                                            }"
-                                            :disabled="
-                                                submittingComment ||
-                                                !commentDraft.trim()
-                                            "
-                                        >
-                                            {{
-                                                submittingComment
-                                                    ? 'Posting...'
-                                                    : 'Post Comment'
-                                            }}
-                                        </PrimaryButton>
-                                    </div>
-                                </form>
-
-                                <div
-                                    v-if="activeTask.comments.length"
-                                    class="space-y-3"
-                                >
-                                    <CommentThread
-                                        v-for="comment in activeTask.comments"
-                                        :key="comment.id"
-                                        v-model:reply-draft="replyDraft"
-                                        :comment="comment"
-                                        :active-reply-comment-id="activeReplyCommentId"
-                                        :reply-errors="replyErrors"
-                                        :replying-comment-id="replyingCommentId"
-                                        @start-reply="startReply"
-                                        @cancel-reply="cancelReply"
-                                        @submit-reply="submitReply"
-                                    />
-                                </div>
-                                <div
-                                    v-else
-                                    class="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-500"
-                                >
-                                    No comments yet.
-                                </div>
-                            </section>
-                        </div>
-                    </div>
-                </Modal>
-
-                <Modal
+                <TaskFormModal
+                    mode="create"
                     :show="showingCreateModal"
-                    max-width="2xl"
+                    :form="form"
+                    :statuses="boardStatuses"
+                    :format-status="formatStatus"
+                    :priorities="priorityOptions"
+                    :max-tags="maxTaskTags"
+                    :max-tag-length="maxTaskTagLength"
+                    :resolve-field-error="resolveFieldError"
                     @close="closeCreateModal"
-                >
-                    <div class="p-6">
-                        <div
-                            class="flex flex-col gap-1 border-b border-gray-100 pb-4"
-                        >
-                            <h3 class="text-lg font-semibold text-gray-900">
-                                Create a new task
-                            </h3>
-                            <p class="text-sm text-gray-500">
-                                New tasks are automatically assigned to you and
-                                added to this board.
-                            </p>
-                        </div>
+                    @submit="submitTask"
+                />
 
-                        <form
-                            class="mt-6 grid gap-4 md:grid-cols-2"
-                            @submit.prevent="submitTask"
-                        >
-                            <div class="md:col-span-2">
-                                <InputLabel for="title" value="Title" />
-                                <TextInput
-                                    id="title"
-                                    v-model="form.title"
-                                    type="text"
-                                    class="mt-1 block w-full"
-                                    required
-                                    maxlength="150"
-                                    autocomplete="off"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="form.errors.title"
-                                />
-                            </div>
-
-                            <div>
-                                <InputLabel for="status" value="Status" />
-                                <select
-                                    id="status"
-                                    v-model="form.status"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                    required
-                                >
-                                    <option
-                                        v-for="status in boardStatuses"
-                                        :key="status"
-                                        :value="status"
-                                    >
-                                        {{ formatStatus(status) }}
-                                    </option>
-                                </select>
-                                <InputError
-                                    class="mt-2"
-                                    :message="form.errors.status"
-                                />
-                            </div>
-
-                            <div>
-                                <InputLabel for="priority" value="Priority" />
-                                <select
-                                    id="priority"
-                                    v-model="form.priority"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                    required
-                                >
-                                    <option
-                                        v-for="priority in priorityOptions"
-                                        :key="priority"
-                                        :value="priority"
-                                    >
-                                        {{ formatPriority(priority) }}
-                                    </option>
-                                </select>
-                                <InputError
-                                    class="mt-2"
-                                    :message="form.errors.priority"
-                                />
-                            </div>
-
-                            <div class="md:col-span-2">
-                                <InputLabel
-                                    for="description"
-                                    value="Description"
-                                />
-                                <textarea
-                                    id="description"
-                                    v-model="form.description"
-                                    rows="5"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="form.errors.description"
-                                />
-                            </div>
-
-                            <div class="md:col-span-2">
-                                <InputLabel for="tags" value="Tags" />
-                                <TagInput
-                                    id="tags"
-                                    v-model="form.tags"
-                                    placeholder="Add a tag, e.g. backend"
-                                    :max-tags="maxTaskTags"
-                                    :max-tag-length="maxTaskTagLength"
-                                    :error="resolveFieldError(form.errors, 'tags')"
-                                />
-                            </div>
-
-                            <div>
-                                <InputLabel
-                                    for="deadline_at"
-                                    value="Deadline"
-                                />
-                                <input
-                                    id="deadline_at"
-                                    v-model="form.deadline_at"
-                                    type="date"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="form.errors.deadline_at"
-                                />
-                            </div>
-
-                            <div
-                                class="md:col-span-2 flex items-center justify-end gap-3 pt-2"
-                            >
-                                <SecondaryButton @click="closeCreateModal">
-                                    Cancel
-                                </SecondaryButton>
-                                <PrimaryButton
-                                    :class="{ 'opacity-25': form.processing }"
-                                    :disabled="form.processing"
-                                >
-                                    {{
-                                        form.processing
-                                            ? 'Creating...'
-                                            : 'Create Task'
-                                    }}
-                                </PrimaryButton>
-                            </div>
-                        </form>
-                    </div>
-                </Modal>
-
-                <Modal
+                <TaskFormModal
+                    mode="edit"
                     :show="showingEditModal"
-                    max-width="2xl"
+                    :form="editForm"
+                    :statuses="boardStatuses"
+                    :format-status="formatStatus"
+                    :priorities="priorityOptions"
+                    :max-tags="maxTaskTags"
+                    :max-tag-length="maxTaskTagLength"
+                    :resolve-field-error="resolveFieldError"
                     @close="closeEditModal"
-                >
-                    <div class="p-6">
-                        <div
-                            class="flex flex-col gap-1 border-b border-gray-100 pb-4"
-                        >
-                            <h3 class="text-lg font-semibold text-gray-900">
-                                Update task
-                            </h3>
-                            <p class="text-sm text-gray-500">
-                                Edit the task details without leaving the board.
-                            </p>
-                        </div>
-
-                        <form
-                            class="mt-6 grid gap-4 md:grid-cols-2"
-                            @submit.prevent="submitTaskUpdate"
-                        >
-                            <div class="md:col-span-2">
-                                <InputLabel for="edit-title" value="Title" />
-                                <TextInput
-                                    id="edit-title"
-                                    v-model="editForm.title"
-                                    type="text"
-                                    class="mt-1 block w-full"
-                                    required
-                                    maxlength="150"
-                                    autocomplete="off"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="editForm.errors.title"
-                                />
-                            </div>
-
-                            <div>
-                                <InputLabel for="edit-status" value="Status" />
-                                <select
-                                    id="edit-status"
-                                    v-model="editForm.status"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                    required
-                                >
-                                    <option
-                                        v-for="status in boardStatuses"
-                                        :key="status"
-                                        :value="status"
-                                    >
-                                        {{ formatStatus(status) }}
-                                    </option>
-                                </select>
-                                <InputError
-                                    class="mt-2"
-                                    :message="editForm.errors.status"
-                                />
-                            </div>
-
-                            <div>
-                                <InputLabel
-                                    for="edit-priority"
-                                    value="Priority"
-                                />
-                                <select
-                                    id="edit-priority"
-                                    v-model="editForm.priority"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                    required
-                                >
-                                    <option
-                                        v-for="priority in priorityOptions"
-                                        :key="priority"
-                                        :value="priority"
-                                    >
-                                        {{ formatPriority(priority) }}
-                                    </option>
-                                </select>
-                                <InputError
-                                    class="mt-2"
-                                    :message="editForm.errors.priority"
-                                />
-                            </div>
-
-                            <div class="md:col-span-2">
-                                <InputLabel
-                                    for="edit-description"
-                                    value="Description"
-                                />
-                                <textarea
-                                    id="edit-description"
-                                    v-model="editForm.description"
-                                    rows="5"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="editForm.errors.description"
-                                />
-                            </div>
-
-                            <div class="md:col-span-2">
-                                <InputLabel for="edit-tags" value="Tags" />
-                                <TagInput
-                                    id="edit-tags"
-                                    v-model="editForm.tags"
-                                    placeholder="Add a tag, e.g. backend"
-                                    :max-tags="maxTaskTags"
-                                    :max-tag-length="maxTaskTagLength"
-                                    :error="resolveFieldError(editForm.errors, 'tags')"
-                                />
-                            </div>
-
-                            <div class="md:col-span-2">
-                                <InputLabel
-                                    for="edit-progress"
-                                    value="Progress"
-                                />
-                                <div class="mt-2">
-                                    <input
-                                        id="edit-progress"
-                                        v-model.number="editForm.progress"
-                                        class="task-progress-slider block w-full"
-                                        type="range"
-                                        min="0"
-                                        max="100"
-                                        step="5"
-                                        :style="{
-                                            '--task-progress': `${editForm.progress}%`,
-                                        }"
-                                    />
-                                    <div class="mt-1 text-sm text-gray-500">
-                                        {{ editForm.progress }}% complete
-                                    </div>
-                                </div>
-                                <InputError
-                                    class="mt-2"
-                                    :message="editForm.errors.progress"
-                                />
-                            </div>
-
-                            <div class="md:col-span-2">
-                                <InputLabel
-                                    for="edit-deadline_at"
-                                    value="Deadline"
-                                />
-                                <input
-                                    id="edit-deadline_at"
-                                    v-model="editForm.deadline_at"
-                                    type="date"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="editForm.errors.deadline_at"
-                                />
-                            </div>
-
-                            <div
-                                class="md:col-span-2 flex items-center justify-end gap-3 pt-2"
-                            >
-                                <SecondaryButton @click="closeEditModal">
-                                    Cancel
-                                </SecondaryButton>
-                                <PrimaryButton
-                                    :class="{ 'opacity-25': editForm.processing }"
-                                    :disabled="editForm.processing"
-                                >
-                                    {{
-                                        editForm.processing
-                                            ? 'Saving...'
-                                            : 'Save Changes'
-                                    }}
-                                </PrimaryButton>
-                            </div>
-                        </form>
-                    </div>
-                </Modal>
+                    @submit="submitTaskUpdate"
+                />
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
 
 <style scoped>
-.task-progress-slider {
-    --task-progress: 0%;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 0.5rem;
-    border-radius: 9999px;
-    background: transparent;
-    cursor: pointer;
-}
-
-.task-progress-slider::-webkit-slider-runnable-track {
-    height: 0.5rem;
-    border-radius: 9999px;
-    background: linear-gradient(
-        to right,
-        rgb(31 41 55) 0%,
-        rgb(31 41 55) var(--task-progress),
-        rgb(229 231 235) var(--task-progress),
-        rgb(229 231 235) 100%
-    );
-}
-
-.task-progress-slider::-moz-range-track {
-    height: 0.5rem;
-    border: 0;
-    border-radius: 9999px;
-    background: linear-gradient(
-        to right,
-        rgb(31 41 55) 0%,
-        rgb(31 41 55) var(--task-progress),
-        rgb(229 231 235) var(--task-progress),
-        rgb(229 231 235) 100%
-    );
-}
-
-.task-progress-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 0.9rem;
-    height: 0.9rem;
-    margin-top: -0.2rem;
-    border: 2px solid #fff;
-    border-radius: 9999px;
-    background: rgb(31 41 55);
-    box-shadow: 0 1px 3px rgb(15 23 42 / 0.25);
-}
-
-.task-progress-slider::-moz-range-thumb {
-    width: 0.9rem;
-    height: 0.9rem;
-    border: 2px solid #fff;
-    border-radius: 9999px;
-    background: rgb(31 41 55);
-    box-shadow: 0 1px 3px rgb(15 23 42 / 0.25);
-}
-
 .board-description-preview {
     display: -webkit-box;
     overflow: hidden;
