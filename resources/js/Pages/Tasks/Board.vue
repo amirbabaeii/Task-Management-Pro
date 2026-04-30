@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import AddColumnModal from '@/Components/AddColumnModal.vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import BoardColumn from '@/Components/BoardColumn.vue';
@@ -11,12 +11,8 @@ import TaskDetailsModal from '@/Components/TaskDetailsModal.vue';
 import TaskFormModal from '@/Components/TaskFormModal.vue';
 import {
     defaultStatusLabels,
-    formatDate,
     formatDateInput,
-    formatDateTime,
-    formatPriority,
     formatStatus as formatStatusValue,
-    priorityBadgeClass,
 } from '@/lib/format';
 import {
     appendReplyToComments,
