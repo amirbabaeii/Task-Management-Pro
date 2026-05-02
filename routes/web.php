@@ -37,6 +37,8 @@ Route::middleware('auth')->group(function () {
         ->name('tasks.columns.store');
     Route::patch('/tasks/board/{board}/columns/{status}/reorder', [BoardColumnController::class, 'reorder'])
         ->name('tasks.columns.reorder');
+    Route::delete('/tasks/board/{board}/columns/{status}', [BoardColumnController::class, 'destroy'])
+        ->name('tasks.columns.destroy');
     Route::patch('/tasks/board/{board}/status-labels/{status}', [BoardColumnController::class, 'updateLabel'])
         ->name('tasks.status-labels.update');
 

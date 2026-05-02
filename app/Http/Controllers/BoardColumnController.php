@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Actions\BoardColumns\CreateBoardColumnAction;
+use App\Actions\BoardColumns\DeleteBoardColumnAction;
 use App\Actions\BoardColumns\EnsureBoardHasDefaultColumnsAction;
 use App\Actions\BoardColumns\ReorderBoardColumnsAction;
 use App\Actions\BoardColumns\UpdateBoardColumnLabelAction;
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
+use App\Http\Requests\BoardColumns\DeleteBoardColumnRequest;
 use App\Http\Requests\BoardColumns\ReorderBoardColumnRequest;
 use App\Http\Requests\BoardColumns\StoreBoardColumnRequest;
 use App\Http\Requests\BoardColumns\UpdateBoardColumnLabelRequest;
@@ -24,6 +26,7 @@ class BoardColumnController extends Controller
         private readonly CreateBoardColumnAction $createColumn,
         private readonly ReorderBoardColumnsAction $reorderColumns,
         private readonly UpdateBoardColumnLabelAction $updateColumnLabel,
+        private readonly DeleteBoardColumnAction $deleteColumn,
     ) {}
 
     public function store(StoreBoardColumnRequest $request, Board $board): RedirectResponse
@@ -67,6 +70,24 @@ class BoardColumnController extends Controller
             'status' => $request->validated('status'),
             'label' => $request->validated('label'),
             'status_labels' => BoardColumn::labelsForBoard($board->fresh()),
+        ]);
+    }
+
+    public function destroy(DeleteBoardColumnRequest $request, Board $board, string $status): JsonResponse
+    {
+        $board = $this->resolveBoard($request->user(), $board);
+
+        $this->deleteColumn->execute(
+            $board,
+            $status,
+            $request->validated('move_tasks_to'),
+        );
+
+        $fresh = $board->fresh();
+
+        return response()->json([
+            'statuses' => BoardColumn::statusesForBoard($fresh),
+            'status_labels' => BoardColumn::labelsForBoard($fresh),
         ]);
     }
 
