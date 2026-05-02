@@ -1,4 +1,5 @@
 <script setup>
+import Dropdown from '@/Components/Dropdown.vue';
 import TaskCard from '@/Components/TaskCard.vue';
 
 defineProps({
@@ -42,6 +43,10 @@ defineProps({
         type: Boolean,
         default: false,
     },
+    canDelete: {
+        type: Boolean,
+        default: true,
+    },
     updatingTaskId: {
         type: Number,
         default: null,
@@ -68,6 +73,7 @@ const emit = defineEmits([
     'start-edit-label',
     'save-label',
     'cancel-edit-label',
+    'request-delete',
     'task-drag-start',
     'task-drag-over',
     'task-drag-end',
@@ -152,11 +158,54 @@ const setInputRef = (element) => {
                     </button>
                 </div>
             </div>
-            <span
-                class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
-            >
-                {{ tasks.length }}
-            </span>
+            <div class="flex shrink-0 items-center gap-1">
+                <span
+                    class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
+                >
+                    {{ tasks.length }}
+                </span>
+                <Dropdown align="right" width="48">
+                    <template #trigger>
+                        <button
+                            type="button"
+                            class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                            aria-label="Column actions"
+                            @click.stop
+                        >
+                            <svg
+                                class="h-4 w-4"
+                                viewBox="0 0 16 16"
+                                fill="currentColor"
+                                aria-hidden="true"
+                            >
+                                <circle cx="8" cy="3" r="1.4" />
+                                <circle cx="8" cy="8" r="1.4" />
+                                <circle cx="8" cy="13" r="1.4" />
+                            </svg>
+                        </button>
+                    </template>
+                    <template #content>
+                        <button
+                            type="button"
+                            class="block w-full px-4 py-2 text-left text-sm transition focus:outline-none focus:bg-gray-100"
+                            :class="
+                                canDelete
+                                    ? 'text-rose-600 hover:bg-gray-100 hover:text-rose-700'
+                                    : 'cursor-not-allowed text-gray-400'
+                            "
+                            :disabled="!canDelete"
+                            :title="
+                                canDelete
+                                    ? null
+                                    : 'You need at least one column on a board.'
+                            "
+                            @click.stop="canDelete && emit('request-delete')"
+                        >
+                            Delete column
+                        </button>
+                    </template>
+                </Dropdown>
+            </div>
         </div>
         <div class="flex-1 space-y-4 p-4">
             <div
