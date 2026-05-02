@@ -356,3 +356,19 @@ Route::get('/users', function () {
 
 - Always use Tailwind CSS v3 - verify you're using only classes supported by this version.
 </laravel-boost-guidelines>
+
+# Project Architecture (read first)
+
+The architecture and layering rules for this codebase live in [AGENTS.md](AGENTS.md). **Read it before editing.** Where AGENTS.md conflicts with the Boost-generated section above, AGENTS.md wins — the Boost guidelines are general Laravel advice and don't know what this project's structure looks like.
+
+The most common gotchas:
+
+- This project **does** use the Laravel 11 streamlined structure (`bootstrap/app.php` owns middleware + exceptions). Boost's "Laravel 10 Structure" section above is wrong for this project.
+- There is no repository layer. Use Eloquent directly. Do not reintroduce `App\Repositories`.
+- API responses go through `App\Http\ApiResponse::success/error(...)` — not bare arrays, not the deleted `ApiResource` envelope.
+- Business logic lives in `App\Actions\<Resource>\<Verb><Resource>Action`, one verb per Action.
+- Controllers are thin (3–5 lines per method). Use FormRequests for validation, never inline `validator(...)` or `$request->validate()`.
+- Board/Task ownership goes through `BoardPolicy` / `TaskPolicy` and `$this->authorize(...)`, never `abort_unless` on `user_id`.
+- Frontend pure helpers live in `resources/js/lib/*.js`; reusable stateful logic in `resources/js/composables/use*.js`. Tailwind scans both `.vue` and `.js` (already configured).
+- Commit messages: Conventional Commits prefix, short, **no `Co-Authored-By: Claude` trailer**.
+
