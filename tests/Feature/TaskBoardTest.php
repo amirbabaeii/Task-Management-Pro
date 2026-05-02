@@ -238,6 +238,123 @@ class TaskBoardTest extends TestCase
         ]);
     }
 
+    public function test_authenticated_user_can_delete_an_empty_column(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+
+        $response = $this->actingAs($user)->deleteJson(
+            route('tasks.columns.destroy', ['board' => $board, 'status' => 'in-progress']),
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('statuses.0', 'pending')
+            ->assertJsonPath('statuses.1', 'completed');
+
+        $this->assertDatabaseMissing('board_columns', [
+            'board_id' => $board->id,
+            'status' => 'in-progress',
+        ]);
+        $this->assertDatabaseHas('board_columns', [
+            'board_id' => $board->id,
+            'status' => 'pending',
+            'position' => 1,
+        ]);
+        $this->assertDatabaseHas('board_columns', [
+            'board_id' => $board->id,
+            'status' => 'completed',
+            'position' => 2,
+        ]);
+    }
+
+    public function test_authenticated_user_can_delete_a_column_and_move_its_tasks(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+
+        $task = Task::factory()->create(['status' => 'in-progress']);
+        $this->attachAssignee($user, $board, $task, 1);
+
+        $response = $this->actingAs($user)->deleteJson(
+            route('tasks.columns.destroy', ['board' => $board, 'status' => 'in-progress']),
+            ['move_tasks_to' => 'pending'],
+        );
+
+        $response->assertOk();
+
+        $this->assertDatabaseMissing('board_columns', [
+            'board_id' => $board->id,
+            'status' => 'in-progress',
+        ]);
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_cannot_delete_a_column_with_tasks_without_destination(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+
+        $task = Task::factory()->create(['status' => 'in-progress']);
+        $this->attachAssignee($user, $board, $task, 1);
+
+        $response = $this->actingAs($user)->deleteJson(
+            route('tasks.columns.destroy', ['board' => $board, 'status' => 'in-progress']),
+        );
+
+        $response->assertStatus(500);
+
+        $this->assertDatabaseHas('board_columns', [
+            'board_id' => $board->id,
+            'status' => 'in-progress',
+        ]);
+    }
+
+    public function test_cannot_delete_the_last_column_on_a_board(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+
+        BoardColumn::query()
+            ->where('board_id', $board->id)
+            ->whereIn('status', ['pending', 'in-progress'])
+            ->delete();
+
+        $response = $this->actingAs($user)->deleteJson(
+            route('tasks.columns.destroy', ['board' => $board, 'status' => 'completed']),
+        );
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['status']);
+
+        $this->assertDatabaseHas('board_columns', [
+            'board_id' => $board->id,
+            'status' => 'completed',
+        ]);
+    }
+
+    public function test_cannot_delete_column_from_another_users_board(): void
+    {
+        $owner = User::factory()->create();
+        $intruder = User::factory()->create();
+        $board = $this->defaultBoardFor($owner);
+
+        $response = $this->actingAs($intruder)->deleteJson(
+            route('tasks.columns.destroy', ['board' => $board, 'status' => 'in-progress']),
+        );
+
+        $response->assertNotFound();
+
+        $this->assertDatabaseHas('board_columns', [
+            'board_id' => $board->id,
+            'status' => 'in-progress',
+        ]);
+    }
+
     public function test_authenticated_user_can_create_a_new_board(): void
     {
         $user = User::factory()->create();
