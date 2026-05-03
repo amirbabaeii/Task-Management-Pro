@@ -1,14 +1,16 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import AddColumnModal from '@/Components/AddColumnModal.vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import BoardColumn from '@/Components/BoardColumn.vue';
 import BoardHeader from '@/Components/BoardHeader.vue';
+import DeleteColumnModal from '@/Components/DeleteColumnModal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TaskDetailsModal from '@/Components/TaskDetailsModal.vue';
 import TaskFormModal from '@/Components/TaskFormModal.vue';
+import UndoToast from '@/Components/UndoToast.vue';
 import {
     defaultStatusLabels,
     formatDateInput,
@@ -407,6 +409,200 @@ const onBoardSectionDrop = async (status) => {
     }
 
     await onColumnDrop(status);
+};
+
+// ---------------------------------------------------------------------------
+// Column deletion
+//
+// Empty columns: optimistic remove + 5s undo toast (toast expiry fires the
+// actual server delete; the user can undo until then).
+// Non-empty columns: open a modal that asks where to move the tasks, then
+// optimistic remove + server delete with the chosen destination.
+// ---------------------------------------------------------------------------
+
+const pendingColumnDeletion = ref(null);
+let pendingColumnDeletionTimer = null;
+const showingDeleteColumnModal = ref(false);
+const deleteColumnContext = ref(null);
+const deleteColumnError = ref('');
+const deleteColumnProcessing = ref(false);
+
+const canDeleteColumn = computed(() => boardStatuses.value.length > 1);
+
+const destinationOptionsForDelete = computed(() => {
+    if (!deleteColumnContext.value) {
+        return [];
+    }
+
+    return boardStatuses.value
+        .filter((status) => status !== deleteColumnContext.value.status)
+        .map((status) => ({
+            status,
+            label: formatStatus(status),
+        }));
+});
+
+const snapshotColumnState = (status) => ({
+    statuses: [...boardStatuses.value],
+    statusLabels: { ...boardStatusLabels.value },
+    deletedStatus: status,
+});
+
+const removeStatusLocally = (status) => {
+    boardStatuses.value = boardStatuses.value.filter(
+        (candidate) => candidate !== status,
+    );
+
+    const nextLabels = { ...boardStatusLabels.value };
+    delete nextLabels[status];
+    boardStatusLabels.value = nextLabels;
+};
+
+const clearPendingDeletionTimer = () => {
+    if (pendingColumnDeletionTimer !== null) {
+        window.clearTimeout(pendingColumnDeletionTimer);
+        pendingColumnDeletionTimer = null;
+    }
+};
+
+const undoPendingColumnDeletion = () => {
+    if (!pendingColumnDeletion.value) {
+        return;
+    }
+
+    const pending = pendingColumnDeletion.value;
+    pendingColumnDeletion.value = null;
+    clearPendingDeletionTimer();
+
+    boardStatuses.value = pending.snapshot.statuses;
+    boardStatusLabels.value = pending.snapshot.statusLabels;
+};
+
+const flushPendingColumnDeletion = async () => {
+    if (!pendingColumnDeletion.value) {
+        return;
+    }
+
+    const pending = pendingColumnDeletion.value;
+    pendingColumnDeletion.value = null;
+    clearPendingDeletionTimer();
+
+    try {
+        const response = await axios.delete(
+            route('tasks.columns.destroy', {
+                board: currentBoardId.value,
+                status: pending.snapshot.deletedStatus,
+            }),
+        );
+
+        if (Array.isArray(response?.data?.statuses)) {
+            boardStatuses.value = response.data.statuses;
+        }
+
+        if (response?.data?.status_labels) {
+            boardStatusLabels.value = buildStatusLabels(
+                response.data.status_labels,
+            );
+        }
+    } catch (error) {
+        boardStatuses.value = pending.snapshot.statuses;
+        boardStatusLabels.value = pending.snapshot.statusLabels;
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to delete column. Please try again.';
+    }
+};
+
+const requestDeleteColumn = (status) => {
+    if (!canDeleteColumn.value) {
+        return;
+    }
+
+    // Commit any in-flight pending delete first so state stays predictable.
+    if (pendingColumnDeletion.value) {
+        flushPendingColumnDeletion();
+    }
+
+    errorMessage.value = '';
+    const taskCount = (tasksByStatus.value[status] ?? []).length;
+
+    if (taskCount > 0) {
+        deleteColumnContext.value = {
+            status,
+            label: formatStatus(status),
+            taskCount,
+        };
+        deleteColumnError.value = '';
+        deleteColumnProcessing.value = false;
+        showingDeleteColumnModal.value = true;
+        return;
+    }
+
+    pendingColumnDeletion.value = {
+        label: formatStatus(status),
+        snapshot: snapshotColumnState(status),
+    };
+    removeStatusLocally(status);
+
+    pendingColumnDeletionTimer = window.setTimeout(() => {
+        flushPendingColumnDeletion();
+    }, 5100);
+};
+
+const cancelDeleteColumnModal = () => {
+    showingDeleteColumnModal.value = false;
+    deleteColumnContext.value = null;
+    deleteColumnError.value = '';
+};
+
+const confirmDeleteColumnWithMove = async (moveTasksTo) => {
+    if (!deleteColumnContext.value || !moveTasksTo) {
+        return;
+    }
+
+    const ctx = deleteColumnContext.value;
+    const snapshot = snapshotColumnState(ctx.status);
+
+    deleteColumnProcessing.value = true;
+    deleteColumnError.value = '';
+
+    try {
+        const response = await axios.delete(
+            route('tasks.columns.destroy', {
+                board: currentBoardId.value,
+                status: ctx.status,
+            }),
+            { data: { move_tasks_to: moveTasksTo } },
+        );
+
+        if (Array.isArray(response?.data?.statuses)) {
+            boardStatuses.value = response.data.statuses;
+        }
+
+        if (response?.data?.status_labels) {
+            boardStatusLabels.value = buildStatusLabels(
+                response.data.status_labels,
+            );
+        }
+
+        // Tasks have new statuses on the server; refresh from Inertia.
+        router.reload({
+            only: ['tasks'],
+            preserveScroll: true,
+            preserveState: true,
+        });
+
+        showingDeleteColumnModal.value = false;
+        deleteColumnContext.value = null;
+    } catch (error) {
+        boardStatuses.value = snapshot.statuses;
+        boardStatusLabels.value = snapshot.statusLabels;
+        deleteColumnError.value =
+            error?.response?.data?.message ||
+            'Unable to delete column. Please try again.';
+    } finally {
+        deleteColumnProcessing.value = false;
+    }
 };
 
 const openTaskDetails = (task) => {
@@ -857,6 +1053,7 @@ const submitTaskUpdate = () => {
                             :is-reorder-drop-before="isColumnReorderDropTarget(status, 'before')"
                             :is-reorder-drop-after="isColumnReorderDropTarget(status, 'after')"
                             :columns-busy="movingColumnStatus !== null"
+                            :can-delete="canDeleteColumn"
                             :updating-task-id="updatingId"
                             :is-task-dragging="isDraggingTask"
                             :is-task-drop-before="(taskId) => isTaskDropTarget(taskId, 'before')"
@@ -868,6 +1065,7 @@ const submitTaskUpdate = () => {
                             @start-edit-label="startStatusLabelEdit(status)"
                             @save-label="saveStatusLabel(status)"
                             @cancel-edit-label="cancelStatusLabelEdit"
+                            @request-delete="requestDeleteColumn(status)"
                             @task-drag-start="onTaskDragStart"
                             @task-drag-over="onTaskDragOver"
                             @task-drag-end="onTaskDragEnd"
@@ -890,6 +1088,25 @@ const submitTaskUpdate = () => {
                     :form="columnForm"
                     @close="closeColumnModal"
                     @submit="submitColumn"
+                />
+
+                <DeleteColumnModal
+                    :show="showingDeleteColumnModal"
+                    :column-label="deleteColumnContext?.label ?? ''"
+                    :task-count="deleteColumnContext?.taskCount ?? 0"
+                    :destinations="destinationOptionsForDelete"
+                    :processing="deleteColumnProcessing"
+                    :error="deleteColumnError"
+                    @close="cancelDeleteColumnModal"
+                    @confirm="confirmDeleteColumnWithMove"
+                />
+
+                <UndoToast
+                    :show="pendingColumnDeletion !== null"
+                    :message="`Column “${pendingColumnDeletion?.label ?? ''}” deleted`"
+                    :duration-ms="5000"
+                    @undo="undoPendingColumnDeletion"
+                    @expire="flushPendingColumnDeletion"
                 />
 
                 <TaskDetailsModal
