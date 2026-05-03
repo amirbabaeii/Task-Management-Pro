@@ -170,7 +170,6 @@ const setInputRef = (element) => {
                             type="button"
                             class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                             aria-label="Column actions"
-                            @click.stop
                         >
                             <svg
                                 class="h-4 w-4"
@@ -199,7 +198,7 @@ const setInputRef = (element) => {
                                     ? null
                                     : 'You need at least one column on a board.'
                             "
-                            @click.stop="canDelete && emit('request-delete')"
+                            @click="canDelete && emit('request-delete')"
                         >
                             Delete column
                         </button>
