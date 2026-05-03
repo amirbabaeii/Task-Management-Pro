@@ -1033,7 +1033,7 @@ const submitTaskUpdate = () => {
 
         <div class="min-h-[calc(100vh-9rem)] py-8">
             <div class="w-full px-4 sm:px-6 lg:px-8">
-                <div class="h-full overflow-x-auto overflow-y-hidden pb-2">
+                <div class="board-scroll h-full overflow-x-auto overflow-y-hidden pb-3">
                     <div
                         class="flex min-h-[calc(100vh-13rem)] w-max min-w-full items-stretch justify-center gap-6"
                         @dragover="onBoardLaneDragOver"
@@ -1160,3 +1160,34 @@ const submitTaskUpdate = () => {
     </AuthenticatedLayout>
 </template>
 
+<style scoped>
+.board-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(203 213 225) transparent;
+    scrollbar-gutter: stable;
+}
+
+.board-scroll::-webkit-scrollbar {
+    height: 10px;
+}
+
+.board-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.board-scroll::-webkit-scrollbar-thumb {
+    background-color: rgb(203 213 225);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    min-width: 40px;
+}
+
+.board-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(148 163 184);
+}
+
+.board-scroll::-webkit-scrollbar-button {
+    display: none;
+}
+</style>
