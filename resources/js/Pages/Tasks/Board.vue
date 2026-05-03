@@ -1031,7 +1031,7 @@ const submitTaskUpdate = () => {
             </BoardHeader>
         </template>
 
-        <div class="min-h-[calc(100vh-9rem)] py-8">
+        <div class="min-h-[calc(100vh-9rem)] pt-8">
             <div class="w-full px-4 sm:px-6 lg:px-8">
                 <div class="board-scroll h-full overflow-x-auto overflow-y-hidden pb-3">
                     <div
