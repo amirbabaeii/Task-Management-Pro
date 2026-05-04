@@ -238,6 +238,64 @@ class TaskBoardTest extends TestCase
         ]);
     }
 
+    public function test_assignee_can_delete_a_task(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+
+        $task = Task::factory()->create(['status' => 'in-progress']);
+        $this->attachAssignee($user, $board, $task, 1);
+
+        $task->comments()->create([
+            'user_id' => $user->id,
+            'content' => 'Some context',
+        ]);
+
+        $response = $this->actingAs($user)->deleteJson(
+            route('tasks.destroy', ['board' => $board, 'task' => $task]),
+        );
+
+        $response->assertOk()->assertJsonPath('id', $task->id);
+
+        $this->assertDatabaseMissing('tasks', ['id' => $task->id]);
+        $this->assertDatabaseMissing('task_user', ['task_id' => $task->id]);
+        $this->assertDatabaseMissing('task_comments', ['task_id' => $task->id]);
+    }
+
+    public function test_non_assignee_cannot_delete_a_task(): void
+    {
+        $owner = User::factory()->create();
+        $intruder = User::factory()->create();
+        $board = $this->defaultBoardFor($owner);
+
+        $task = Task::factory()->create(['status' => 'pending']);
+        $this->attachAssignee($owner, $board, $task, 1);
+
+        $response = $this->actingAs($intruder)->deleteJson(
+            route('tasks.destroy', ['board' => $board, 'task' => $task]),
+        );
+
+        // The board itself is foreign to the intruder, so resolveBoard 404s first.
+        $response->assertNotFound();
+        $this->assertDatabaseHas('tasks', ['id' => $task->id]);
+    }
+
+    public function test_cannot_delete_a_task_that_is_not_on_the_board(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+
+        $task = Task::factory()->create(['status' => 'pending']);
+        // No attachAssignee — task exists but isn't on the user's board.
+
+        $response = $this->actingAs($user)->deleteJson(
+            route('tasks.destroy', ['board' => $board, 'task' => $task]),
+        );
+
+        $response->assertNotFound();
+        $this->assertDatabaseHas('tasks', ['id' => $task->id]);
+    }
+
     public function test_authenticated_user_can_delete_an_empty_column(): void
     {
         $user = User::factory()->create();
