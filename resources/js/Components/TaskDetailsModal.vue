@@ -50,6 +50,7 @@ defineProps({
 const emit = defineEmits([
     'close',
     'open-edit',
+    'request-delete',
     'submit-comment',
     'start-reply',
     'cancel-reply',
@@ -91,9 +92,18 @@ const replyDraft = defineModel('replyDraft', {
                         </span>
                     </div>
                 </div>
-                <SecondaryButton @click="emit('open-edit')">
-                    Edit Task
-                </SecondaryButton>
+                <div class="flex shrink-0 items-center gap-2">
+                    <SecondaryButton @click="emit('open-edit')">
+                        Edit Task
+                    </SecondaryButton>
+                    <button
+                        type="button"
+                        class="rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-widest text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"
+                        @click="emit('request-delete')"
+                    >
+                        Delete
+                    </button>
+                </div>
             </div>
 
             <div class="mt-6 space-y-6">

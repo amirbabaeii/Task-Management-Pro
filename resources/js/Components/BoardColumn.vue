@@ -80,6 +80,7 @@ const emit = defineEmits([
     'task-drop',
     'task-open-details',
     'task-open-edit',
+    'task-request-delete',
 ]);
 
 const labelDraft = defineModel('labelDraft', {
@@ -224,6 +225,7 @@ const setInputRef = (element) => {
                 :is-updating="updatingTaskId === task.id"
                 @open-details="(t) => emit('task-open-details', t)"
                 @open-edit="(t) => emit('task-open-edit', t)"
+                @request-delete="(t) => emit('task-request-delete', t)"
                 @drag-start="(event, t) => emit('task-drag-start', event, t)"
                 @drag-over="(event, t) => emit('task-drag-over', event, t)"
                 @drop="(t) => emit('task-drop', t)"

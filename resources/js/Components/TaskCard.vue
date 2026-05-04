@@ -1,4 +1,5 @@
 <script setup>
+import Dropdown from '@/Components/Dropdown.vue';
 import {
     formatDate,
     formatPriority,
@@ -36,6 +37,7 @@ defineProps({
 const emit = defineEmits([
     'open-details',
     'open-edit',
+    'request-delete',
     'drag-start',
     'drag-over',
     'drag-end',
@@ -128,6 +130,36 @@ const emit = defineEmits([
                 >
                     Edit
                 </button>
+                <Dropdown align="right" width="48">
+                    <template #trigger>
+                        <button
+                            type="button"
+                            class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
+                            aria-label="Task actions"
+                            :disabled="isUpdating"
+                        >
+                            <svg
+                                class="h-4 w-4"
+                                viewBox="0 0 16 16"
+                                fill="currentColor"
+                                aria-hidden="true"
+                            >
+                                <circle cx="8" cy="3" r="1.4" />
+                                <circle cx="8" cy="8" r="1.4" />
+                                <circle cx="8" cy="13" r="1.4" />
+                            </svg>
+                        </button>
+                    </template>
+                    <template #content>
+                        <button
+                            type="button"
+                            class="block w-full px-4 py-2 text-left text-sm text-rose-600 transition hover:bg-gray-100 hover:text-rose-700 focus:outline-none focus:bg-gray-100"
+                            @click="emit('request-delete', task)"
+                        >
+                            Delete task
+                        </button>
+                    </template>
+                </Dropdown>
                 <span
                     v-if="isUpdating"
                     class="text-[11px] text-gray-400"
