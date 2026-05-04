@@ -422,6 +422,8 @@ const onBoardSectionDrop = async (status) => {
 
 const pendingColumnDeletion = ref(null);
 let pendingColumnDeletionTimer = null;
+const pendingTaskDeletion = ref(null);
+let pendingTaskDeletionTimer = null;
 const showingDeleteColumnModal = ref(false);
 const deleteColumnContext = ref(null);
 const deleteColumnError = ref('');
@@ -522,6 +524,9 @@ const requestDeleteColumn = (status) => {
     if (pendingColumnDeletion.value) {
         flushPendingColumnDeletion();
     }
+    if (pendingTaskDeletion.value) {
+        flushPendingTaskDeletion();
+    }
 
     errorMessage.value = '';
     const taskCount = (tasksByStatus.value[status] ?? []).length;
@@ -603,6 +608,84 @@ const confirmDeleteColumnWithMove = async (moveTasksTo) => {
     } finally {
         deleteColumnProcessing.value = false;
     }
+};
+
+// ---------------------------------------------------------------------------
+// Task deletion (mirrors the column flow: optimistic remove + 5s undo toast).
+// ---------------------------------------------------------------------------
+
+const clearPendingTaskTimer = () => {
+    if (pendingTaskDeletionTimer !== null) {
+        window.clearTimeout(pendingTaskDeletionTimer);
+        pendingTaskDeletionTimer = null;
+    }
+};
+
+const undoPendingTaskDeletion = () => {
+    if (!pendingTaskDeletion.value) {
+        return;
+    }
+
+    const pending = pendingTaskDeletion.value;
+    pendingTaskDeletion.value = null;
+    clearPendingTaskTimer();
+
+    tasks.value = pending.snapshot;
+};
+
+const flushPendingTaskDeletion = async () => {
+    if (!pendingTaskDeletion.value) {
+        return;
+    }
+
+    const pending = pendingTaskDeletion.value;
+    pendingTaskDeletion.value = null;
+    clearPendingTaskTimer();
+
+    try {
+        await axios.delete(
+            route('tasks.destroy', {
+                board: currentBoardId.value,
+                task: pending.taskId,
+            }),
+        );
+    } catch (error) {
+        tasks.value = pending.snapshot;
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to delete task. Please try again.';
+    }
+};
+
+const requestDeleteTask = (task) => {
+    if (!task) {
+        return;
+    }
+
+    if (pendingColumnDeletion.value) {
+        flushPendingColumnDeletion();
+    }
+    if (pendingTaskDeletion.value) {
+        flushPendingTaskDeletion();
+    }
+
+    errorMessage.value = '';
+
+    if (showingDetailsModal.value && selectedTaskId.value === task.id) {
+        closeTaskDetails();
+    }
+
+    pendingTaskDeletion.value = {
+        taskId: task.id,
+        title: task.title,
+        snapshot: cloneTasks(tasks.value),
+    };
+
+    tasks.value = tasks.value.filter((t) => t.id !== task.id);
+
+    pendingTaskDeletionTimer = window.setTimeout(() => {
+        flushPendingTaskDeletion();
+    }, 5100);
 };
 
 const openTaskDetails = (task) => {
@@ -1072,6 +1155,7 @@ const submitTaskUpdate = () => {
                             @task-drop="onTaskDrop"
                             @task-open-details="openTaskDetails"
                             @task-open-edit="openEditModal"
+                            @task-request-delete="requestDeleteTask"
                         />
                     </div>
                 </div>
@@ -1109,6 +1193,14 @@ const submitTaskUpdate = () => {
                     @expire="flushPendingColumnDeletion"
                 />
 
+                <UndoToast
+                    :show="pendingTaskDeletion !== null"
+                    :message="`Task “${pendingTaskDeletion?.title ?? ''}” deleted`"
+                    :duration-ms="5000"
+                    @undo="undoPendingTaskDeletion"
+                    @expire="flushPendingTaskDeletion"
+                />
+
                 <TaskDetailsModal
                     :show="showingDetailsModal"
                     :task="activeTask"
@@ -1122,6 +1214,7 @@ const submitTaskUpdate = () => {
                     :replying-comment-id="replyingCommentId"
                     @close="closeTaskDetails"
                     @open-edit="openEditFromDetails"
+                    @request-delete="requestDeleteTask(activeTask)"
                     @submit-comment="submitTaskComment"
                     @start-reply="startReply"
                     @cancel-reply="cancelReply"
