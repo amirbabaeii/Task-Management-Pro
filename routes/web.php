@@ -50,6 +50,8 @@ Route::middleware('auth')->group(function () {
         ->name('tasks.reorder');
     Route::patch('/tasks/board/{board}/tasks/{task}/status', [TaskController::class, 'updateStatus'])
         ->name('tasks.status');
+    Route::delete('/tasks/board/{board}/tasks/{task}', [TaskController::class, 'destroy'])
+        ->name('tasks.destroy');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

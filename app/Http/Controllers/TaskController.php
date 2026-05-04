@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\BoardColumns\EnsureBoardHasDefaultColumnsAction;
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Actions\Tasks\CreateTaskAction;
+use App\Actions\Tasks\DeleteTaskAction;
 use App\Actions\Tasks\ReorderTaskAction;
 use App\Actions\Tasks\UpdateTaskAction;
 use App\Actions\Tasks\UpdateTaskStatusAction;
@@ -18,6 +19,7 @@ use App\Models\User;
 use App\Support\BoardTaskAssignments;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -30,6 +32,7 @@ class TaskController extends Controller
         private readonly UpdateTaskAction $updateTask,
         private readonly ReorderTaskAction $reorderTask,
         private readonly UpdateTaskStatusAction $updateTaskStatus,
+        private readonly DeleteTaskAction $deleteTask,
     ) {}
 
     public function store(StoreTaskRequest $request, Board $board): RedirectResponse
@@ -102,6 +105,18 @@ class TaskController extends Controller
             'task' => $this->taskPayloadForUser($task->fresh(), $user->id, $board->id),
             'orders' => $this->userTaskOrderPayload($user->id, $board->id, [$originalStatus, $destinationStatus]),
         ]);
+    }
+
+    public function destroy(Request $request, Board $board, Task $task): JsonResponse
+    {
+        $user = $request->user();
+        $board = $this->resolveBoard($user, $board);
+        $this->ensureTaskIsOnBoard($user, $board, $task);
+        $this->authorize('update', $task);
+
+        $this->deleteTask->execute($task);
+
+        return response()->json(['id' => $task->id]);
     }
 
     private function resolveBoard(User $user, ?Board $board): Board
