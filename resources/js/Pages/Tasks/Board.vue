@@ -4,6 +4,7 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import AddColumnModal from '@/Components/AddColumnModal.vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import BoardColumn from '@/Components/BoardColumn.vue';
+import BoardFilters from '@/Components/BoardFilters.vue';
 import BoardHeader from '@/Components/BoardHeader.vue';
 import DeleteColumnModal from '@/Components/DeleteColumnModal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
@@ -25,6 +26,7 @@ import {
     normalizeTask,
     sortTaskList,
 } from '@/lib/task';
+import { useBoardFilter } from '@/composables/useBoardFilter';
 import { useColumnDragDrop } from '@/composables/useColumnDragDrop';
 import { useTaskDragDrop } from '@/composables/useTaskDragDrop';
 import axios from 'axios';
@@ -732,13 +734,22 @@ const openEditFromDetails = () => {
     openEditModal(task);
 };
 
+const {
+    searchQuery,
+    priorityFilter,
+    filteredTasks,
+    hasActiveFilters,
+    togglePriority,
+    clearFilters,
+} = useBoardFilter(tasks);
+
 const tasksByStatus = computed(() => {
     const grouped = {};
     boardStatuses.value.forEach((status) => {
         grouped[status] = [];
     });
 
-    tasks.value.forEach((task) => {
+    filteredTasks.value.forEach((task) => {
         if (!grouped[task.status]) {
             grouped[task.status] = [];
         }
@@ -1116,6 +1127,17 @@ const submitTaskUpdate = () => {
 
         <div class="min-h-[calc(100vh-9rem)] pt-8">
             <div class="w-full px-4 sm:px-6 lg:px-8">
+                <BoardFilters
+                    v-model:search-query="searchQuery"
+                    :priorities="priorityOptions"
+                    :active-priorities="priorityFilter"
+                    :has-active-filters="hasActiveFilters"
+                    :matched-count="filteredTasks.length"
+                    :total-count="tasks.length"
+                    class="mb-4"
+                    @toggle-priority="togglePriority"
+                    @clear="clearFilters"
+                />
                 <div class="board-scroll h-full overflow-x-auto overflow-y-hidden pb-3">
                     <div
                         class="flex min-h-[calc(100vh-13rem)] w-max min-w-full items-stretch justify-center gap-6"
