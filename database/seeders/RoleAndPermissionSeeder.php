@@ -3,35 +3,40 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RoleAndPermissionSeeder extends Seeder
 {
-    public function run()
+    /**
+     * Permissions intentionally only cover features that exist today. Add to
+     * this list as features ship — don't seed permissions for vapor.
+     */
+    public function run(): void
     {
-        $normalUser = Role::create(['name' => 'normal-user']);
-        $vipUser = Role::create(['name' => 'vip-user']);
-        $admin = Role::create(['name' => 'admin']);
-
         $permissions = [
-            'see-tasks',
             'create-tasks',
             'edit-tasks',
             'delete-tasks',
-            'use-ai',
-            'see-users',
-            'add-users',
-            'edit-users',
-            'delete-users',
         ];
 
         foreach ($permissions as $permission) {
-            Permission::create(['name' => $permission, 'guard_name' => 'web']);
+            Permission::firstOrCreate([
+                'name' => $permission,
+                'guard_name' => 'web',
+            ]);
         }
-        $normal_user_permissions = ['see-tasks', 'create-tasks', 'edit-tasks', 'delete-tasks'];
-        $normalUser->givePermissionTo($normal_user_permissions);
-        $vipUser->givePermissionTo(array_merge($normal_user_permissions, ['use-ai']));
-        $admin->givePermissionTo(array_merge($normal_user_permissions, ['use-ai', 'see-users', 'add-users', 'edit-users', 'delete-users']));
+
+        $normalUser = Role::firstOrCreate([
+            'name' => 'normal-user',
+            'guard_name' => 'web',
+        ]);
+        $admin = Role::firstOrCreate([
+            'name' => 'admin',
+            'guard_name' => 'web',
+        ]);
+
+        $normalUser->syncPermissions($permissions);
+        $admin->syncPermissions($permissions);
     }
-} 
+}
