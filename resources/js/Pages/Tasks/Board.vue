@@ -6,6 +6,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import BoardColumn from '@/Components/BoardColumn.vue';
 import BoardFilters from '@/Components/BoardFilters.vue';
 import BoardHeader from '@/Components/BoardHeader.vue';
+import BoardMembersModal from '@/Components/BoardMembersModal.vue';
 import DeleteColumnModal from '@/Components/DeleteColumnModal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
@@ -122,6 +123,98 @@ const boardStatusLabels = ref(buildStatusLabels(props.statusLabels));
 const currentBoardId = computed(() => props.currentBoard?.id ?? null);
 const currentBoardName = ref(props.currentBoard?.name ?? 'Task Board');
 const currentBoardDescription = ref(props.currentBoard?.description ?? '');
+const isBoardOwner = computed(() => props.currentBoard?.is_owner === true);
+
+// Members management state
+const showingMembersModal = ref(false);
+const boardMembers = ref([]);
+const loadingMembers = ref(false);
+const invitingMember = ref(false);
+const removingMemberId = ref(null);
+const memberInviteError = ref('');
+
+const openMembersModal = async () => {
+    if (!currentBoardId.value) {
+        return;
+    }
+
+    showingMembersModal.value = true;
+    memberInviteError.value = '';
+    loadingMembers.value = true;
+
+    try {
+        const response = await axios.get(
+            route('boards.members.index', { board: currentBoardId.value }),
+        );
+        boardMembers.value = response?.data?.members ?? [];
+    } catch (error) {
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to load members. Please try again.';
+        showingMembersModal.value = false;
+    } finally {
+        loadingMembers.value = false;
+    }
+};
+
+const closeMembersModal = () => {
+    showingMembersModal.value = false;
+    memberInviteError.value = '';
+};
+
+const inviteMember = async (email) => {
+    if (!currentBoardId.value || !email) {
+        return;
+    }
+
+    invitingMember.value = true;
+    memberInviteError.value = '';
+
+    try {
+        const response = await axios.post(
+            route('boards.members.store', { board: currentBoardId.value }),
+            { email },
+        );
+        boardMembers.value = response?.data?.members ?? boardMembers.value;
+    } catch (error) {
+        if (error?.response?.status === 422) {
+            memberInviteError.value =
+                error.response.data?.data?.errors?.email?.[0] ||
+                error.response.data?.message ||
+                'Unable to invite that user.';
+        } else {
+            memberInviteError.value =
+                error?.response?.data?.message ||
+                'Unable to invite that user. Please try again.';
+        }
+    } finally {
+        invitingMember.value = false;
+    }
+};
+
+const removeMember = async (userId) => {
+    if (!currentBoardId.value || !userId) {
+        return;
+    }
+
+    removingMemberId.value = userId;
+
+    try {
+        const response = await axios.delete(
+            route('boards.members.destroy', {
+                board: currentBoardId.value,
+                user: userId,
+            }),
+        );
+        boardMembers.value = response?.data?.members ?? boardMembers.value;
+    } catch (error) {
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to remove that member. Please try again.';
+    } finally {
+        removingMemberId.value = null;
+    }
+};
 const priorityOptions = computed(() =>
     props.priorities.length
         ? props.priorities
@@ -1115,6 +1208,9 @@ const submitTaskUpdate = () => {
                 @error="errorMessage = $event"
             >
                 <template #actions>
+                    <SecondaryButton @click="openMembersModal">
+                        Members
+                    </SecondaryButton>
                     <SecondaryButton @click="showingColumnModal = true">
                         Add Column
                     </SecondaryButton>
@@ -1204,6 +1300,19 @@ const submitTaskUpdate = () => {
                     :error="deleteColumnError"
                     @close="cancelDeleteColumnModal"
                     @confirm="confirmDeleteColumnWithMove"
+                />
+
+                <BoardMembersModal
+                    :show="showingMembersModal"
+                    :members="boardMembers"
+                    :is-owner="isBoardOwner"
+                    :loading="loadingMembers"
+                    :inviting="invitingMember"
+                    :removing-user-id="removingMemberId"
+                    :invite-error="memberInviteError"
+                    @close="closeMembersModal"
+                    @invite="inviteMember"
+                    @remove="removeMember"
                 />
 
                 <UndoToast
