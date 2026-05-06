@@ -46,6 +46,7 @@ class BoardController extends Controller
             'statuses' => BoardColumn::statusesForBoard($board),
             'statusLabels' => BoardColumn::labelsForBoard($board),
             'priorities' => TaskPriority::values(),
+            'members' => $this->boardMembersForBoard($board),
         ]);
     }
 
@@ -127,6 +128,9 @@ class BoardController extends Controller
                     ])
                     ->orderBy('created_at')
                     ->orderBy('id'),
+                'assignees' => fn ($query) => $query
+                    ->wherePivot('board_id', $board->id)
+                    ->select(['users.id', 'users.name', 'users.email']),
             ])
             ->orderBy('task_user.sort_order')
             ->orderBy('tasks.id')
@@ -142,10 +146,37 @@ class BoardController extends Controller
                 'progress' => $task->progress,
                 'created_at' => $task->created_at,
                 'sort_order' => (int) $task->pivot->sort_order,
+                'assignees' => $task->assignees
+                    ->map(fn (User $assignee): array => [
+                        'id' => $assignee->id,
+                        'name' => $assignee->name,
+                        'email' => $assignee->email,
+                    ])
+                    ->values()
+                    ->all(),
                 'comments' => $task->comments
                     ->map(fn (TaskComment $comment): array => TaskCommentPresenter::toArray($comment))
                     ->values()
                     ->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, name: string, email: string, role: string}>
+     */
+    private function boardMembersForBoard(Board $board): array
+    {
+        return $board->members()
+            ->orderByRaw("CASE board_members.role WHEN 'owner' THEN 0 ELSE 1 END")
+            ->orderBy('users.name')
+            ->get()
+            ->map(fn (User $member): array => [
+                'id' => $member->id,
+                'name' => $member->name,
+                'email' => $member->email,
+                'role' => $member->pivot->role,
             ])
             ->values()
             ->all();
