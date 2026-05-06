@@ -27,6 +27,10 @@ class StoreTaskRequest extends FormRequest
     public function rules(): array
     {
         $board = $this->route('board');
+        $memberIdsRule = $board instanceof Board
+            ? Rule::exists('board_members', 'user_id')
+                ->where('board_id', $board->id)
+            : Rule::exists('users', 'id');
 
         return [
             'title' => ['required', 'string', 'max:150'],
@@ -40,6 +44,8 @@ class StoreTaskRequest extends FormRequest
             'deadline_at' => ['nullable', 'date'],
             'tags' => ['nullable', 'array', 'max:'.Task::MAX_TAGS],
             'tags.*' => ['string', 'max:'.Task::MAX_TAG_LENGTH],
+            'assignee_ids' => ['nullable', 'array'],
+            'assignee_ids.*' => ['integer', $memberIdsRule],
         ];
     }
 }
