@@ -58,6 +58,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Every board this user can access — owned plus boards they collaborate on.
+     */
+    public function accessibleBoards(): BelongsToMany
+    {
+        return $this->belongsToMany(Board::class, 'board_members')
+            ->withPivot(['role', 'joined_at'])
+            ->withTimestamps();
+    }
+
+    /**
      * Get the saved board column settings for the user.
      */
     public function boardColumns(): HasMany

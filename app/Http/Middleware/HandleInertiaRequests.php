@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\BoardRole;
 use App\Models\Board;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -45,6 +46,9 @@ class HandleInertiaRequests extends Middleware
         ];
     }
 
+    /**
+     * @return list<array{id: int, name: string, description: string|null, role: string}>
+     */
     private function sharedBoards(Request $request): array
     {
         $user = $request->user();
@@ -53,11 +57,15 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
-        return Board::orderedForUser($user)
+        return $user->accessibleBoards()
+            ->orderByRaw("CASE board_members.role WHEN 'owner' THEN 0 ELSE 1 END")
+            ->orderBy('boards.name')
+            ->get()
             ->map(fn (Board $board): array => [
                 'id' => $board->id,
                 'name' => $board->name,
                 'description' => $board->description,
+                'role' => $board->pivot->role,
             ])
             ->values()
             ->all();
@@ -71,12 +79,13 @@ class HandleInertiaRequests extends Middleware
             return null;
         }
 
-        $boards = Board::orderedForUser($user);
         $routeBoard = $request->route('board');
-        $board = $routeBoard instanceof Board &&
-            (int) $routeBoard->user_id === (int) $user->id
+        $board = $routeBoard instanceof Board && $routeBoard->hasMember($user)
             ? $routeBoard
-            : $boards->first();
+            : $user->accessibleBoards()
+                ->orderByRaw("CASE board_members.role WHEN 'owner' THEN 0 ELSE 1 END")
+                ->orderBy('boards.name')
+                ->first();
 
         if (! $board) {
             return null;
@@ -86,6 +95,10 @@ class HandleInertiaRequests extends Middleware
             'id' => $board->id,
             'name' => $board->name,
             'description' => $board->description,
+            'role' => $board->isOwnedBy($user)
+                ? BoardRole::Owner->value
+                : BoardRole::Collaborator->value,
+            'is_owner' => $board->isOwnedBy($user),
         ];
     }
 }
