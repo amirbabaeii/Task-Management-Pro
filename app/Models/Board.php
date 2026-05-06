@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\BoardRole;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +23,25 @@ class Board extends Model
         'description',
         'position',
     ];
+
+    /**
+     * Every Board has exactly one owner membership row, created automatically.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (Board $board): void {
+            if (! $board->user_id) {
+                return;
+            }
+
+            $board->members()->syncWithoutDetaching([
+                $board->user_id => [
+                    'role' => BoardRole::Owner->value,
+                    'joined_at' => now(),
+                ],
+            ]);
+        });
+    }
 
     public function user(): BelongsTo
     {

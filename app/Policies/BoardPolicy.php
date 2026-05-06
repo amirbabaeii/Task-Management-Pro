@@ -12,20 +12,33 @@ class BoardPolicy
     use HandlesAuthorization;
 
     /**
-     * Determine if the user owns the board.
-     *
-     * Failures are surfaced as 404 so we don't leak the existence of
-     * boards belonging to other users.
+     * Owners and accepted collaborators can view a board. Failures surface
+     * as 404 so we don't leak the existence of boards owned by other users.
      */
     public function view(User $user, Board $board): Response
     {
-        return (int) $board->user_id === (int) $user->id
+        return $board->hasMember($user)
             ? Response::allow()
             : Response::denyAsNotFound();
     }
 
+    /**
+     * Both owners and collaborators can edit board content (rename,
+     * tasks, columns). Member-management is handled by manageMembers.
+     */
     public function update(User $user, Board $board): Response
     {
         return $this->view($user, $board);
+    }
+
+    /**
+     * Only the board owner can invite, remove, or otherwise alter the
+     * member roster.
+     */
+    public function manageMembers(User $user, Board $board): Response
+    {
+        return $board->isOwnedBy($user)
+            ? Response::allow()
+            : Response::denyAsNotFound();
     }
 }
