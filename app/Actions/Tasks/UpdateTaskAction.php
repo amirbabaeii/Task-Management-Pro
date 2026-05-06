@@ -10,6 +10,7 @@ class UpdateTaskAction
 {
     public function __construct(
         private readonly MoveTaskBetweenStatusesAction $moveBetweenStatuses,
+        private readonly UpdateTaskAssigneesAction $updateAssignees,
     ) {}
 
     /**
@@ -18,8 +19,12 @@ class UpdateTaskAction
     public function execute(Board $board, Task $task, array $data): Task
     {
         $originalStatus = $task->status;
+        $assigneeIds = array_key_exists('assignee_ids', $data)
+            ? $data['assignee_ids']
+            : null;
+        unset($data['assignee_ids']);
 
-        DB::transaction(function () use ($board, $task, $data, $originalStatus): void {
+        DB::transaction(function () use ($board, $task, $data, $originalStatus, $assigneeIds): void {
             $task->fill($data);
             $task->save();
 
@@ -30,6 +35,10 @@ class UpdateTaskAction
                     $task->status,
                     $board->id,
                 );
+            }
+
+            if (is_array($assigneeIds)) {
+                $this->updateAssignees->execute($board, $task, $assigneeIds);
             }
         });
 
