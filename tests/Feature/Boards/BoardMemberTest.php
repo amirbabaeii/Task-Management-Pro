@@ -170,6 +170,123 @@ class BoardMemberTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_owner_can_create_a_task_assigned_to_a_collaborator(): void
+    {
+        $owner = User::factory()->create();
+        $collab = User::factory()->create();
+        $board = $this->boardFor($owner);
+        $board->members()->attach($collab->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
+        ]);
+
+        $response = $this->actingAs($owner)->post(
+            route('tasks.store', ['board' => $board]),
+            [
+                'title' => 'Pair on the migration',
+                'status' => 'pending',
+                'priority' => 'medium',
+                'assignee_ids' => [$collab->id],
+            ],
+        );
+
+        $response->assertRedirect()->assertSessionHasNoErrors();
+
+        $task = Task::query()->where('title', 'Pair on the migration')->first();
+        $this->assertNotNull($task);
+
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $task->id,
+            'user_id' => $collab->id,
+            'board_id' => $board->id,
+            'role' => 'assignee',
+        ]);
+        $this->assertDatabaseMissing('task_user', [
+            'task_id' => $task->id,
+            'user_id' => $owner->id,
+        ]);
+    }
+
+    public function test_creating_a_task_without_assignee_ids_falls_back_to_creator(): void
+    {
+        $owner = User::factory()->create();
+        $board = $this->boardFor($owner);
+
+        $this->actingAs($owner)
+            ->post(route('tasks.store', ['board' => $board]), [
+                'title' => 'Solo task',
+                'status' => 'pending',
+                'priority' => 'medium',
+            ])
+            ->assertRedirect();
+
+        $task = Task::query()->where('title', 'Solo task')->first();
+
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $task->id,
+            'user_id' => $owner->id,
+            'role' => 'assignee',
+        ]);
+    }
+
+    public function test_cannot_assign_a_user_who_is_not_a_board_member(): void
+    {
+        $owner = User::factory()->create();
+        $stranger = User::factory()->create();
+        $board = $this->boardFor($owner);
+
+        $response = $this->actingAs($owner)
+            ->from(route('tasks.board', ['board' => $board]))
+            ->post(route('tasks.store', ['board' => $board]), [
+                'title' => 'Bad assignment',
+                'status' => 'pending',
+                'priority' => 'medium',
+                'assignee_ids' => [$stranger->id],
+            ]);
+
+        $response->assertSessionHasErrors(['assignee_ids.0']);
+    }
+
+    public function test_updating_a_task_replaces_the_assignee_set(): void
+    {
+        $owner = User::factory()->create();
+        $collab = User::factory()->create();
+        $board = $this->boardFor($owner);
+        $board->members()->attach($collab->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
+        ]);
+
+        $task = Task::factory()->create(['status' => 'pending']);
+        $task->users()->attach($owner->id, [
+            'board_id' => $board->id,
+            'role' => 'assignee',
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($owner)
+            ->patch(route('tasks.update', ['board' => $board, 'task' => $task]), [
+                'title' => $task->title,
+                'description' => $task->description,
+                'status' => 'pending',
+                'priority' => 'medium',
+                'progress' => 0,
+                'assignee_ids' => [$collab->id],
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $task->id,
+            'user_id' => $collab->id,
+            'role' => 'assignee',
+        ]);
+        $this->assertDatabaseMissing('task_user', [
+            'task_id' => $task->id,
+            'user_id' => $owner->id,
+        ]);
+    }
+
     private function boardFor(User $user): Board
     {
         return app(EnsureUserHasDefaultBoardAction::class)->execute($user);
