@@ -1177,7 +1177,6 @@ const submitTaskUpdate = () => {
                             @task-drop="onTaskDrop"
                             @task-open-details="openTaskDetails"
                             @task-open-edit="openEditModal"
-                            @task-request-delete="requestDeleteTask"
                         />
                     </div>
                 </div>
