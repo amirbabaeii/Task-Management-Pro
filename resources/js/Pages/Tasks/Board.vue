@@ -53,6 +53,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    members: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const tasks = ref(props.tasks.map(normalizeTask));
@@ -97,6 +101,7 @@ const blankTaskData = () => ({
     tags: [],
     progress: 0,
     deadline_at: '',
+    assignee_ids: [],
 });
 
 const form = useForm(blankTaskData());
@@ -266,6 +271,9 @@ const setTaskFormValues = (taskForm, values = {}) => {
     taskForm.tags = Array.isArray(values.tags) ? [...values.tags] : [];
     taskForm.progress = values.progress ?? 0;
     taskForm.deadline_at = values.deadline_at ?? '';
+    taskForm.assignee_ids = Array.isArray(values.assignee_ids)
+        ? [...values.assignee_ids]
+        : [];
 };
 
 const resolveFieldError = (errors = {}, field) =>
@@ -805,6 +813,9 @@ const openEditModal = (task) => {
         tags: task.tags ?? [],
         progress: task.progress ?? 0,
         deadline_at: formatDateInput(task.deadline_at),
+        assignee_ids: Array.isArray(task.assignees)
+            ? task.assignees.map((assignee) => assignee.id)
+            : [],
     });
     editForm.clearErrors();
     showingEditModal.value = true;
@@ -1361,6 +1372,7 @@ const submitTaskUpdate = () => {
                     :max-tags="maxTaskTags"
                     :max-tag-length="maxTaskTagLength"
                     :resolve-field-error="resolveFieldError"
+                    :members="members"
                     @close="closeCreateModal"
                     @submit="submitTask"
                 />
@@ -1375,6 +1387,7 @@ const submitTaskUpdate = () => {
                     :max-tags="maxTaskTags"
                     :max-tag-length="maxTaskTagLength"
                     :resolve-field-error="resolveFieldError"
+                    :members="members"
                     @close="closeEditModal"
                     @submit="submitTaskUpdate"
                 />

@@ -1,4 +1,5 @@
 <script setup>
+import AssigneePicker from '@/Components/AssigneePicker.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import Modal from '@/Components/Modal.vue';
@@ -46,6 +47,10 @@ const props = defineProps({
     resolveFieldError: {
         type: Function,
         required: true,
+    },
+    members: {
+        type: Array,
+        default: () => [],
     },
 });
 
@@ -197,6 +202,19 @@ const submitBusy = computed(() =>
                         class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
                     />
                     <InputError class="mt-2" :message="form.errors.deadline_at" />
+                </div>
+
+                <div class="md:col-span-2">
+                    <InputLabel value="Assignees" />
+                    <AssigneePicker
+                        v-model:selected-ids="form.assignee_ids"
+                        :members="members"
+                        class="mt-1"
+                    />
+                    <InputError
+                        class="mt-2"
+                        :message="resolveFieldError(form.errors, 'assignee_ids')"
+                    />
                 </div>
 
                 <div
