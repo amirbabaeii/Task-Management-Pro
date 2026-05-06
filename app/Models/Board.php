@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\BoardRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
@@ -29,6 +31,28 @@ class Board extends Model
     public function columns(): HasMany
     {
         return $this->hasMany(BoardColumn::class);
+    }
+
+    /**
+     * Every user with access to this board (owner + collaborators).
+     */
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'board_members')
+            ->withPivot(['role', 'joined_at'])
+            ->withTimestamps();
+    }
+
+    public function hasMember(User $user): bool
+    {
+        return $this->members()
+            ->where('users.id', $user->id)
+            ->exists();
+    }
+
+    public function isOwnedBy(User $user): bool
+    {
+        return (int) $this->user_id === (int) $user->id;
     }
 
     /**
