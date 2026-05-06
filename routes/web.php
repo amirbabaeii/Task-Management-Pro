@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BoardColumnController;
 use App\Http\Controllers\BoardController;
+use App\Http\Controllers\BoardMemberController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskController;
@@ -29,6 +30,13 @@ Route::middleware('auth')->group(function () {
         ->name('boards.store');
     Route::patch('/boards/{board}', [BoardController::class, 'update'])
         ->name('boards.update');
+
+    Route::get('/boards/{board}/members', [BoardMemberController::class, 'index'])
+        ->name('boards.members.index');
+    Route::post('/boards/{board}/members', [BoardMemberController::class, 'store'])
+        ->name('boards.members.store');
+    Route::delete('/boards/{board}/members/{user}', [BoardMemberController::class, 'destroy'])
+        ->name('boards.members.destroy');
 
     Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'store'])
         ->name('tasks.comments.store');
