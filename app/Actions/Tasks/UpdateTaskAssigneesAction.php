@@ -6,8 +6,10 @@ use App\Enums\TaskActivityKind;
 use App\Models\Board;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\TaskAssignedNotification;
 use App\Support\BoardTaskAssignments;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 class UpdateTaskAssigneesAction
 {
@@ -17,15 +19,6 @@ class UpdateTaskAssigneesAction
 
     /**
      * Replace the task's assignees on this board with the given user ids.
-     *
-     * - Removes pivot rows for users no longer in the list (those users lose
-     *   visibility of the task on this board).
-     * - Adds pivot rows for new users at the end of their column for the
-     *   task's current status.
-     * - Existing assignees keep their sort_order.
-     *
-     * Caller is responsible for validating that every userId is a board
-     * member. The action does not re-validate.
      *
      * @param  list<int>  $userIds
      */
@@ -68,9 +61,10 @@ class UpdateTaskAssigneesAction
 
             if ($toAdd !== [] || $toRemove !== []) {
                 $changedIds = array_merge($toAdd, $toRemove);
-                $names = User::query()
+                $changedUsers = User::query()
                     ->whereIn('id', $changedIds)
-                    ->pluck('name', 'id');
+                    ->get()
+                    ->keyBy('id');
 
                 $this->recordActivity->execute(
                     $task,
@@ -79,19 +73,34 @@ class UpdateTaskAssigneesAction
                         'added' => array_map(
                             fn (int $id): array => [
                                 'id' => $id,
-                                'name' => $names->get($id, 'Unknown user'),
+                                'name' => $changedUsers->get($id)?->name ?? 'Unknown user',
                             ],
                             $toAdd,
                         ),
                         'removed' => array_map(
                             fn (int $id): array => [
                                 'id' => $id,
-                                'name' => $names->get($id, 'Unknown user'),
+                                'name' => $changedUsers->get($id)?->name ?? 'Unknown user',
                             ],
                             $toRemove,
                         ),
                     ],
                 );
+
+                $actor = auth()->user();
+                if ($actor !== null && $toAdd !== []) {
+                    $newAssignees = $changedUsers
+                        ->only($toAdd)
+                        ->reject(fn (User $user) => $user->id === $actor->id)
+                        ->values();
+
+                    if ($newAssignees->isNotEmpty()) {
+                        Notification::send(
+                            $newAssignees,
+                            new TaskAssignedNotification($task, $board, $actor),
+                        );
+                    }
+                }
             }
         });
     }
