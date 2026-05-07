@@ -1,0 +1,187 @@
+<script setup>
+import Dropdown from '@/Components/Dropdown.vue';
+import { formatDateTime } from '@/lib/format';
+import { Link, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
+import { computed, ref } from 'vue';
+
+const page = usePage();
+const notifications = ref([]);
+const unreadCount = ref(page.props.unreadNotifications ?? 0);
+const loading = ref(false);
+const loaded = ref(false);
+
+const sharedUnread = computed(() => page.props.unreadNotifications ?? 0);
+
+// Keep our local count in sync when Inertia partial-reloads update the prop.
+const stopWatch = page.props && computed(() => sharedUnread.value);
+// (effect-only to make Vue track the prop)
+const _watcher = computed(() => {
+    unreadCount.value = sharedUnread.value;
+    return sharedUnread.value;
+});
+void _watcher;
+
+const fetchNotifications = async () => {
+    loading.value = true;
+    try {
+        const response = await axios.get(route('notifications.index'));
+        notifications.value = response.data.notifications ?? [];
+        unreadCount.value = response.data.unread_count ?? 0;
+        loaded.value = true;
+    } catch {
+        // Silently swallow — bell is non-critical UI.
+    } finally {
+        loading.value = false;
+    }
+};
+
+const onOpen = () => {
+    if (! loaded.value) {
+        fetchNotifications();
+    }
+};
+
+const markAsRead = async (notification) => {
+    if (notification.read_at) {
+        return;
+    }
+
+    try {
+        const response = await axios.patch(
+            route('notifications.read', { id: notification.id }),
+        );
+        notification.read_at = new Date().toISOString();
+        unreadCount.value = response.data.unread_count ?? 0;
+    } catch {
+        // ignore
+    }
+};
+
+const markAllAsRead = async () => {
+    if (unreadCount.value === 0) {
+        return;
+    }
+
+    try {
+        await axios.patch(route('notifications.read-all'));
+        notifications.value = notifications.value.map((n) => ({
+            ...n,
+            read_at: n.read_at ?? new Date().toISOString(),
+        }));
+        unreadCount.value = 0;
+    } catch {
+        // ignore
+    }
+};
+
+const summarize = (notification) => {
+    const data = notification.data ?? {};
+
+    if (data.kind === 'task_assigned') {
+        return `${data.assigned_by?.name ?? 'Someone'} assigned “${data.task?.title ?? 'a task'}” to you on ${data.board?.name ?? 'a board'}`;
+    }
+    if (data.kind === 'comment_reply') {
+        return `${data.author?.name ?? 'Someone'} replied to your comment on “${data.task?.title ?? 'a task'}”`;
+    }
+    return 'You have a new notification';
+};
+
+const linkFor = (notification) => {
+    const data = notification.data ?? {};
+    if (data.board?.id) {
+        return route('tasks.board', { board: data.board.id });
+    }
+    return route('dashboard');
+};
+</script>
+
+<template>
+    <Dropdown align="right" width="64" @click="onOpen">
+        <template #trigger>
+            <button
+                type="button"
+                class="relative flex h-9 w-9 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                aria-label="Notifications"
+                @click="onOpen"
+            >
+                <svg
+                    class="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                >
+                    <path
+                        d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z"
+                    />
+                    <path
+                        d="M8.5 16a1.5 1.5 0 003 0h-3z"
+                    />
+                </svg>
+                <span
+                    v-if="unreadCount > 0"
+                    class="absolute -right-0.5 -top-0.5 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-4 text-white"
+                >
+                    {{ unreadCount > 9 ? '9+' : unreadCount }}
+                </span>
+            </button>
+        </template>
+        <template #content>
+            <div class="w-80">
+                <div
+                    class="flex items-center justify-between border-b border-gray-100 px-4 py-2"
+                >
+                    <h4 class="text-sm font-semibold text-gray-900">
+                        Notifications
+                    </h4>
+                    <button
+                        v-if="unreadCount > 0"
+                        type="button"
+                        class="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                        @click.stop="markAllAsRead"
+                    >
+                        Mark all read
+                    </button>
+                </div>
+                <div
+                    v-if="loading && notifications.length === 0"
+                    class="px-4 py-6 text-center text-xs text-gray-500"
+                >
+                    Loading...
+                </div>
+                <div
+                    v-else-if="notifications.length === 0"
+                    class="px-4 py-6 text-center text-xs text-gray-500"
+                >
+                    You're all caught up.
+                </div>
+                <ul
+                    v-else
+                    class="max-h-80 divide-y divide-gray-100 overflow-y-auto"
+                >
+                    <li
+                        v-for="notification in notifications"
+                        :key="notification.id"
+                        class="transition"
+                        :class="
+                            notification.read_at ? 'bg-white' : 'bg-indigo-50/40'
+                        "
+                    >
+                        <Link
+                            :href="linkFor(notification)"
+                            class="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
+                            @click="markAsRead(notification)"
+                        >
+                            <p class="leading-snug">
+                                {{ summarize(notification) }}
+                            </p>
+                            <p class="mt-1 text-[10px] text-gray-400">
+                                {{ formatDateTime(notification.created_at) }}
+                            </p>
+                        </Link>
+                    </li>
+                </ul>
+            </div>
+        </template>
+    </Dropdown>
+</template>

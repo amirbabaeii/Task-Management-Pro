@@ -3,6 +3,7 @@
 use App\Http\Controllers\BoardColumnController;
 use App\Http\Controllers\BoardController;
 use App\Http\Controllers\BoardMemberController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskController;
@@ -60,6 +61,13 @@ Route::middleware('auth')->group(function () {
         ->name('tasks.status');
     Route::delete('/tasks/board/{board}/tasks/{task}', [TaskController::class, 'destroy'])
         ->name('tasks.destroy');
+
+    Route::get('/notifications', [NotificationController::class, 'index'])
+        ->name('notifications.index');
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])
+        ->name('notifications.read');
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])
+        ->name('notifications.read-all');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

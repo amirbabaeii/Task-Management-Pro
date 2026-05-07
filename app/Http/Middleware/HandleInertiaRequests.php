@@ -37,6 +37,9 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'unreadNotifications' => fn () => $request->user()
+                ? $request->user()->unreadNotifications()->count()
+                : 0,
             'boards' => fn () => $this->sharedBoards($request),
             'currentBoard' => fn () => $this->sharedCurrentBoard($request),
             'ziggy' => fn () => [

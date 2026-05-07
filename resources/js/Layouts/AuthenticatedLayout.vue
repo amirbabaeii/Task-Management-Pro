@@ -7,6 +7,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import Modal from '@/Components/Modal.vue';
 import NavLink from '@/Components/NavLink.vue';
+import NotificationBell from '@/Components/NotificationBell.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
@@ -142,6 +143,7 @@ const submitBoard = () => {
                         </div>
 
                         <div class="hidden sm:ms-6 sm:flex sm:items-center">
+                            <NotificationBell class="me-2" />
                             <!-- Settings Dropdown -->
                             <div class="relative ms-3">
                                 <Dropdown align="right" width="48">
