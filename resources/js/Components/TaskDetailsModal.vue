@@ -140,6 +140,45 @@ const replyDraft = defineModel('replyDraft', {
                     </div>
                 </section>
 
+                <section class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-semibold text-gray-900">
+                            Assignees
+                        </h4>
+                        <span class="text-xs text-gray-500">
+                            {{ task.assignees?.length ?? 0 }}
+                            {{ (task.assignees?.length ?? 0) === 1 ? 'person' : 'people' }}
+                        </span>
+                    </div>
+                    <ul
+                        v-if="task.assignees && task.assignees.length"
+                        class="flex flex-wrap gap-2"
+                    >
+                        <li
+                            v-for="assignee in task.assignees"
+                            :key="assignee.id"
+                            class="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2 py-1"
+                        >
+                            <span
+                                class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700"
+                            >
+                                {{
+                                    assignee.name
+                                        .split(/\s+/)
+                                        .filter(Boolean)
+                                        .slice(0, 2)
+                                        .map((p) => p[0]?.toUpperCase() ?? '')
+                                        .join('') || '?'
+                                }}
+                            </span>
+                            <span class="text-sm text-gray-700">
+                                {{ assignee.name }}
+                            </span>
+                        </li>
+                    </ul>
+                    <p v-else class="text-sm text-gray-500">No one assigned.</p>
+                </section>
+
                 <section class="space-y-2">
                     <h4 class="text-sm font-semibold text-gray-900">
                         Description

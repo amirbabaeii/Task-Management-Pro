@@ -1,4 +1,5 @@
 <script setup>
+import AvatarGroup from '@/Components/AvatarGroup.vue';
 import {
     formatDate,
     formatPriority,
@@ -113,6 +114,11 @@ const emit = defineEmits([
         </div>
 
         <div class="mt-3 flex flex-wrap items-center gap-2">
+            <AvatarGroup
+                v-if="task.assignees && task.assignees.length"
+                :users="task.assignees"
+                :max="3"
+            />
             <span
                 v-if="formatDate(task.deadline_at)"
                 class="text-[11px] text-gray-500"
