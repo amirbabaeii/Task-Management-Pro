@@ -7,6 +7,7 @@ use App\Enums\TaskActivityKind;
 use App\Models\Task;
 use App\Models\TaskComment;
 use App\Models\User;
+use App\Notifications\CommentReplyNotification;
 
 class AddTaskCommentAction
 {
@@ -36,6 +37,21 @@ class AddTaskCommentAction
             ],
             $author,
         );
+
+        // Notify the parent comment's author (unless they're the replier).
+        if ($comment->parent_id !== null) {
+            $parent = TaskComment::query()->with('user')->find($comment->parent_id);
+
+            if (
+                $parent !== null
+                && $parent->user !== null
+                && $parent->user->id !== $author->id
+            ) {
+                $parent->user->notify(
+                    new CommentReplyNotification($task, $comment, $parent, $author),
+                );
+            }
+        }
 
         return $comment;
     }
