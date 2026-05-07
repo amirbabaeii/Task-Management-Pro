@@ -86,6 +86,13 @@ class Task extends Model
             ->orderBy('id');
     }
 
+    public function activities(): HasMany
+    {
+        return $this->hasMany(TaskActivity::class)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+    }
+
     /**
      * Normalize tag input from request payloads or persisted data.
      *

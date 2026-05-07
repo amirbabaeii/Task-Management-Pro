@@ -12,8 +12,10 @@ use App\Http\Requests\Boards\UpdateBoardRequest;
 use App\Models\Board;
 use App\Models\BoardColumn;
 use App\Models\Task;
+use App\Models\TaskActivity;
 use App\Models\TaskComment;
 use App\Models\User;
+use App\Support\Presenters\TaskActivityPresenter;
 use App\Support\Presenters\TaskCommentPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -131,6 +133,9 @@ class BoardController extends Controller
                 'assignees' => fn ($query) => $query
                     ->wherePivot('board_id', $board->id)
                     ->select(['users.id', 'users.name', 'users.email']),
+                'activities' => fn ($query) => $query
+                    ->with('actor:id,name')
+                    ->limit(20),
             ])
             ->orderBy('task_user.sort_order')
             ->orderBy('tasks.id')
@@ -156,6 +161,10 @@ class BoardController extends Controller
                     ->all(),
                 'comments' => $task->comments
                     ->map(fn (TaskComment $comment): array => TaskCommentPresenter::toArray($comment))
+                    ->values()
+                    ->all(),
+                'activities' => $task->activities
+                    ->map(fn (TaskActivity $activity): array => TaskActivityPresenter::toArray($activity))
                     ->values()
                     ->all(),
             ])

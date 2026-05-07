@@ -66,6 +66,21 @@ const replyDraft = defineModel('replyDraft', {
     type: String,
     default: '',
 });
+
+const activityDotClass = (kind) => {
+    switch (kind) {
+        case 'created':
+            return 'bg-emerald-400';
+        case 'status_changed':
+            return 'bg-indigo-400';
+        case 'assignees_changed':
+            return 'bg-amber-400';
+        case 'comment_added':
+            return 'bg-sky-400';
+        default:
+            return 'bg-gray-300';
+    }
+};
 </script>
 
 <template>
@@ -230,6 +245,37 @@ const replyDraft = defineModel('replyDraft', {
                             :style="{ width: `${task.progress}%` }"
                         />
                     </div>
+                </section>
+
+                <section
+                    v-if="task.activities && task.activities.length"
+                    class="space-y-3"
+                >
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-semibold text-gray-900">
+                            Activity
+                        </h4>
+                        <span class="text-xs text-gray-500">
+                            {{ task.activities.length }} entries
+                        </span>
+                    </div>
+                    <ol class="space-y-3 border-l-2 border-gray-100 pl-4">
+                        <li
+                            v-for="activity in task.activities"
+                            :key="activity.id"
+                            class="relative text-sm text-gray-700"
+                        >
+                            <span
+                                class="absolute -left-[0.4rem] top-1.5 h-2 w-2 rounded-full"
+                                :class="activityDotClass(activity.kind)"
+                                aria-hidden="true"
+                            />
+                            <p class="leading-snug">{{ activity.text }}</p>
+                            <p class="text-xs text-gray-400">
+                                {{ formatDateTime(activity.created_at) }}
+                            </p>
+                        </li>
+                    </ol>
                 </section>
 
                 <section class="space-y-4">

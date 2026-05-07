@@ -32,6 +32,7 @@ export const normalizeTask = (task) => ({
               name: assignee.name ?? 'Unknown user',
           }))
         : [],
+    activities: Array.isArray(task.activities) ? task.activities : [],
 });
 
 export const cloneTasks = (taskList) => taskList.map((task) => ({ ...task }));
