@@ -2,13 +2,19 @@
 
 namespace App\Actions\Tasks;
 
+use App\Enums\TaskActivityKind;
 use App\Models\Board;
 use App\Models\Task;
+use App\Models\User;
 use App\Support\BoardTaskAssignments;
 use Illuminate\Support\Facades\DB;
 
 class UpdateTaskAssigneesAction
 {
+    public function __construct(
+        private readonly RecordTaskActivityAction $recordActivity,
+    ) {}
+
     /**
      * Replace the task's assignees on this board with the given user ids.
      *
@@ -58,6 +64,34 @@ class UpdateTaskAssigneesAction
                         $task->status,
                     ),
                 ]);
+            }
+
+            if ($toAdd !== [] || $toRemove !== []) {
+                $changedIds = array_merge($toAdd, $toRemove);
+                $names = User::query()
+                    ->whereIn('id', $changedIds)
+                    ->pluck('name', 'id');
+
+                $this->recordActivity->execute(
+                    $task,
+                    TaskActivityKind::AssigneesChanged,
+                    [
+                        'added' => array_map(
+                            fn (int $id): array => [
+                                'id' => $id,
+                                'name' => $names->get($id, 'Unknown user'),
+                            ],
+                            $toAdd,
+                        ),
+                        'removed' => array_map(
+                            fn (int $id): array => [
+                                'id' => $id,
+                                'name' => $names->get($id, 'Unknown user'),
+                            ],
+                            $toRemove,
+                        ),
+                    ],
+                );
             }
         });
     }

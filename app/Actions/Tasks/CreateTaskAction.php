@@ -2,6 +2,7 @@
 
 namespace App\Actions\Tasks;
 
+use App\Enums\TaskActivityKind;
 use App\Models\Board;
 use App\Models\Task;
 use App\Models\User;
@@ -10,6 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 class CreateTaskAction
 {
+    public function __construct(
+        private readonly RecordTaskActivityAction $recordActivity,
+    ) {}
+
     /**
      * Create a task on the board. Excluding `assignee_ids`, $data becomes the
      * Task model's fillable payload. Assignees default to [creator] when not
@@ -36,6 +41,13 @@ class CreateTaskAction
                     ),
                 ]);
             }
+
+            $this->recordActivity->execute(
+                $task,
+                TaskActivityKind::Created,
+                ['title' => $task->title],
+                $creator,
+            );
 
             return $task;
         });

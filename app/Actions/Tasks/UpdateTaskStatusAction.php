@@ -2,6 +2,7 @@
 
 namespace App\Actions\Tasks;
 
+use App\Enums\TaskActivityKind;
 use App\Models\Board;
 use App\Models\Task;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,7 @@ class UpdateTaskStatusAction
 {
     public function __construct(
         private readonly MoveTaskBetweenStatusesAction $moveBetweenStatuses,
+        private readonly RecordTaskActivityAction $recordActivity,
     ) {}
 
     public function execute(Board $board, Task $task, string $destinationStatus): Task
@@ -26,6 +28,12 @@ class UpdateTaskStatusAction
                     $originalStatus,
                     $destinationStatus,
                     $board->id,
+                );
+
+                $this->recordActivity->execute(
+                    $task,
+                    TaskActivityKind::StatusChanged,
+                    ['from' => $originalStatus, 'to' => $destinationStatus],
                 );
             }
         });
