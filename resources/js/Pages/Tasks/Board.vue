@@ -841,6 +841,7 @@ const openEditFromDetails = () => {
 const {
     searchQuery,
     priorityFilter,
+    assigneeFilter,
     filteredTasks,
     hasActiveFilters,
     togglePriority,
@@ -1236,8 +1237,11 @@ const submitTaskUpdate = () => {
             <div class="w-full px-4 sm:px-6 lg:px-8">
                 <BoardFilters
                     v-model:search-query="searchQuery"
+                    v-model:assignee-filter="assigneeFilter"
                     :priorities="priorityOptions"
                     :active-priorities="priorityFilter"
+                    :members="members"
+                    :current-user-id="$page.props.auth.user?.id ?? null"
                     :has-active-filters="hasActiveFilters"
                     :matched-count="filteredTasks.length"
                     :total-count="tasks.length"

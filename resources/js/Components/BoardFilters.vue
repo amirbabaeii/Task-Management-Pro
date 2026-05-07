@@ -1,7 +1,8 @@
 <script setup>
 import { formatPriority, priorityBadgeClass } from '@/lib/format';
+import { computed } from 'vue';
 
-defineProps({
+const props = defineProps({
     priorities: {
         type: Array,
         default: () => [],
@@ -9,6 +10,14 @@ defineProps({
     activePriorities: {
         type: Array,
         default: () => [],
+    },
+    members: {
+        type: Array,
+        default: () => [],
+    },
+    currentUserId: {
+        type: Number,
+        default: null,
     },
     hasActiveFilters: {
         type: Boolean,
@@ -29,6 +38,23 @@ const emit = defineEmits(['toggle-priority', 'clear']);
 const searchQuery = defineModel('searchQuery', {
     type: String,
     default: '',
+});
+
+const assigneeFilter = defineModel('assigneeFilter', {
+    type: Number,
+    default: null,
+});
+
+// "Me" appears first when the current user is on the board.
+const assigneeOptions = computed(() => {
+    const sorted = [...props.members].sort((a, b) => {
+        if (a.id === props.currentUserId) return -1;
+        if (b.id === props.currentUserId) return 1;
+        if (a.role === 'owner' && b.role !== 'owner') return -1;
+        if (b.role === 'owner' && a.role !== 'owner') return 1;
+        return a.name.localeCompare(b.name);
+    });
+    return sorted;
 });
 </script>
 
@@ -78,6 +104,29 @@ const searchQuery = defineModel('searchQuery', {
                 {{ formatPriority(priority) }}
             </button>
         </div>
+
+        <label class="flex items-center gap-2 text-xs">
+            <span class="font-semibold uppercase tracking-wide text-gray-500">
+                Assignee
+            </span>
+            <select
+                v-model="assigneeFilter"
+                class="rounded-md border-gray-300 py-1 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
+            >
+                <option :value="null">Anyone</option>
+                <option
+                    v-for="member in assigneeOptions"
+                    :key="member.id"
+                    :value="member.id"
+                >
+                    {{
+                        member.id === currentUserId
+                            ? `Me (${member.name})`
+                            : member.name
+                    }}
+                </option>
+            </select>
+        </label>
 
         <div class="ml-auto flex items-center gap-3">
             <span
