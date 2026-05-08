@@ -34,8 +34,9 @@ export const formatDate = (value) => {
         return null;
     }
 
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
+    const date = dateFromDateLike(value);
+
+    if (!date) {
         return null;
     }
 
@@ -81,4 +82,107 @@ export const formatDateInput = (value) => {
     }
 
     return date.toISOString().slice(0, 10);
+};
+
+const dateFromDateLike = (value) => {
+    if (!value) {
+        return null;
+    }
+
+    if (typeof value === 'string') {
+        const dateParts = value.slice(0, 10).split('-').map(Number);
+
+        if (
+            dateParts.length === 3 &&
+            dateParts.every((part) => Number.isInteger(part))
+        ) {
+            return new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+        }
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+};
+
+const today = () => {
+    const now = new Date();
+
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+};
+
+export const daysUntilDate = (value) => {
+    const date = dateFromDateLike(value);
+
+    if (!date) {
+        return null;
+    }
+
+    const millisecondsPerDay = 24 * 60 * 60 * 1000;
+
+    return Math.round((date.getTime() - today().getTime()) / millisecondsPerDay);
+};
+
+export const deadlineState = (value) => {
+    const daysUntil = daysUntilDate(value);
+
+    if (daysUntil === null) {
+        return 'none';
+    }
+
+    if (daysUntil < 0) {
+        return 'overdue';
+    }
+
+    if (daysUntil === 0) {
+        return 'today';
+    }
+
+    if (daysUntil <= 7) {
+        return 'soon';
+    }
+
+    return 'scheduled';
+};
+
+export const deadlineBadgeClass = (value) => {
+    const state = deadlineState(value);
+
+    if (state === 'overdue') {
+        return 'border-rose-200 bg-rose-50 text-rose-700';
+    }
+
+    if (state === 'today') {
+        return 'border-amber-200 bg-amber-50 text-amber-700';
+    }
+
+    if (state === 'soon') {
+        return 'border-sky-200 bg-sky-50 text-sky-700';
+    }
+
+    return 'border-gray-200 bg-white text-gray-500';
+};
+
+export const formatDeadlineLabel = (value) => {
+    const formattedDate = formatDate(value);
+
+    if (!formattedDate) {
+        return null;
+    }
+
+    const state = deadlineState(value);
+
+    if (state === 'overdue') {
+        return `Overdue ${formattedDate}`;
+    }
+
+    if (state === 'today') {
+        return 'Due today';
+    }
+
+    return `Due ${formattedDate}`;
 };

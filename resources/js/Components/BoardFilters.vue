@@ -45,6 +45,19 @@ const assigneeFilter = defineModel('assigneeFilter', {
     default: null,
 });
 
+const deadlineFilter = defineModel('deadlineFilter', {
+    type: String,
+    default: 'all',
+});
+
+const deadlineOptions = [
+    { value: 'all', label: 'All' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'today', label: 'Today' },
+    { value: 'upcoming', label: 'Next 7' },
+    { value: 'none', label: 'No date' },
+];
+
 // "Me" appears first when the current user is on the board.
 const assigneeOptions = computed(() => {
     const sorted = [...props.members].sort((a, b) => {
@@ -102,6 +115,27 @@ const assigneeOptions = computed(() => {
                 @click="emit('toggle-priority', priority)"
             >
                 {{ formatPriority(priority) }}
+            </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Due
+            </span>
+            <button
+                v-for="option in deadlineOptions"
+                :key="option.value"
+                type="button"
+                class="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                :class="
+                    deadlineFilter === option.value
+                        ? 'border-gray-700 bg-gray-800 text-white'
+                        : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+                "
+                :aria-pressed="deadlineFilter === option.value"
+                @click="deadlineFilter = option.value"
+            >
+                {{ option.label }}
             </button>
         </div>
 

@@ -1,7 +1,8 @@
 <script setup>
 import AvatarGroup from '@/Components/AvatarGroup.vue';
 import {
-    formatDate,
+    deadlineBadgeClass,
+    formatDeadlineLabel,
     formatPriority,
     priorityBadgeClass,
 } from '@/lib/format';
@@ -120,10 +121,11 @@ const emit = defineEmits([
                 :max="3"
             />
             <span
-                v-if="formatDate(task.deadline_at)"
-                class="text-[11px] text-gray-500"
+                v-if="formatDeadlineLabel(task.deadline_at)"
+                class="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                :class="deadlineBadgeClass(task.deadline_at)"
             >
-                Due {{ formatDate(task.deadline_at) }}
+                {{ formatDeadlineLabel(task.deadline_at) }}
             </span>
             <div class="ml-auto flex items-center gap-2">
                 <button

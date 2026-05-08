@@ -842,6 +842,7 @@ const {
     searchQuery,
     priorityFilter,
     assigneeFilter,
+    deadlineFilter,
     filteredTasks,
     hasActiveFilters,
     togglePriority,
@@ -1238,6 +1239,7 @@ const submitTaskUpdate = () => {
                 <BoardFilters
                     v-model:search-query="searchQuery"
                     v-model:assignee-filter="assigneeFilter"
+                    v-model:deadline-filter="deadlineFilter"
                     :priorities="priorityOptions"
                     :active-priorities="priorityFilter"
                     :members="members"
