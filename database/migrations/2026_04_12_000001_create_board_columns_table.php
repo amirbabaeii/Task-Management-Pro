@@ -23,7 +23,7 @@ return new class extends Migration
             $table->unique(['user_id', 'status']);
         });
 
-        if (!Schema::hasColumn('users', 'board_status_labels')) {
+        if (! Schema::hasColumn('users', 'board_status_labels')) {
             return;
         }
 
@@ -70,7 +70,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (!Schema::hasColumn('users', 'board_status_labels')) {
+        if (! Schema::hasColumn('users', 'board_status_labels')) {
             Schema::table('users', function (Blueprint $table) {
                 $table->json('board_status_labels')->nullable()->after('password');
             });
@@ -105,7 +105,7 @@ return new class extends Migration
             ? $value
             : json_decode((string) $value, true);
 
-        if (!is_array($decoded)) {
+        if (! is_array($decoded)) {
             return collect();
         }
 

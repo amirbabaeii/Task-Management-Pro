@@ -12,7 +12,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->name('login');
         Route::post('register', [App\Http\Controllers\Api\V1\Auth\RegisterController::class, 'register'])
             ->name('register');
-        
+
         // Protected auth routes
         Route::middleware('auth:sanctum')->group(function () {
             Route::post('logout', [App\Http\Controllers\Api\V1\Auth\AuthController::class, 'logout'])
@@ -25,7 +25,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('user', function (Request $request) {
             return $request->user();
         })->name('user.profile');
-        
+
         // Tasks resource
         Route::apiResource('tasks', App\Http\Controllers\Api\V1\TaskController::class)
             ->only(['index', 'store', 'update']);

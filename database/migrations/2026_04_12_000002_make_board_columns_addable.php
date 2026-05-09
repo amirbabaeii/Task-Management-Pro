@@ -49,15 +49,15 @@ return new class extends Migration
 
         if ($driver === 'mysql') {
             DB::statement("ALTER TABLE tasks MODIFY status VARCHAR(100) NOT NULL DEFAULT 'pending'");
-            DB::statement("ALTER TABLE board_columns MODIFY status VARCHAR(100) NOT NULL");
+            DB::statement('ALTER TABLE board_columns MODIFY status VARCHAR(100) NOT NULL');
 
             return;
         }
 
         if ($driver === 'pgsql') {
-            DB::statement("ALTER TABLE tasks ALTER COLUMN status TYPE VARCHAR(100) USING status::text");
+            DB::statement('ALTER TABLE tasks ALTER COLUMN status TYPE VARCHAR(100) USING status::text');
             DB::statement("ALTER TABLE tasks ALTER COLUMN status SET DEFAULT 'pending'");
-            DB::statement("ALTER TABLE board_columns ALTER COLUMN status TYPE VARCHAR(100) USING status::text");
+            DB::statement('ALTER TABLE board_columns ALTER COLUMN status TYPE VARCHAR(100) USING status::text');
 
             return;
         }
@@ -83,15 +83,15 @@ return new class extends Migration
         }
 
         if ($driver === 'pgsql') {
-            DB::statement("ALTER TABLE tasks ALTER COLUMN status DROP DEFAULT");
-            DB::statement("DROP TYPE IF EXISTS task_status_enum");
+            DB::statement('ALTER TABLE tasks ALTER COLUMN status DROP DEFAULT');
+            DB::statement('DROP TYPE IF EXISTS task_status_enum');
             DB::statement("CREATE TYPE task_status_enum AS ENUM ('pending', 'in-progress', 'completed')");
-            DB::statement("ALTER TABLE tasks ALTER COLUMN status TYPE task_status_enum USING status::task_status_enum");
+            DB::statement('ALTER TABLE tasks ALTER COLUMN status TYPE task_status_enum USING status::task_status_enum');
             DB::statement("ALTER TABLE tasks ALTER COLUMN status SET DEFAULT 'pending'");
 
-            DB::statement("DROP TYPE IF EXISTS board_column_status_enum");
+            DB::statement('DROP TYPE IF EXISTS board_column_status_enum');
             DB::statement("CREATE TYPE board_column_status_enum AS ENUM ('pending', 'in-progress', 'completed')");
-            DB::statement("ALTER TABLE board_columns ALTER COLUMN status TYPE board_column_status_enum USING status::board_column_status_enum");
+            DB::statement('ALTER TABLE board_columns ALTER COLUMN status TYPE board_column_status_enum USING status::board_column_status_enum');
 
             return;
         }
