@@ -3,6 +3,7 @@
 use App\Http\Controllers\BoardColumnController;
 use App\Http\Controllers\BoardController;
 use App\Http\Controllers\BoardMemberController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TaskCommentController;
@@ -20,9 +21,9 @@ Route::get('/', function () {
     ]);
 });
 
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/tasks/board/{board?}', [BoardController::class, 'index'])
