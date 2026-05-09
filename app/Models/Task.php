@@ -35,6 +35,7 @@ class Task extends Model
      */
     protected $casts = [
         'deadline_at' => 'datetime',
+        'archived_at' => 'datetime',
         'progress' => 'integer',
         'priority' => TaskPriority::class,
         'tags' => 'array',

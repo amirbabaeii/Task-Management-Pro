@@ -41,6 +41,8 @@ class TaskActivityPresenter
             ),
             TaskActivityKind::AssigneesChanged => self::describeAssigneeChange($actorName, $payload),
             TaskActivityKind::CommentAdded => "{$actorName} commented",
+            TaskActivityKind::Archived => "{$actorName} archived this task",
+            TaskActivityKind::Restored => "{$actorName} restored this task",
         };
     }
 

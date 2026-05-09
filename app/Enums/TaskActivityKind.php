@@ -8,4 +8,6 @@ enum TaskActivityKind: string
     case StatusChanged = 'status_changed';
     case AssigneesChanged = 'assignees_changed';
     case CommentAdded = 'comment_added';
+    case Archived = 'archived';
+    case Restored = 'restored';
 }
