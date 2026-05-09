@@ -291,7 +291,9 @@ class TaskBoardTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Tasks/Board')
-                ->has('tasks', 0));
+                ->has('tasks', 0)
+                ->has('archivedTasks', 1)
+                ->where('archivedTasks.0.id', $task->id));
     }
 
     public function test_assignee_can_restore_an_archived_task_to_the_board(): void
@@ -326,7 +328,8 @@ class TaskBoardTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Tasks/Board')
                 ->has('tasks', 1)
-                ->where('tasks.0.id', $task->id));
+                ->where('tasks.0.id', $task->id)
+                ->has('archivedTasks', 0));
     }
 
     public function test_cannot_archive_a_task_that_is_not_on_the_board(): void

@@ -42,6 +42,7 @@ class BoardController extends Controller
             'boards' => $this->boardListForUser($user),
             'currentBoard' => BoardPresenter::navigation($board, $user),
             'tasks' => $this->boardTasksForUser($user, $board),
+            'archivedTasks' => $this->boardTasksForUser($user, $board, archived: true),
             'statuses' => BoardColumn::statusesForBoard($board),
             'statusLabels' => BoardColumn::labelsForBoard($board),
             'priorities' => TaskPriority::values(),
@@ -97,11 +98,15 @@ class BoardController extends Controller
     /**
      * @return list<array<string, mixed>>
      */
-    private function boardTasksForUser(User $user, Board $board): array
+    private function boardTasksForUser(User $user, Board $board, bool $archived = false): array
     {
         return $user->assignedTasks()
             ->wherePivot('board_id', $board->id)
-            ->whereNull('tasks.archived_at')
+            ->when(
+                $archived,
+                fn ($query) => $query->whereNotNull('tasks.archived_at'),
+                fn ($query) => $query->whereNull('tasks.archived_at'),
+            )
             ->select([
                 'tasks.id',
                 'tasks.title',
@@ -130,7 +135,11 @@ class BoardController extends Controller
                     ->with('actor:id,name')
                     ->limit(20),
             ])
-            ->orderBy('task_user.sort_order')
+            ->when(
+                $archived,
+                fn ($query) => $query->orderByDesc('tasks.archived_at'),
+                fn ($query) => $query->orderBy('task_user.sort_order'),
+            )
             ->orderBy('tasks.id')
             ->get()
             ->map(fn (Task $task): array => [

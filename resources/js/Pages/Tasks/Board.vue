@@ -12,6 +12,7 @@ import DeleteColumnModal from '@/Components/DeleteColumnModal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TaskDetailsModal from '@/Components/TaskDetailsModal.vue';
+import TaskCard from '@/Components/TaskCard.vue';
 import TaskFormModal from '@/Components/TaskFormModal.vue';
 import UndoToast from '@/Components/UndoToast.vue';
 import {
@@ -42,6 +43,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    archivedTasks: {
+        type: Array,
+        default: () => [],
+    },
     statuses: {
         type: Array,
         default: () => [],
@@ -61,6 +66,7 @@ const props = defineProps({
 });
 
 const tasks = ref(props.tasks.map(normalizeTask));
+const archivedTasks = ref(props.archivedTasks.map(normalizeTask));
 const updatingId = ref(null);
 const movingColumnStatus = ref(null);
 const editingStatusLabel = ref(null);
@@ -71,6 +77,7 @@ const showingColumnModal = ref(false);
 const showingCreateModal = ref(false);
 const showingDetailsModal = ref(false);
 const showingEditModal = ref(false);
+const showingArchived = ref(false);
 const selectedTaskId = ref(null);
 const editingTaskId = ref(null);
 const errorMessage = ref('');
@@ -243,6 +250,13 @@ watch(
 );
 
 watch(
+    () => props.archivedTasks,
+    (nextTasks) => {
+        archivedTasks.value = nextTasks.map(normalizeTask);
+    },
+);
+
+watch(
     () => props.statuses,
     (nextStatuses) => {
         boardStatuses.value = normalizeBoardStatuses(nextStatuses);
@@ -261,7 +275,13 @@ const formatStatus = (status) =>
     formatStatusValue(status, boardStatusLabels.value);
 
 const activeTask = computed(() =>
-    tasks.value.find((task) => task.id === selectedTaskId.value) ?? null,
+    [...tasks.value, ...archivedTasks.value].find(
+        (task) => task.id === selectedTaskId.value,
+    ) ?? null,
+);
+
+const currentTaskList = computed(() =>
+    showingArchived.value ? archivedTasks.value : tasks.value,
 );
 
 const setTaskFormValues = (taskForm, values = {}) => {
@@ -743,7 +763,8 @@ const undoPendingTaskDeletion = () => {
     pendingTaskDeletion.value = null;
     clearPendingTaskTimer();
 
-    tasks.value = pending.snapshot;
+    tasks.value = pending.activeSnapshot;
+    archivedTasks.value = pending.archivedSnapshot;
 };
 
 const flushPendingTaskDeletion = async () => {
@@ -763,7 +784,8 @@ const flushPendingTaskDeletion = async () => {
             }),
         );
     } catch (error) {
-        tasks.value = pending.snapshot;
+        tasks.value = pending.activeSnapshot;
+        archivedTasks.value = pending.archivedSnapshot;
         errorMessage.value =
             error?.response?.data?.message ||
             'Unable to delete task. Please try again.';
@@ -791,14 +813,103 @@ const requestDeleteTask = (task) => {
     pendingTaskDeletion.value = {
         taskId: task.id,
         title: task.title,
-        snapshot: cloneTasks(tasks.value),
+        activeSnapshot: cloneTasks(tasks.value),
+        archivedSnapshot: cloneTasks(archivedTasks.value),
     };
 
     tasks.value = tasks.value.filter((t) => t.id !== task.id);
+    archivedTasks.value = archivedTasks.value.filter((t) => t.id !== task.id);
 
     pendingTaskDeletionTimer = window.setTimeout(() => {
         flushPendingTaskDeletion();
     }, 5100);
+};
+
+const archiveTaskLocally = (task, archivedAt) => {
+    tasks.value = tasks.value.filter((candidate) => candidate.id !== task.id);
+    archivedTasks.value = [
+        normalizeTask({
+            ...task,
+            archived_at: archivedAt,
+        }),
+        ...archivedTasks.value.filter((candidate) => candidate.id !== task.id),
+    ];
+};
+
+const restoreTaskLocally = (task) => {
+    archivedTasks.value = archivedTasks.value.filter(
+        (candidate) => candidate.id !== task.id,
+    );
+    tasks.value = [
+        ...tasks.value.filter((candidate) => candidate.id !== task.id),
+        normalizeTask({
+            ...task,
+            archived_at: null,
+        }),
+    ];
+};
+
+const requestArchiveTask = async (task) => {
+    if (!task || updatingId.value) {
+        return;
+    }
+
+    errorMessage.value = '';
+    updatingId.value = task.id;
+    const previousTasks = cloneTasks(tasks.value);
+    const previousArchivedTasks = cloneTasks(archivedTasks.value);
+
+    try {
+        const response = await axios.patch(
+            route('tasks.archive', {
+                board: currentBoardId.value,
+                task: task.id,
+            }),
+        );
+
+        archiveTaskLocally(
+            task,
+            response?.data?.archived_at ?? new Date().toISOString(),
+        );
+    } catch (error) {
+        tasks.value = previousTasks;
+        archivedTasks.value = previousArchivedTasks;
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to archive task. Please try again.';
+    } finally {
+        updatingId.value = null;
+    }
+};
+
+const requestRestoreTask = async (task) => {
+    if (!task || updatingId.value) {
+        return;
+    }
+
+    errorMessage.value = '';
+    updatingId.value = task.id;
+    const previousTasks = cloneTasks(tasks.value);
+    const previousArchivedTasks = cloneTasks(archivedTasks.value);
+
+    try {
+        await axios.patch(
+            route('tasks.restore', {
+                board: currentBoardId.value,
+                task: task.id,
+            }),
+        );
+
+        restoreTaskLocally(task);
+    } catch (error) {
+        tasks.value = previousTasks;
+        archivedTasks.value = previousArchivedTasks;
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to restore task. Please try again.';
+    } finally {
+        updatingId.value = null;
+    }
 };
 
 const openTaskDetails = (task) => {
@@ -839,7 +950,7 @@ const closeEditModal = () => {
 };
 
 const openEditFromDetails = () => {
-    if (!activeTask.value) {
+    if (!activeTask.value || activeTask.value.archived_at) {
         return;
     }
 
@@ -857,13 +968,17 @@ const {
     hasActiveFilters,
     togglePriority,
     clearFilters,
-} = useBoardFilter(tasks);
+} = useBoardFilter(currentTaskList);
 
 const tasksByStatus = computed(() => {
     const grouped = {};
     boardStatuses.value.forEach((status) => {
         grouped[status] = [];
     });
+
+    if (showingArchived.value) {
+        return grouped;
+    }
 
     filteredTasks.value.forEach((task) => {
         if (!grouped[task.status]) {
@@ -1037,7 +1152,7 @@ const {
 const appendCommentToTask = (taskId, comment) => {
     const normalizedComment = normalizeComment(comment);
 
-    tasks.value = tasks.value.map((task) => {
+    const appendToList = (taskList) => taskList.map((task) => {
         if (task.id !== taskId) {
             return task;
         }
@@ -1047,12 +1162,15 @@ const appendCommentToTask = (taskId, comment) => {
             comments: [...(task.comments ?? []), normalizedComment],
         });
     });
+
+    tasks.value = appendToList(tasks.value);
+    archivedTasks.value = appendToList(archivedTasks.value);
 };
 
 const appendReplyToTask = (taskId, parentId, comment) => {
     const normalizedReply = normalizeComment(comment);
 
-    tasks.value = tasks.value.map((task) => {
+    const appendToList = (taskList) => taskList.map((task) => {
         if (task.id !== taskId) {
             return task;
         }
@@ -1066,6 +1184,9 @@ const appendReplyToTask = (taskId, parentId, comment) => {
             ),
         });
     });
+
+    tasks.value = appendToList(tasks.value);
+    archivedTasks.value = appendToList(archivedTasks.value);
 };
 
 const submitComment = async ({ content, parentId = null }) => {
@@ -1246,72 +1367,140 @@ const submitTaskUpdate = () => {
 
         <div class="min-h-[calc(100vh-9rem)] pt-8">
             <div class="w-full px-4 sm:px-6 lg:px-8">
+                <template v-if="tasks.length || archivedTasks.length">
+                    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div class="inline-flex rounded-md border border-gray-200 bg-white p-1 shadow-sm">
+                            <button
+                                type="button"
+                                class="rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                :class="
+                                    !showingArchived
+                                        ? 'bg-gray-800 text-white'
+                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                                "
+                                :aria-pressed="!showingArchived"
+                                @click="showingArchived = false"
+                            >
+                                Active {{ tasks.length }}
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                :class="
+                                    showingArchived
+                                        ? 'bg-gray-800 text-white'
+                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                                "
+                                :aria-pressed="showingArchived"
+                                @click="showingArchived = true"
+                            >
+                                Archived {{ archivedTasks.length }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <BoardFilters
+                        v-if="currentTaskList.length"
+                        v-model:search-query="searchQuery"
+                        v-model:assignee-filter="assigneeFilter"
+                        v-model:deadline-filter="deadlineFilter"
+                        :priorities="priorityOptions"
+                        :active-priorities="priorityFilter"
+                        :members="members"
+                        :current-user-id="$page.props.auth.user?.id ?? null"
+                        :has-active-filters="hasActiveFilters"
+                        :matched-count="filteredTasks.length"
+                        :total-count="currentTaskList.length"
+                        class="mb-4"
+                        @toggle-priority="togglePriority"
+                        @clear="clearFilters"
+                    />
+
+                    <template v-if="showingArchived">
+                        <div
+                            v-if="filteredTasks.length"
+                            class="grid gap-4 pb-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                        >
+                            <TaskCard
+                                v-for="task in filteredTasks"
+                                :key="`archived-${task.id}`"
+                                :task="task"
+                                :can-drag="false"
+                                :can-edit="false"
+                                :is-updating="updatingId === task.id"
+                                @open-details="openTaskDetails"
+                            />
+                        </div>
+                        <div
+                            v-else
+                            class="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500"
+                        >
+                            No archived tasks.
+                        </div>
+                    </template>
+
+                    <template v-else-if="tasks.length">
+                        <div class="board-scroll h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden pb-3 sm:snap-none">
+                            <div
+                                class="flex min-h-[calc(100vh-13rem)] w-max min-w-full items-stretch justify-start gap-4 sm:justify-center sm:gap-6"
+                                @dragover="onBoardLaneDragOver"
+                                @drop.stop.prevent="onBoardLaneDrop"
+                            >
+                                <BoardColumn
+                                    v-for="status in boardStatuses"
+                                    :key="status"
+                                    v-model:label-draft="statusLabelDraft"
+                                    :status="status"
+                                    :label="formatStatus(status)"
+                                    :tasks="tasksByStatus[status] ?? []"
+                                    :is-editing-label="editingStatusLabel === status"
+                                    :is-dragging-column="isDraggingColumn(status)"
+                                    :is-moving="movingColumnStatus === status"
+                                    :is-task-drop-target="isColumnDropTarget(status)"
+                                    :is-reorder-drop-before="isColumnReorderDropTarget(status, 'before')"
+                                    :is-reorder-drop-after="isColumnReorderDropTarget(status, 'after')"
+                                    :columns-busy="movingColumnStatus !== null"
+                                    :can-delete="canDeleteColumn"
+                                    :updating-task-id="updatingId"
+                                    :is-task-dragging="isDraggingTask"
+                                    :is-task-drop-before="(taskId) => isTaskDropTarget(taskId, 'before')"
+                                    :is-task-drop-after="(taskId) => isTaskDropTarget(taskId, 'after')"
+                                    @section-drag-over="(event) => onBoardSectionDragOver(event, status)"
+                                    @section-drop="onBoardSectionDrop(status)"
+                                    @column-drag-start="(event) => onBoardColumnDragStart(event, status)"
+                                    @column-drag-end="onBoardColumnDragEnd"
+                                    @start-edit-label="startStatusLabelEdit(status)"
+                                    @save-label="saveStatusLabel(status)"
+                                    @cancel-edit-label="cancelStatusLabelEdit"
+                                    @request-delete="requestDeleteColumn(status)"
+                                    @add-task="openCreateModal(status)"
+                                    @task-drag-start="onTaskDragStart"
+                                    @task-drag-over="onTaskDragOver"
+                                    @task-drag-end="onTaskDragEnd"
+                                    @task-drop="onTaskDrop"
+                                    @task-open-details="openTaskDetails"
+                                    @task-open-edit="openEditModal"
+                                />
+                            </div>
+                        </div>
+                    </template>
+
+                    <div
+                        v-else
+                        class="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center"
+                    >
+                        <p class="text-sm text-gray-500">No active tasks.</p>
+                        <PrimaryButton class="mt-4" @click="openCreateModal()">
+                            New Task
+                        </PrimaryButton>
+                    </div>
+                </template>
                 <BoardEmptyState
-                    v-if="!tasks.length"
+                    v-else
                     :board-name="currentBoardName"
                     @create-task="openCreateModal()"
                     @add-column="showingColumnModal = true"
                 />
-                <template v-else>
-                <BoardFilters
-                    v-model:search-query="searchQuery"
-                    v-model:assignee-filter="assigneeFilter"
-                    v-model:deadline-filter="deadlineFilter"
-                    :priorities="priorityOptions"
-                    :active-priorities="priorityFilter"
-                    :members="members"
-                    :current-user-id="$page.props.auth.user?.id ?? null"
-                    :has-active-filters="hasActiveFilters"
-                    :matched-count="filteredTasks.length"
-                    :total-count="tasks.length"
-                    class="mb-4"
-                    @toggle-priority="togglePriority"
-                    @clear="clearFilters"
-                />
-                <div class="board-scroll h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden pb-3 sm:snap-none">
-                    <div
-                        class="flex min-h-[calc(100vh-13rem)] w-max min-w-full items-stretch justify-start gap-4 sm:justify-center sm:gap-6"
-                        @dragover="onBoardLaneDragOver"
-                        @drop.stop.prevent="onBoardLaneDrop"
-                    >
-                        <BoardColumn
-                            v-for="status in boardStatuses"
-                            :key="status"
-                            v-model:label-draft="statusLabelDraft"
-                            :status="status"
-                            :label="formatStatus(status)"
-                            :tasks="tasksByStatus[status] ?? []"
-                            :is-editing-label="editingStatusLabel === status"
-                            :is-dragging-column="isDraggingColumn(status)"
-                            :is-moving="movingColumnStatus === status"
-                            :is-task-drop-target="isColumnDropTarget(status)"
-                            :is-reorder-drop-before="isColumnReorderDropTarget(status, 'before')"
-                            :is-reorder-drop-after="isColumnReorderDropTarget(status, 'after')"
-                            :columns-busy="movingColumnStatus !== null"
-                            :can-delete="canDeleteColumn"
-                            :updating-task-id="updatingId"
-                            :is-task-dragging="isDraggingTask"
-                            :is-task-drop-before="(taskId) => isTaskDropTarget(taskId, 'before')"
-                            :is-task-drop-after="(taskId) => isTaskDropTarget(taskId, 'after')"
-                            @section-drag-over="(event) => onBoardSectionDragOver(event, status)"
-                            @section-drop="onBoardSectionDrop(status)"
-                            @column-drag-start="(event) => onBoardColumnDragStart(event, status)"
-                            @column-drag-end="onBoardColumnDragEnd"
-                            @start-edit-label="startStatusLabelEdit(status)"
-                            @save-label="saveStatusLabel(status)"
-                            @cancel-edit-label="cancelStatusLabelEdit"
-                            @request-delete="requestDeleteColumn(status)"
-                            @add-task="openCreateModal(status)"
-                            @task-drag-start="onTaskDragStart"
-                            @task-drag-over="onTaskDragOver"
-                            @task-drag-end="onTaskDragEnd"
-                            @task-drop="onTaskDrop"
-                            @task-open-details="openTaskDetails"
-                            @task-open-edit="openEditModal"
-                        />
-                    </div>
-                </div>
-                </template>
 
                 <p
                     v-if="errorMessage"
@@ -1380,6 +1569,8 @@ const submitTaskUpdate = () => {
                     :replying-comment-id="replyingCommentId"
                     @close="closeTaskDetails"
                     @open-edit="openEditFromDetails"
+                    @request-archive="requestArchiveTask(activeTask)"
+                    @request-restore="requestRestoreTask(activeTask)"
                     @request-delete="requestDeleteTask(activeTask)"
                     @submit-comment="submitTaskComment"
                     @start-reply="startReply"

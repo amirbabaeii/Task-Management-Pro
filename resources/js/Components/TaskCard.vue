@@ -33,6 +33,10 @@ defineProps({
         type: Boolean,
         default: false,
     },
+    canEdit: {
+        type: Boolean,
+        default: true,
+    },
 });
 
 const emit = defineEmits([
@@ -52,6 +56,7 @@ const emit = defineEmits([
             'task-card--dragging': isDragging,
             'task-card--drop-before': isDropBeforeTarget,
             'task-card--drop-after': isDropAfterTarget,
+            'task-card--static': !canDrag,
         }"
         role="button"
         tabindex="0"
@@ -129,6 +134,7 @@ const emit = defineEmits([
             </span>
             <div class="ml-auto flex items-center gap-2">
                 <button
+                    v-if="canEdit"
                     type="button"
                     class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
                     :disabled="isUpdating"
@@ -161,6 +167,10 @@ const emit = defineEmits([
     opacity: 0.55;
     transform: rotate(1deg);
     cursor: grabbing;
+}
+
+.task-card--static {
+    cursor: pointer;
 }
 
 .task-card--drop-before {

@@ -50,6 +50,8 @@ defineProps({
 const emit = defineEmits([
     'close',
     'open-edit',
+    'request-archive',
+    'request-restore',
     'request-delete',
     'submit-comment',
     'start-reply',
@@ -77,6 +79,10 @@ const activityDotClass = (kind) => {
             return 'bg-amber-400';
         case 'comment_added':
             return 'bg-sky-400';
+        case 'archived':
+            return 'bg-gray-400';
+        case 'restored':
+            return 'bg-emerald-400';
         default:
             return 'bg-gray-300';
     }
@@ -108,9 +114,26 @@ const activityDotClass = (kind) => {
                     </div>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
-                    <SecondaryButton @click="emit('open-edit')">
+                    <SecondaryButton
+                        v-if="!task.archived_at"
+                        @click="emit('open-edit')"
+                    >
                         Edit Task
                     </SecondaryButton>
+                    <SecondaryButton
+                        v-if="task.archived_at"
+                        @click="emit('request-restore')"
+                    >
+                        Restore
+                    </SecondaryButton>
+                    <button
+                        v-else
+                        type="button"
+                        class="rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-widest text-gray-600 transition hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                        @click="emit('request-archive')"
+                    >
+                        Archive
+                    </button>
                     <button
                         type="button"
                         class="rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-widest text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"

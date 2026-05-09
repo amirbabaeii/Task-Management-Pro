@@ -20,6 +20,7 @@ export const normalizeTask = (task) => ({
     ...task,
     progress: Number(task.progress ?? 0),
     sort_order: Number(task.sort_order ?? 0),
+    archived_at: task.archived_at ?? null,
     tags: Array.isArray(task.tags)
         ? task.tags.map((tag) => `${tag ?? ''}`.trim()).filter(Boolean)
         : [],
