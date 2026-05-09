@@ -5,6 +5,7 @@ namespace App\Http\Requests\BoardColumns;
 use App\Models\Board;
 use App\Models\BoardColumn;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -62,6 +63,26 @@ class DeleteBoardColumnRequest extends FormRequest
                 $validator->errors()->add(
                     'status',
                     'A board must keep at least one column.',
+                );
+
+                return;
+            }
+
+            if ($this->filled('move_tasks_to')) {
+                return;
+            }
+
+            $hasTasks = DB::table('task_user')
+                ->join('tasks', 'tasks.id', '=', 'task_user.task_id')
+                ->where('task_user.board_id', $board->id)
+                ->where('task_user.role', 'assignee')
+                ->where('tasks.status', $status)
+                ->exists();
+
+            if ($hasTasks) {
+                $validator->errors()->add(
+                    'move_tasks_to',
+                    'Choose a destination column before deleting a column with tasks.',
                 );
             }
         });

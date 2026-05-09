@@ -363,7 +363,9 @@ class TaskBoardTest extends TestCase
             route('tasks.columns.destroy', ['board' => $board, 'status' => 'in-progress']),
         );
 
-        $response->assertStatus(500);
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['move_tasks_to']);
 
         $this->assertDatabaseHas('board_columns', [
             'board_id' => $board->id,
