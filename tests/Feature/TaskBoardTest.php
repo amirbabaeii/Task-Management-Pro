@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
+use App\Enums\TaskActivityKind;
 use App\Enums\TaskPriority;
 use App\Models\Board;
 use App\Models\BoardColumn;
@@ -10,6 +11,7 @@ use App\Models\Task;
 use App\Models\TaskComment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class TaskBoardTest extends TestCase
@@ -260,6 +262,85 @@ class TaskBoardTest extends TestCase
         $this->assertDatabaseMissing('tasks', ['id' => $task->id]);
         $this->assertDatabaseMissing('task_user', ['task_id' => $task->id]);
         $this->assertDatabaseMissing('task_comments', ['task_id' => $task->id]);
+    }
+
+    public function test_assignee_can_archive_a_task_from_the_board(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+        $task = Task::factory()->create(['status' => 'in-progress']);
+        $this->attachAssignee($user, $board, $task, 1);
+
+        $response = $this->actingAs($user)->patchJson(
+            route('tasks.archive', ['board' => $board, 'task' => $task]),
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('id', $task->id);
+
+        $this->assertNotNull($task->fresh()->archived_at);
+        $this->assertDatabaseHas('task_activities', [
+            'task_id' => $task->id,
+            'user_id' => $user->id,
+            'kind' => TaskActivityKind::Archived->value,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('tasks.board', ['board' => $board]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Board')
+                ->has('tasks', 0));
+    }
+
+    public function test_assignee_can_restore_an_archived_task_to_the_board(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+        $task = Task::factory()->create([
+            'status' => 'pending',
+            'archived_at' => now(),
+        ]);
+        $this->attachAssignee($user, $board, $task, 1);
+
+        $response = $this->actingAs($user)->patchJson(
+            route('tasks.restore', ['board' => $board, 'task' => $task]),
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('id', $task->id)
+            ->assertJsonPath('archived_at', null);
+
+        $this->assertNull($task->fresh()->archived_at);
+        $this->assertDatabaseHas('task_activities', [
+            'task_id' => $task->id,
+            'user_id' => $user->id,
+            'kind' => TaskActivityKind::Restored->value,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('tasks.board', ['board' => $board]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Board')
+                ->has('tasks', 1)
+                ->where('tasks.0.id', $task->id));
+    }
+
+    public function test_cannot_archive_a_task_that_is_not_on_the_board(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+        $task = Task::factory()->create(['status' => 'pending']);
+
+        $response = $this->actingAs($user)->patchJson(
+            route('tasks.archive', ['board' => $board, 'task' => $task]),
+        );
+
+        $response->assertNotFound();
+        $this->assertNull($task->fresh()->archived_at);
     }
 
     public function test_non_assignee_cannot_delete_a_task(): void

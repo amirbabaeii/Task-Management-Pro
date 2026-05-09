@@ -4,12 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Actions\BoardColumns\EnsureBoardHasDefaultColumnsAction;
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
+use App\Actions\Tasks\ArchiveTaskAction;
 use App\Actions\Tasks\CreateTaskAction;
 use App\Actions\Tasks\DeleteTaskAction;
 use App\Actions\Tasks\ReorderTaskAction;
+use App\Actions\Tasks\RestoreTaskAction;
 use App\Actions\Tasks\UpdateTaskAction;
 use App\Actions\Tasks\UpdateTaskStatusAction;
+use App\Http\Requests\Tasks\ArchiveTaskRequest;
 use App\Http\Requests\Tasks\ReorderTaskRequest;
+use App\Http\Requests\Tasks\RestoreTaskRequest;
 use App\Http\Requests\Tasks\StoreTaskRequest;
 use App\Http\Requests\Tasks\UpdateTaskRequest;
 use App\Http\Requests\Tasks\UpdateTaskStatusRequest;
@@ -33,6 +37,8 @@ class TaskController extends Controller
         private readonly ReorderTaskAction $reorderTask,
         private readonly UpdateTaskStatusAction $updateTaskStatus,
         private readonly DeleteTaskAction $deleteTask,
+        private readonly ArchiveTaskAction $archiveTask,
+        private readonly RestoreTaskAction $restoreTask,
     ) {}
 
     public function store(StoreTaskRequest $request, Board $board): RedirectResponse
@@ -117,6 +123,36 @@ class TaskController extends Controller
         $this->deleteTask->execute($task);
 
         return response()->json(['id' => $task->id]);
+    }
+
+    public function archive(ArchiveTaskRequest $request, Board $board, Task $task): JsonResponse
+    {
+        $user = $request->user();
+        $board = $this->resolveBoard($user, $board);
+        $this->ensureTaskIsOnBoard($user, $board, $task);
+        $this->authorize('update', $task);
+
+        $this->archiveTask->execute($task, $user);
+
+        return response()->json([
+            'id' => $task->id,
+            'archived_at' => $task->fresh()->archived_at,
+        ]);
+    }
+
+    public function restore(RestoreTaskRequest $request, Board $board, Task $task): JsonResponse
+    {
+        $user = $request->user();
+        $board = $this->resolveBoard($user, $board);
+        $this->ensureTaskIsOnBoard($user, $board, $task);
+        $this->authorize('update', $task);
+
+        $this->restoreTask->execute($task, $user);
+
+        return response()->json([
+            'id' => $task->id,
+            'archived_at' => $task->fresh()->archived_at,
+        ]);
     }
 
     private function resolveBoard(User $user, ?Board $board): Board

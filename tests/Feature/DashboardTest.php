@@ -66,6 +66,14 @@ class DashboardTest extends TestCase
             'progress' => 100,
             'deadline_at' => Carbon::parse('2026-05-08 09:00:00'),
         ]);
+        $archivedTask = Task::factory()->create([
+            'title' => 'Archived follow-up',
+            'status' => 'pending',
+            'priority' => 'high',
+            'progress' => 10,
+            'deadline_at' => Carbon::parse('2026-05-11 09:00:00'),
+            'archived_at' => Carbon::parse('2026-05-10 08:00:00'),
+        ]);
         $foreignTask = Task::factory()->create([
             'title' => 'Invisible task',
             'status' => 'pending',
@@ -76,6 +84,7 @@ class DashboardTest extends TestCase
         $this->attachAssignee($user, $sharedBoard, $todayTask, 1);
         $this->attachAssignee($user, $ownedBoard, $soonTask, 2);
         $this->attachAssignee($user, $ownedBoard, $completedTask, 3);
+        $this->attachAssignee($user, $ownedBoard, $archivedTask, 4);
         $this->attachAssignee($sharedOwner, $sharedBoard, $foreignTask, 2);
 
         $this->actingAs($user)

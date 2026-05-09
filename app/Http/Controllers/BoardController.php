@@ -101,6 +101,7 @@ class BoardController extends Controller
     {
         return $user->assignedTasks()
             ->wherePivot('board_id', $board->id)
+            ->whereNull('tasks.archived_at')
             ->select([
                 'tasks.id',
                 'tasks.title',
@@ -109,6 +110,7 @@ class BoardController extends Controller
                 'tasks.priority',
                 'tasks.tags',
                 'tasks.deadline_at',
+                'tasks.archived_at',
                 'tasks.progress',
                 'tasks.created_at',
             ])
@@ -139,6 +141,7 @@ class BoardController extends Controller
                 'priority' => $task->priority,
                 'tags' => $task->tags ?? [],
                 'deadline_at' => $task->deadline_at,
+                'archived_at' => $task->archived_at,
                 'progress' => $task->progress,
                 'created_at' => $task->created_at,
                 'sort_order' => (int) $task->pivot->sort_order,

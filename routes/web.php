@@ -60,6 +60,10 @@ Route::middleware('auth')->group(function () {
         ->name('tasks.reorder');
     Route::patch('/tasks/board/{board}/tasks/{task}/status', [TaskController::class, 'updateStatus'])
         ->name('tasks.status');
+    Route::patch('/tasks/board/{board}/tasks/{task}/archive', [TaskController::class, 'archive'])
+        ->name('tasks.archive');
+    Route::patch('/tasks/board/{board}/tasks/{task}/restore', [TaskController::class, 'restore'])
+        ->name('tasks.restore');
     Route::delete('/tasks/board/{board}/tasks/{task}', [TaskController::class, 'destroy'])
         ->name('tasks.destroy');
 
