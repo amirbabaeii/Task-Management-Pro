@@ -1268,9 +1268,9 @@ const submitTaskUpdate = () => {
                     @toggle-priority="togglePriority"
                     @clear="clearFilters"
                 />
-                <div class="board-scroll h-full overflow-x-auto overflow-y-hidden pb-3">
+                <div class="board-scroll h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden pb-3 sm:snap-none">
                     <div
-                        class="flex min-h-[calc(100vh-13rem)] w-max min-w-full items-stretch justify-center gap-6"
+                        class="flex min-h-[calc(100vh-13rem)] w-max min-w-full items-stretch justify-start gap-4 sm:justify-center sm:gap-6"
                         @dragover="onBoardLaneDragOver"
                         @drop.stop.prevent="onBoardLaneDrop"
                     >

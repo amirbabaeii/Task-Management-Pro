@@ -98,7 +98,7 @@ const setInputRef = (element) => {
 
 <template>
     <section
-        class="task-column flex h-full w-80 min-w-80 shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm transition"
+        class="task-column flex h-full w-[85vw] min-w-[85vw] shrink-0 snap-start flex-col rounded-lg border border-gray-200 bg-white shadow-sm transition sm:w-80 sm:min-w-80"
         :class="{
             'task-column--drop-target': isTaskDropTarget,
             'task-column--dragging': isDraggingColumn,
