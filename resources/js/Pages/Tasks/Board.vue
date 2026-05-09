@@ -297,6 +297,15 @@ const closeCreateModal = () => {
     form.clearErrors();
 };
 
+const openCreateModal = (status = null) => {
+    setTaskFormValues(form, blankTaskData());
+    if (status && boardStatuses.value.includes(status)) {
+        form.status = status;
+    }
+    form.clearErrors();
+    showingCreateModal.value = true;
+};
+
 const closeColumnModal = () => {
     showingColumnModal.value = false;
     columnForm.reset();
@@ -1227,7 +1236,7 @@ const submitTaskUpdate = () => {
                     <SecondaryButton @click="showingColumnModal = true">
                         Add Column
                     </SecondaryButton>
-                    <PrimaryButton @click="showingCreateModal = true">
+                    <PrimaryButton @click="openCreateModal()">
                         New Task
                     </PrimaryButton>
                 </template>
@@ -1284,6 +1293,7 @@ const submitTaskUpdate = () => {
                             @save-label="saveStatusLabel(status)"
                             @cancel-edit-label="cancelStatusLabelEdit"
                             @request-delete="requestDeleteColumn(status)"
+                            @add-task="openCreateModal(status)"
                             @task-drag-start="onTaskDragStart"
                             @task-drag-over="onTaskDragOver"
                             @task-drag-end="onTaskDragEnd"

@@ -74,6 +74,7 @@ const emit = defineEmits([
     'save-label',
     'cancel-edit-label',
     'request-delete',
+    'add-task',
     'task-drag-start',
     'task-drag-over',
     'task-drag-end',
@@ -207,12 +208,17 @@ const setInputRef = (element) => {
             </div>
         </div>
         <div class="flex-1 space-y-4 p-4">
-            <div
+            <button
                 v-if="!tasks.length"
-                class="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-6 text-center text-xs text-gray-500"
+                type="button"
+                class="block w-full rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-6 text-center text-xs text-gray-500 transition hover:border-indigo-300 hover:bg-indigo-50/40 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                @click="emit('add-task')"
             >
-                No tasks in this status.
-            </div>
+                <span class="block">No tasks yet</span>
+                <span class="mt-1 block text-[11px] font-semibold uppercase tracking-wide">
+                    + Add a task
+                </span>
+            </button>
             <TaskCard
                 v-for="task in tasks"
                 :key="task.id"
