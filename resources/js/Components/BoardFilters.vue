@@ -73,9 +73,9 @@ const assigneeOptions = computed(() => {
 
 <template>
     <div
-        class="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm"
+        class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm sm:gap-3"
     >
-        <div class="relative min-w-[14rem] flex-1">
+        <div class="relative min-w-0 flex-1 basis-full sm:min-w-[14rem] sm:basis-auto">
             <svg
                 class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
                 viewBox="0 0 20 20"
@@ -162,7 +162,7 @@ const assigneeOptions = computed(() => {
             </select>
         </label>
 
-        <div class="ml-auto flex items-center gap-3">
+        <div class="flex w-full items-center gap-3 sm:ml-auto sm:w-auto">
             <span
                 v-if="hasActiveFilters"
                 class="text-xs text-gray-500"
