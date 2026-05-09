@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\BoardRole;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -83,6 +82,18 @@ class Board extends Model
         return $user->boards()
             ->orderBy('position')
             ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Boards the user can access through board_members, owner first.
+     */
+    public static function accessibleForUser(User $user): Collection
+    {
+        return $user->accessibleBoards()
+            ->orderByRaw("CASE board_members.role WHEN 'owner' THEN 0 ELSE 1 END")
+            ->orderBy('boards.name')
+            ->orderBy('boards.id')
             ->get();
     }
 

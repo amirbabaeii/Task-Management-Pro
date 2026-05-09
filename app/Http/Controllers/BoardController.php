@@ -15,6 +15,7 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskComment;
 use App\Models\User;
+use App\Support\Presenters\BoardPresenter;
 use App\Support\Presenters\TaskActivityPresenter;
 use App\Support\Presenters\TaskCommentPresenter;
 use Illuminate\Http\JsonResponse;
@@ -39,11 +40,7 @@ class BoardController extends Controller
 
         return Inertia::render('Tasks/Board', [
             'boards' => $this->boardListForUser($user),
-            'currentBoard' => [
-                'id' => $board->id,
-                'name' => $board->name,
-                'description' => $board->description,
-            ],
+            'currentBoard' => BoardPresenter::navigation($board, $user),
             'tasks' => $this->boardTasksForUser($user, $board),
             'statuses' => BoardColumn::statusesForBoard($board),
             'statusLabels' => BoardColumn::labelsForBoard($board),
@@ -90,17 +87,11 @@ class BoardController extends Controller
     }
 
     /**
-     * @return list<array{id: int, name: string}>
+     * @return list<array{id: int, name: string, description: string|null, role: string, is_owner: bool}>
      */
     private function boardListForUser(User $user): array
     {
-        return Board::orderedForUser($user)
-            ->map(fn (Board $board): array => [
-                'id' => $board->id,
-                'name' => $board->name,
-            ])
-            ->values()
-            ->all();
+        return BoardPresenter::collection(Board::accessibleForUser($user), $user);
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Models\Board;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class BoardMemberTest extends TestCase
@@ -157,6 +158,36 @@ class BoardMemberTest extends TestCase
         $this->actingAs($collab)
             ->get(route('tasks.board', ['board' => $board]))
             ->assertOk();
+    }
+
+    public function test_board_page_exposes_owner_state_and_accessible_boards(): void
+    {
+        $owner = User::factory()->create();
+        $collaboratorOwner = User::factory()->create();
+        $ownedBoard = $this->boardFor($owner);
+        $sharedBoard = $this->boardFor($collaboratorOwner);
+        $ownedBoard->update(['name' => 'Owned Delivery']);
+        $sharedBoard->update(['name' => 'Shared Ops']);
+
+        $sharedBoard->members()->attach($owner->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('tasks.board', ['board' => $ownedBoard]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Board')
+                ->where('currentBoard.id', $ownedBoard->id)
+                ->where('currentBoard.role', BoardRole::Owner->value)
+                ->where('currentBoard.is_owner', true)
+                ->has('boards', 2)
+                ->where('boards.0.id', $ownedBoard->id)
+                ->where('boards.0.is_owner', true)
+                ->where('boards.1.id', $sharedBoard->id)
+                ->where('boards.1.role', BoardRole::Collaborator->value)
+                ->where('boards.1.is_owner', false));
     }
 
     public function test_non_member_gets_404_on_the_board(): void

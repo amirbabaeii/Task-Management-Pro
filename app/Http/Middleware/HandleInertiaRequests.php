@@ -2,8 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Enums\BoardRole;
 use App\Models\Board;
+use App\Support\Presenters\BoardPresenter;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
@@ -60,18 +60,7 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
-        return $user->accessibleBoards()
-            ->orderByRaw("CASE board_members.role WHEN 'owner' THEN 0 ELSE 1 END")
-            ->orderBy('boards.name')
-            ->get()
-            ->map(fn (Board $board): array => [
-                'id' => $board->id,
-                'name' => $board->name,
-                'description' => $board->description,
-                'role' => $board->pivot->role,
-            ])
-            ->values()
-            ->all();
+        return BoardPresenter::collection(Board::accessibleForUser($user), $user);
     }
 
     private function sharedCurrentBoard(Request $request): ?array
@@ -85,23 +74,12 @@ class HandleInertiaRequests extends Middleware
         $routeBoard = $request->route('board');
         $board = $routeBoard instanceof Board && $routeBoard->hasMember($user)
             ? $routeBoard
-            : $user->accessibleBoards()
-                ->orderByRaw("CASE board_members.role WHEN 'owner' THEN 0 ELSE 1 END")
-                ->orderBy('boards.name')
-                ->first();
+            : Board::accessibleForUser($user)->first();
 
         if (! $board) {
             return null;
         }
 
-        return [
-            'id' => $board->id,
-            'name' => $board->name,
-            'description' => $board->description,
-            'role' => $board->isOwnedBy($user)
-                ? BoardRole::Owner->value
-                : BoardRole::Collaborator->value,
-            'is_owner' => $board->isOwnedBy($user),
-        ];
+        return BoardPresenter::navigation($board, $user);
     }
 }
