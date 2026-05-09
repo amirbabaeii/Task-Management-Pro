@@ -3,7 +3,7 @@ import Dropdown from '@/Components/Dropdown.vue';
 import { formatDateTime } from '@/lib/format';
 import { Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const page = usePage();
 const notifications = ref([]);
@@ -13,14 +13,9 @@ const loaded = ref(false);
 
 const sharedUnread = computed(() => page.props.unreadNotifications ?? 0);
 
-// Keep our local count in sync when Inertia partial-reloads update the prop.
-const stopWatch = page.props && computed(() => sharedUnread.value);
-// (effect-only to make Vue track the prop)
-const _watcher = computed(() => {
-    unreadCount.value = sharedUnread.value;
-    return sharedUnread.value;
+watch(sharedUnread, (count) => {
+    unreadCount.value = count;
 });
-void _watcher;
 
 const fetchNotifications = async () => {
     loading.value = true;
