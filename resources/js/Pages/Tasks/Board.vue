@@ -4,6 +4,7 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import AddColumnModal from '@/Components/AddColumnModal.vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import BoardColumn from '@/Components/BoardColumn.vue';
+import BoardEmptyState from '@/Components/BoardEmptyState.vue';
 import BoardFilters from '@/Components/BoardFilters.vue';
 import BoardHeader from '@/Components/BoardHeader.vue';
 import BoardMembersModal from '@/Components/BoardMembersModal.vue';
@@ -1245,6 +1246,13 @@ const submitTaskUpdate = () => {
 
         <div class="min-h-[calc(100vh-9rem)] pt-8">
             <div class="w-full px-4 sm:px-6 lg:px-8">
+                <BoardEmptyState
+                    v-if="!tasks.length"
+                    :board-name="currentBoardName"
+                    @create-task="openCreateModal()"
+                    @add-column="showingColumnModal = true"
+                />
+                <template v-else>
                 <BoardFilters
                     v-model:search-query="searchQuery"
                     v-model:assignee-filter="assigneeFilter"
@@ -1303,6 +1311,7 @@ const submitTaskUpdate = () => {
                         />
                     </div>
                 </div>
+                </template>
 
                 <p
                     v-if="errorMessage"
