@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BoardColumnController;
 use App\Http\Controllers\BoardController;
+use App\Http\Controllers\BoardFilterController;
 use App\Http\Controllers\BoardMemberController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NotificationController;
@@ -32,6 +33,8 @@ Route::middleware('auth')->group(function () {
         ->name('boards.store');
     Route::patch('/boards/{board}', [BoardController::class, 'update'])
         ->name('boards.update');
+    Route::patch('/boards/{board}/filters', [BoardFilterController::class, 'update'])
+        ->name('boards.filters.update');
 
     Route::get('/boards/{board}/members', [BoardMemberController::class, 'index'])
         ->name('boards.members.index');
