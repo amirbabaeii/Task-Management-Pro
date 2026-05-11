@@ -8,6 +8,7 @@ use App\Models\Board;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class BoardFilterTest extends TestCase
@@ -99,6 +100,52 @@ class BoardFilterTest extends TestCase
                 'view' => 'active',
             ])
             ->assertNotFound();
+    }
+
+    public function test_board_page_receives_saved_filter_preferences(): void
+    {
+        $owner = User::factory()->create();
+        $collaborator = User::factory()->create();
+        $board = $this->boardFor($owner);
+        $board->members()->attach($collaborator->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
+            'filter_preferences' => json_encode([
+                'search' => 'release',
+                'priorities' => ['high'],
+                'assignee_id' => $collaborator->id,
+                'deadline' => 'today',
+                'view' => 'archived',
+            ]),
+        ]);
+
+        $this->actingAs($collaborator)
+            ->get(route('tasks.board', ['board' => $board]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Board')
+                ->where('filterPreferences.search', 'release')
+                ->where('filterPreferences.priorities', ['high'])
+                ->where('filterPreferences.assignee_id', $collaborator->id)
+                ->where('filterPreferences.deadline', 'today')
+                ->where('filterPreferences.view', 'archived'));
+    }
+
+    public function test_board_page_uses_default_filter_preferences_without_saved_values(): void
+    {
+        $owner = User::factory()->create();
+        $board = $this->boardFor($owner);
+
+        $this->actingAs($owner)
+            ->get(route('tasks.board', ['board' => $board]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Board')
+                ->where('filterPreferences.search', '')
+                ->where('filterPreferences.priorities', [])
+                ->where('filterPreferences.assignee_id', null)
+                ->where('filterPreferences.deadline', 'all')
+                ->where('filterPreferences.view', 'active'));
     }
 
     private function boardFor(User $user): Board

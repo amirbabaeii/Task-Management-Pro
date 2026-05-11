@@ -15,6 +15,7 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskComment;
 use App\Models\User;
+use App\Support\Presenters\BoardFilterPreferencePresenter;
 use App\Support\Presenters\BoardPresenter;
 use App\Support\Presenters\TaskActivityPresenter;
 use App\Support\Presenters\TaskCommentPresenter;
@@ -47,6 +48,7 @@ class BoardController extends Controller
             'statusLabels' => BoardColumn::labelsForBoard($board),
             'priorities' => TaskPriority::values(),
             'members' => $this->boardMembersForBoard($board),
+            'filterPreferences' => BoardFilterPreferencePresenter::forUser($board, $user),
         ]);
     }
 
