@@ -109,11 +109,6 @@ export function useBoardFilter(tasks, initialFilters = {}) {
         deadline: deadlineFilter.value,
     }));
 
-    const assigneeId =
-        filters?.assignee_id === null || filters?.assignee_id === undefined
-            ? null
-            : Number(filters.assignee_id);
-
     return {
         searchQuery,
         priorityFilter,
@@ -146,6 +141,10 @@ export const normalizeBoardFilterPreferences = (filters = {}) => {
     const view = ['active', 'archived'].includes(filters?.view)
         ? filters.view
         : defaults.view;
+    const assigneeId =
+        filters?.assignee_id === null || filters?.assignee_id === undefined
+            ? null
+            : Number(filters.assignee_id);
 
     return {
         search:
