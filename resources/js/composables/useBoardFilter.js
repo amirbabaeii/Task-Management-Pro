@@ -10,11 +10,12 @@ import { deadlineState } from '@/lib/format';
  *
  * @param {import('vue').Ref<Array>} tasks  Raw task list (unfiltered).
  */
-export function useBoardFilter(tasks) {
-    const searchQuery = ref('');
-    const priorityFilter = ref([]);
-    const assigneeFilter = ref(null);
-    const deadlineFilter = ref('all');
+export function useBoardFilter(tasks, initialFilters = {}) {
+    const initial = normalizeBoardFilterPreferences(initialFilters);
+    const searchQuery = ref(initial.search);
+    const priorityFilter = ref([...initial.priorities]);
+    const assigneeFilter = ref(initial.assignee_id);
+    const deadlineFilter = ref(initial.deadline);
 
     const hasActiveFilters = computed(
         () =>
@@ -89,23 +90,76 @@ export function useBoardFilter(tasks) {
     };
 
     const clearFilters = () => {
-        searchQuery.value = '';
-        priorityFilter.value = [];
-        assigneeFilter.value = null;
-        deadlineFilter.value = 'all';
+        setFilters(defaultBoardFilterPreferences());
     };
+
+    const setFilters = (filters = {}) => {
+        const normalized = normalizeBoardFilterPreferences(filters);
+
+        searchQuery.value = normalized.search;
+        priorityFilter.value = [...normalized.priorities];
+        assigneeFilter.value = normalized.assignee_id;
+        deadlineFilter.value = normalized.deadline;
+    };
+
+    const currentFilters = computed(() => ({
+        search: searchQuery.value.trim(),
+        priorities: [...priorityFilter.value],
+        assignee_id: assigneeFilter.value,
+        deadline: deadlineFilter.value,
+    }));
+
+    const assigneeId =
+        filters?.assignee_id === null || filters?.assignee_id === undefined
+            ? null
+            : Number(filters.assignee_id);
 
     return {
         searchQuery,
         priorityFilter,
         assigneeFilter,
         deadlineFilter,
+        currentFilters,
         filteredTasks,
         hasActiveFilters,
         togglePriority,
         clearFilters,
+        setFilters,
     };
 }
+
+export const defaultBoardFilterPreferences = () => ({
+    search: '',
+    priorities: [],
+    assignee_id: null,
+    deadline: 'all',
+    view: 'active',
+});
+
+export const normalizeBoardFilterPreferences = (filters = {}) => {
+    const defaults = defaultBoardFilterPreferences();
+    const deadline = ['all', 'overdue', 'today', 'upcoming', 'none'].includes(
+        filters?.deadline,
+    )
+        ? filters.deadline
+        : defaults.deadline;
+    const view = ['active', 'archived'].includes(filters?.view)
+        ? filters.view
+        : defaults.view;
+
+    return {
+        search:
+            typeof filters?.search === 'string'
+                ? filters.search.trim().slice(0, 150)
+                : defaults.search,
+        priorities: Array.isArray(filters?.priorities)
+            ? [...new Set(filters.priorities.map(String))]
+            : [],
+        assignee_id: Number.isFinite(assigneeId) ? assigneeId : null,
+        deadline,
+        view,
+    };
+};
 
 const matchesDeadline = (value, filter) => {
     if (filter === 'all') {

@@ -31,9 +31,26 @@ const props = defineProps({
         type: Number,
         default: 0,
     },
+    canSaveFilters: {
+        type: Boolean,
+        default: false,
+    },
+    hasSavedFilterChanges: {
+        type: Boolean,
+        default: false,
+    },
+    savingFilters: {
+        type: Boolean,
+        default: false,
+    },
 });
 
-const emit = defineEmits(['toggle-priority', 'clear']);
+const emit = defineEmits([
+    'toggle-priority',
+    'clear',
+    'save-filters',
+    'reset-saved-filters',
+]);
 
 const searchQuery = defineModel('searchQuery', {
     type: String,
@@ -176,6 +193,29 @@ const assigneeOptions = computed(() => {
                 @click="emit('clear')"
             >
                 Clear filters
+            </button>
+            <button
+                v-if="canSaveFilters"
+                type="button"
+                class="rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                :class="
+                    hasSavedFilterChanges
+                        ? 'bg-gray-800 text-white hover:bg-gray-700'
+                        : 'text-gray-400'
+                "
+                :disabled="savingFilters || !hasSavedFilterChanges"
+                @click="emit('save-filters')"
+            >
+                {{ savingFilters ? 'Saving...' : 'Save filters' }}
+            </button>
+            <button
+                v-if="canSaveFilters"
+                type="button"
+                class="rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:text-gray-300"
+                :disabled="savingFilters"
+                @click="emit('reset-saved-filters')"
+            >
+                Reset saved
             </button>
         </div>
     </div>

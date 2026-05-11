@@ -29,7 +29,11 @@ import {
     normalizeTask,
     sortTaskList,
 } from '@/lib/task';
-import { useBoardFilter } from '@/composables/useBoardFilter';
+import {
+    defaultBoardFilterPreferences,
+    normalizeBoardFilterPreferences,
+    useBoardFilter,
+} from '@/composables/useBoardFilter';
 import { useColumnDragDrop } from '@/composables/useColumnDragDrop';
 import { useTaskDragDrop } from '@/composables/useTaskDragDrop';
 import axios from 'axios';
@@ -63,8 +67,15 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    filterPreferences: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
+const initialFilterPreferences = normalizeBoardFilterPreferences(
+    props.filterPreferences,
+);
 const tasks = ref(props.tasks.map(normalizeTask));
 const archivedTasks = ref(props.archivedTasks.map(normalizeTask));
 const updatingId = ref(null);
@@ -77,7 +88,9 @@ const showingColumnModal = ref(false);
 const showingCreateModal = ref(false);
 const showingDetailsModal = ref(false);
 const showingEditModal = ref(false);
-const showingArchived = ref(false);
+const showingArchived = ref(initialFilterPreferences.view === 'archived');
+const savedFilterPreferences = ref(initialFilterPreferences);
+const savingFilterPreferences = ref(false);
 const selectedTaskId = ref(null);
 const editingTaskId = ref(null);
 const errorMessage = ref('');
@@ -964,11 +977,74 @@ const {
     priorityFilter,
     assigneeFilter,
     deadlineFilter,
+    currentFilters,
     filteredTasks,
     hasActiveFilters,
     togglePriority,
     clearFilters,
-} = useBoardFilter(currentTaskList);
+    setFilters,
+} = useBoardFilter(currentTaskList, initialFilterPreferences);
+
+const currentFilterPreferences = computed(() =>
+    normalizeBoardFilterPreferences({
+        ...currentFilters.value,
+        view: showingArchived.value ? 'archived' : 'active',
+    }),
+);
+
+const hasSavedFilterChanges = computed(
+    () =>
+        JSON.stringify(currentFilterPreferences.value) !==
+        JSON.stringify(savedFilterPreferences.value),
+);
+
+watch(
+    () => props.filterPreferences,
+    (nextPreferences) => {
+        const normalized = normalizeBoardFilterPreferences(nextPreferences);
+        savedFilterPreferences.value = normalized;
+        setFilters(normalized);
+        showingArchived.value = normalized.view === 'archived';
+    },
+    { deep: true },
+);
+
+const saveFilterPreferences = async (
+    preferences = currentFilterPreferences.value,
+) => {
+    if (!currentBoardId.value || savingFilterPreferences.value) {
+        return;
+    }
+
+    const payload = normalizeBoardFilterPreferences(preferences);
+    savingFilterPreferences.value = true;
+    errorMessage.value = '';
+
+    try {
+        const response = await axios.patch(
+            route('boards.filters.update', { board: currentBoardId.value }),
+            payload,
+        );
+
+        savedFilterPreferences.value = normalizeBoardFilterPreferences(
+            response?.data?.filters ?? payload,
+        );
+    } catch (error) {
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to save board filters. Please try again.';
+    } finally {
+        savingFilterPreferences.value = false;
+    }
+};
+
+const resetSavedFilterPreferences = async () => {
+    const defaults = defaultBoardFilterPreferences();
+    setFilters(defaults);
+    showingArchived.value = false;
+
+    await saveFilterPreferences(defaults);
+};
 
 const tasksByStatus = computed(() => {
     const grouped = {};
@@ -1411,9 +1487,14 @@ const submitTaskUpdate = () => {
                         :has-active-filters="hasActiveFilters"
                         :matched-count="filteredTasks.length"
                         :total-count="currentTaskList.length"
+                        :can-save-filters="currentBoardId !== null"
+                        :has-saved-filter-changes="hasSavedFilterChanges"
+                        :saving-filters="savingFilterPreferences"
                         class="mb-4"
                         @toggle-priority="togglePriority"
                         @clear="clearFilters"
+                        @save-filters="saveFilterPreferences"
+                        @reset-saved-filters="resetSavedFilterPreferences"
                     />
 
                     <template v-if="showingArchived">
