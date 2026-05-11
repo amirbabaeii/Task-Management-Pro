@@ -12,15 +12,27 @@ class TaskPolicy
     use HandlesAuthorization;
 
     /**
-     * Determine if the user can update the task.
+     * Assigned users can update legacy/API tasks. For board-scoped tasks,
+     * any member of the board that contains the task can update it.
      */
     public function update(User $user, Task $task): Response
     {
-        return $task->users()
-            ->where('user_id', $user->id)
-            ->where('role', 'assignee')
-            ->exists()
+        $isAssignee = $task->users()
+            ->where('users.id', $user->id)
+            ->wherePivot('role', 'assignee')
+            ->exists();
+
+        $isBoardMember = $task->users()
+            ->wherePivot('role', 'assignee')
+            ->join('board_members', function ($join) use ($user): void {
+                $join
+                    ->on('board_members.board_id', '=', 'task_user.board_id')
+                    ->where('board_members.user_id', $user->id);
+            })
+            ->exists();
+
+        return $isAssignee || $isBoardMember
             ? Response::allow()
-            : Response::deny('This task is not assigned to you.');
+            : Response::denyAsNotFound();
     }
 }

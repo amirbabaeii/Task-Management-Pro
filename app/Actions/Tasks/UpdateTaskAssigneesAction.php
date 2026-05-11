@@ -47,15 +47,14 @@ class UpdateTaskAssigneesAction
                     ->delete();
             }
 
+            $sortOrder = BoardTaskAssignments::sortOrderForBoardTask($board->id, $task->id)
+                ?: BoardTaskAssignments::nextSortOrderForBoardStatus($board->id, $task->status);
+
             foreach ($toAdd as $userId) {
                 $task->users()->attach($userId, [
                     'board_id' => $board->id,
                     'role' => 'assignee',
-                    'sort_order' => BoardTaskAssignments::nextSortOrderForUserStatus(
-                        $userId,
-                        $board->id,
-                        $task->status,
-                    ),
+                    'sort_order' => $sortOrder,
                 ]);
             }
 

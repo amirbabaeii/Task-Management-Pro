@@ -42,8 +42,8 @@ class BoardController extends Controller
         return Inertia::render('Tasks/Board', [
             'boards' => $this->boardListForUser($user),
             'currentBoard' => BoardPresenter::navigation($board, $user),
-            'tasks' => $this->boardTasksForUser($user, $board),
-            'archivedTasks' => $this->boardTasksForUser($user, $board, archived: true),
+            'tasks' => $this->boardTasksForBoard($board),
+            'archivedTasks' => $this->boardTasksForBoard($board, archived: true),
             'statuses' => BoardColumn::statusesForBoard($board),
             'statusLabels' => BoardColumn::labelsForBoard($board),
             'priorities' => TaskPriority::values(),
@@ -100,10 +100,15 @@ class BoardController extends Controller
     /**
      * @return list<array<string, mixed>>
      */
-    private function boardTasksForUser(User $user, Board $board, bool $archived = false): array
+    private function boardTasksForBoard(Board $board, bool $archived = false): array
     {
-        return $user->assignedTasks()
-            ->wherePivot('board_id', $board->id)
+        return Task::query()
+            ->whereExists(fn ($query) => $query
+                ->selectRaw('1')
+                ->from('task_user')
+                ->whereColumn('task_user.task_id', 'tasks.id')
+                ->where('task_user.board_id', $board->id)
+                ->where('task_user.role', 'assignee'))
             ->when(
                 $archived,
                 fn ($query) => $query->whereNotNull('tasks.archived_at'),
@@ -121,6 +126,15 @@ class BoardController extends Controller
                 'tasks.progress',
                 'tasks.created_at',
             ])
+            ->selectSub(
+                fn ($query) => $query
+                    ->from('task_user')
+                    ->selectRaw('MIN(task_user.sort_order)')
+                    ->whereColumn('task_user.task_id', 'tasks.id')
+                    ->where('task_user.board_id', $board->id)
+                    ->where('task_user.role', 'assignee'),
+                'board_sort_order',
+            )
             ->with([
                 'comments' => fn ($query) => $query
                     ->whereNull('parent_id')
@@ -140,7 +154,7 @@ class BoardController extends Controller
             ->when(
                 $archived,
                 fn ($query) => $query->orderByDesc('tasks.archived_at'),
-                fn ($query) => $query->orderBy('task_user.sort_order'),
+                fn ($query) => $query->orderBy('board_sort_order'),
             )
             ->orderBy('tasks.id')
             ->get()
@@ -155,7 +169,7 @@ class BoardController extends Controller
                 'archived_at' => $task->archived_at,
                 'progress' => $task->progress,
                 'created_at' => $task->created_at,
-                'sort_order' => (int) $task->pivot->sort_order,
+                'sort_order' => (int) $task->board_sort_order,
                 'assignees' => $task->assignees
                     ->map(fn (User $assignee): array => [
                         'id' => $assignee->id,

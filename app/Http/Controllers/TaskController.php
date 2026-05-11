@@ -55,7 +55,7 @@ class TaskController extends Controller
     {
         $user = $request->user();
         $board = $this->resolveBoard($user, $board);
-        $this->ensureTaskIsOnBoard($user, $board, $task);
+        $this->ensureTaskIsOnBoard($board, $task);
 
         $this->updateTask->execute($board, $task, $request->validated());
 
@@ -66,7 +66,7 @@ class TaskController extends Controller
     {
         $user = $request->user();
         $board = $this->resolveBoard($user, $board);
-        $this->ensureTaskIsOnBoard($user, $board, $task);
+        $this->ensureTaskIsOnBoard($board, $task);
 
         $validated = $request->validated();
         $destinationStatus = $validated['status'];
@@ -81,18 +81,18 @@ class TaskController extends Controller
 
         if (
             $beforeTaskId !== null
-            && ! BoardTaskAssignments::userHasTaskInStatus($user->id, $board->id, $beforeTaskId, $destinationStatus)
+            && ! BoardTaskAssignments::taskExistsInStatus($board->id, $beforeTaskId, $destinationStatus)
         ) {
             throw ValidationException::withMessages([
                 'before_id' => 'Choose a task from the destination column.',
             ]);
         }
 
-        $this->reorderTask->execute($user, $board, $task, $destinationStatus, $beforeTaskId);
+        $this->reorderTask->execute($board, $task, $destinationStatus, $beforeTaskId);
 
         return response()->json([
-            'task' => $this->taskPayloadForUser($task->fresh(), $user->id, $board->id),
-            'orders' => $this->userTaskOrderPayload($user->id, $board->id, [$sourceStatus, $destinationStatus]),
+            'task' => $this->taskPayloadForBoard($task->fresh(), $board->id),
+            'orders' => $this->boardTaskOrderPayload($board->id, [$sourceStatus, $destinationStatus]),
         ]);
     }
 
@@ -100,7 +100,7 @@ class TaskController extends Controller
     {
         $user = $request->user();
         $board = $this->resolveBoard($user, $board);
-        $this->ensureTaskIsOnBoard($user, $board, $task);
+        $this->ensureTaskIsOnBoard($board, $task);
 
         $originalStatus = $task->status;
         $destinationStatus = $request->validated('status');
@@ -108,8 +108,8 @@ class TaskController extends Controller
         $this->updateTaskStatus->execute($board, $task, $destinationStatus);
 
         return response()->json([
-            'task' => $this->taskPayloadForUser($task->fresh(), $user->id, $board->id),
-            'orders' => $this->userTaskOrderPayload($user->id, $board->id, [$originalStatus, $destinationStatus]),
+            'task' => $this->taskPayloadForBoard($task->fresh(), $board->id),
+            'orders' => $this->boardTaskOrderPayload($board->id, [$originalStatus, $destinationStatus]),
         ]);
     }
 
@@ -117,8 +117,8 @@ class TaskController extends Controller
     {
         $user = $request->user();
         $board = $this->resolveBoard($user, $board);
-        $this->ensureTaskIsOnBoard($user, $board, $task);
-        $this->authorize('update', $task);
+        $this->ensureTaskIsOnBoard($board, $task);
+        $this->authorize('update', $board);
 
         $this->deleteTask->execute($task);
 
@@ -129,8 +129,8 @@ class TaskController extends Controller
     {
         $user = $request->user();
         $board = $this->resolveBoard($user, $board);
-        $this->ensureTaskIsOnBoard($user, $board, $task);
-        $this->authorize('update', $task);
+        $this->ensureTaskIsOnBoard($board, $task);
+        $this->authorize('update', $board);
 
         $this->archiveTask->execute($task, $user);
 
@@ -144,8 +144,8 @@ class TaskController extends Controller
     {
         $user = $request->user();
         $board = $this->resolveBoard($user, $board);
-        $this->ensureTaskIsOnBoard($user, $board, $task);
-        $this->authorize('update', $task);
+        $this->ensureTaskIsOnBoard($board, $task);
+        $this->authorize('update', $board);
 
         $this->restoreTask->execute($task, $user);
 
@@ -168,10 +168,10 @@ class TaskController extends Controller
         return $board;
     }
 
-    private function ensureTaskIsOnBoard(User $user, Board $board, Task $task): void
+    private function ensureTaskIsOnBoard(Board $board, Task $task): void
     {
         abort_unless(
-            BoardTaskAssignments::userHasTaskOnBoard($user->id, $board->id, $task->id),
+            BoardTaskAssignments::taskExistsOnBoard($board->id, $task->id),
             404,
         );
     }
@@ -179,19 +179,12 @@ class TaskController extends Controller
     /**
      * @return array{id: int, status: string, sort_order: int}
      */
-    private function taskPayloadForUser(Task $task, int $userId, int $boardId): array
+    private function taskPayloadForBoard(Task $task, int $boardId): array
     {
-        $sortOrder = DB::table('task_user')
-            ->where('user_id', $userId)
-            ->where('board_id', $boardId)
-            ->where('role', 'assignee')
-            ->where('task_id', $task->id)
-            ->value('sort_order');
-
         return [
             'id' => $task->id,
             'status' => $task->status,
-            'sort_order' => (int) $sortOrder,
+            'sort_order' => BoardTaskAssignments::sortOrderForBoardTask($boardId, $task->id),
         ];
     }
 
@@ -199,20 +192,21 @@ class TaskController extends Controller
      * @param  list<string>  $statuses
      * @return list<array{id: int, status: string, sort_order: int}>
      */
-    private function userTaskOrderPayload(int $userId, int $boardId, array $statuses): array
+    private function boardTaskOrderPayload(int $boardId, array $statuses): array
     {
         $statuses = array_values(array_unique($statuses));
 
         return DB::table('task_user')
             ->join('tasks', 'tasks.id', '=', 'task_user.task_id')
-            ->where('task_user.user_id', $userId)
             ->where('task_user.board_id', $boardId)
             ->where('task_user.role', 'assignee')
             ->whereIn('tasks.status', $statuses)
+            ->selectRaw('tasks.id, tasks.status, MIN(task_user.sort_order) as sort_order')
+            ->groupBy('tasks.id', 'tasks.status')
             ->orderBy('tasks.status')
-            ->orderBy('task_user.sort_order')
+            ->orderBy('sort_order')
             ->orderBy('tasks.id')
-            ->get(['tasks.id', 'tasks.status', 'task_user.sort_order'])
+            ->get()
             ->map(fn (object $row): array => [
                 'id' => (int) $row->id,
                 'status' => $row->status,

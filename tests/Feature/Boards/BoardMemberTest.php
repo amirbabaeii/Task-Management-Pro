@@ -160,6 +160,81 @@ class BoardMemberTest extends TestCase
             ->assertOk();
     }
 
+    public function test_collaborator_sees_board_columns_and_existing_tasks(): void
+    {
+        $owner = User::factory()->create();
+        $collab = User::factory()->create();
+        $board = $this->boardFor($owner);
+        $board->members()->attach($collab->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
+        ]);
+
+        $task = Task::factory()->create([
+            'title' => 'Review shared roadmap',
+            'status' => 'pending',
+        ]);
+        $task->users()->attach($owner->id, [
+            'board_id' => $board->id,
+            'role' => 'assignee',
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($collab)
+            ->get(route('tasks.board', ['board' => $board]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Board')
+                ->has('statuses', 3)
+                ->where('statuses.0', 'pending')
+                ->has('tasks', 1)
+                ->where('tasks.0.id', $task->id)
+                ->where('tasks.0.title', 'Review shared roadmap')
+                ->where('tasks.0.assignees.0.id', $owner->id));
+    }
+
+    public function test_collaborator_can_update_existing_board_tasks(): void
+    {
+        $owner = User::factory()->create();
+        $collab = User::factory()->create();
+        $board = $this->boardFor($owner);
+        $board->members()->attach($collab->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
+        ]);
+
+        $task = Task::factory()->create([
+            'title' => 'Draft release notes',
+            'status' => 'pending',
+            'priority' => 'medium',
+        ]);
+        $task->users()->attach($owner->id, [
+            'board_id' => $board->id,
+            'role' => 'assignee',
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($collab)
+            ->patch(route('tasks.update', ['board' => $board, 'task' => $task]), [
+                'title' => 'Draft and review release notes',
+                'description' => 'Include rollout risks and support notes.',
+                'status' => 'in-progress',
+                'priority' => 'high',
+                'progress' => 50,
+                'assignee_ids' => [$owner->id],
+            ])
+            ->assertRedirect(route('tasks.board', ['board' => $board]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'title' => 'Draft and review release notes',
+            'status' => 'in-progress',
+            'priority' => 'high',
+            'progress' => 50,
+        ]);
+    }
+
     public function test_board_page_exposes_owner_state_and_accessible_boards(): void
     {
         $owner = User::factory()->create();

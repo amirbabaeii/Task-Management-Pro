@@ -29,16 +29,16 @@ class CreateTaskAction
 
         return DB::transaction(function () use ($creator, $board, $data, $assigneeIds): Task {
             $task = Task::create($data);
+            $sortOrder = BoardTaskAssignments::nextSortOrderForBoardStatus(
+                $board->id,
+                $task->status,
+            );
 
             foreach ($assigneeIds as $userId) {
                 $task->users()->attach($userId, [
                     'board_id' => $board->id,
                     'role' => 'assignee',
-                    'sort_order' => BoardTaskAssignments::nextSortOrderForUserStatus(
-                        $userId,
-                        $board->id,
-                        $task->status,
-                    ),
+                    'sort_order' => $sortOrder,
                 ]);
             }
 

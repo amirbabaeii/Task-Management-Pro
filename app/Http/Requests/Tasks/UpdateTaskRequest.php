@@ -7,6 +7,7 @@ use App\Http\Requests\Concerns\NormalizesTaskInput;
 use App\Models\Board;
 use App\Models\BoardColumn;
 use App\Models\Task;
+use App\Support\BoardTaskAssignments;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -16,9 +17,13 @@ class UpdateTaskRequest extends FormRequest
 
     public function authorize(): bool
     {
+        $board = $this->route('board');
         $task = $this->route('task');
 
-        return $task instanceof Task && $this->user()?->can('update', $task);
+        return $board instanceof Board
+            && $task instanceof Task
+            && $this->user()?->can('update', $board)
+            && BoardTaskAssignments::taskExistsOnBoard($board->id, $task->id);
     }
 
     protected function prepareForValidation(): void

@@ -4,7 +4,6 @@ namespace App\Actions\Tasks;
 
 use App\Models\Board;
 use App\Models\Task;
-use App\Models\User;
 use App\Support\BoardTaskAssignments;
 use Illuminate\Support\Facades\DB;
 
@@ -15,13 +14,12 @@ class ReorderTaskAction
     ) {}
 
     public function execute(
-        User $user,
         Board $board,
         Task $task,
         string $destinationStatus,
         ?int $beforeTaskId,
     ): void {
-        DB::transaction(function () use ($user, $board, $task, $destinationStatus, $beforeTaskId): void {
+        DB::transaction(function () use ($board, $task, $destinationStatus, $beforeTaskId): void {
             $sourceStatus = $task->status;
 
             if ($sourceStatus !== $destinationStatus) {
@@ -36,19 +34,17 @@ class ReorderTaskAction
                 );
             }
 
-            $this->placeAt($user->id, $board->id, $task, $destinationStatus, $beforeTaskId);
+            $this->placeAt($board->id, $task, $destinationStatus, $beforeTaskId);
         });
     }
 
     private function placeAt(
-        int $userId,
         int $boardId,
         Task $task,
         string $status,
         ?int $beforeTaskId,
     ): void {
-        $taskIds = BoardTaskAssignments::assignedTaskIdsForStatus(
-            $userId,
+        $taskIds = BoardTaskAssignments::taskIdsForBoardStatus(
             $boardId,
             $status,
             $task->id,
@@ -64,6 +60,6 @@ class ReorderTaskAction
 
         array_splice($taskIds, $insertAt, 0, [$task->id]);
 
-        BoardTaskAssignments::syncOrder($userId, $boardId, $taskIds);
+        BoardTaskAssignments::syncBoardOrder($boardId, $taskIds);
     }
 }
