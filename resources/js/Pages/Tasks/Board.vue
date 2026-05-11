@@ -1443,8 +1443,11 @@ const submitTaskUpdate = () => {
 
         <div class="min-h-[calc(100vh-9rem)] pt-8">
             <div class="w-full px-4 sm:px-6 lg:px-8">
-                <template v-if="tasks.length || archivedTasks.length">
-                    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <template v-if="boardStatuses.length">
+                    <div
+                        v-if="tasks.length || archivedTasks.length"
+                        class="mb-4 flex flex-wrap items-center justify-between gap-3"
+                    >
                         <div class="inline-flex rounded-md border border-gray-200 bg-white p-1 shadow-sm">
                             <button
                                 type="button"
@@ -1520,7 +1523,7 @@ const submitTaskUpdate = () => {
                         </div>
                     </template>
 
-                    <template v-else-if="tasks.length">
+                    <template v-else>
                         <div class="board-scroll h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden pb-3 sm:snap-none">
                             <div
                                 class="flex min-h-[calc(100vh-13rem)] w-max min-w-full items-stretch justify-start gap-4 sm:justify-center sm:gap-6"
@@ -1565,16 +1568,6 @@ const submitTaskUpdate = () => {
                             </div>
                         </div>
                     </template>
-
-                    <div
-                        v-else
-                        class="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center"
-                    >
-                        <p class="text-sm text-gray-500">No active tasks.</p>
-                        <PrimaryButton class="mt-4" @click="openCreateModal()">
-                            New Task
-                        </PrimaryButton>
-                    </div>
                 </template>
                 <BoardEmptyState
                     v-else
