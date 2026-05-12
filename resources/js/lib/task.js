@@ -33,6 +33,15 @@ export const normalizeTask = (task) => ({
               name: assignee.name ?? 'Unknown user',
           }))
         : [],
+    checklist_items: Array.isArray(task.checklist_items)
+        ? task.checklist_items.map((item) => ({
+              id: Number(item.id ?? 0),
+              title: `${item.title ?? ''}`.trim(),
+              completed: Boolean(item.completed),
+              completed_at: item.completed_at ?? null,
+              position: Number(item.position ?? 0),
+          }))
+        : [],
     activities: Array.isArray(task.activities) ? task.activities : [],
 });
 

@@ -101,6 +101,11 @@ const activeReplyCommentId = ref(null);
 const replyDraft = ref('');
 const replyErrors = ref({});
 const replyingCommentId = ref(null);
+const checklistDraft = ref('');
+const checklistErrors = ref({});
+const addingChecklistItem = ref(false);
+const updatingChecklistItemId = ref(null);
+const deletingChecklistItemId = ref(null);
 const fallbackBoardStatuses = ['pending', 'in-progress', 'completed'];
 const normalizeBoardStatuses = (statuses = []) =>
     statuses.length ? [...statuses] : [...fallbackBoardStatuses];
@@ -323,6 +328,11 @@ const resetCommentForm = () => {
     replyDraft.value = '';
     replyErrors.value = {};
     replyingCommentId.value = null;
+    checklistDraft.value = '';
+    checklistErrors.value = {};
+    addingChecklistItem.value = false;
+    updatingChecklistItemId.value = null;
+    deletingChecklistItemId.value = null;
 };
 
 const closeCreateModal = () => {
@@ -1265,6 +1275,167 @@ const appendReplyToTask = (taskId, parentId, comment) => {
     archivedTasks.value = appendToList(archivedTasks.value);
 };
 
+const updateTaskInLists = (taskId, callback) => {
+    const updateList = (taskList) => taskList.map((task) => {
+        if (task.id !== taskId) {
+            return task;
+        }
+
+        return normalizeTask(callback(task));
+    });
+
+    tasks.value = updateList(tasks.value);
+    archivedTasks.value = updateList(archivedTasks.value);
+};
+
+const appendChecklistItemToTask = (taskId, item) => {
+    updateTaskInLists(taskId, (task) => ({
+        ...task,
+        checklist_items: [...(task.checklist_items ?? []), item],
+    }));
+};
+
+const replaceChecklistItemOnTask = (taskId, item) => {
+    updateTaskInLists(taskId, (task) => ({
+        ...task,
+        checklist_items: (task.checklist_items ?? []).map((existing) =>
+            existing.id === item.id ? item : existing,
+        ),
+    }));
+};
+
+const removeChecklistItemFromTask = (taskId, itemId) => {
+    updateTaskInLists(taskId, (task) => ({
+        ...task,
+        checklist_items: (task.checklist_items ?? []).filter(
+            (item) => item.id !== itemId,
+        ),
+    }));
+};
+
+const submitChecklistItem = async () => {
+    if (!activeTask.value || addingChecklistItem.value) {
+        return;
+    }
+
+    const title = checklistDraft.value.trim();
+
+    if (!title) {
+        return;
+    }
+
+    addingChecklistItem.value = true;
+    checklistErrors.value = {};
+    errorMessage.value = '';
+
+    try {
+        const response = await axios.post(
+            route('tasks.checklist-items.store', {
+                board: currentBoardId.value,
+                task: activeTask.value.id,
+            }),
+            { title },
+        );
+
+        if (response?.data?.checklist_item) {
+            appendChecklistItemToTask(
+                activeTask.value.id,
+                response.data.checklist_item,
+            );
+        }
+
+        checklistDraft.value = '';
+    } catch (error) {
+        if (error?.response?.status === 422) {
+            checklistErrors.value = error.response.data.errors ?? {};
+            return;
+        }
+
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to add checklist item right now. Please try again.';
+    } finally {
+        addingChecklistItem.value = false;
+    }
+};
+
+const updateChecklistItem = async (item, payload) => {
+    if (!activeTask.value || updatingChecklistItemId.value === item.id) {
+        return;
+    }
+
+    updatingChecklistItemId.value = item.id;
+    checklistErrors.value = {};
+    errorMessage.value = '';
+
+    try {
+        const response = await axios.patch(
+            route('tasks.checklist-items.update', {
+                board: currentBoardId.value,
+                task: activeTask.value.id,
+                checklistItem: item.id,
+            }),
+            payload,
+        );
+
+        if (response?.data?.checklist_item) {
+            replaceChecklistItemOnTask(
+                activeTask.value.id,
+                response.data.checklist_item,
+            );
+        }
+    } catch (error) {
+        if (error?.response?.status === 422) {
+            checklistErrors.value = error.response.data.errors ?? {};
+            return;
+        }
+
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to update checklist item right now. Please try again.';
+    } finally {
+        updatingChecklistItemId.value = null;
+    }
+};
+
+const toggleChecklistItem = ({ item, completed }) => {
+    updateChecklistItem(item, { completed });
+};
+
+const renameChecklistItem = ({ item, title }) => {
+    updateChecklistItem(item, { title });
+};
+
+const deleteChecklistItem = async (item) => {
+    if (!activeTask.value || deletingChecklistItemId.value === item.id) {
+        return;
+    }
+
+    deletingChecklistItemId.value = item.id;
+    errorMessage.value = '';
+
+    try {
+        const response = await axios.delete(
+            route('tasks.checklist-items.destroy', {
+                board: currentBoardId.value,
+                task: activeTask.value.id,
+                checklistItem: item.id,
+            }),
+        );
+
+        removeChecklistItemFromTask(
+            activeTask.value.id,
+            Number(response?.data?.id ?? item.id),
+        );
+    } catch (error) {
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to delete checklist item right now. Please try again.';
+    } finally {
+        deletingChecklistItemId.value = null;
+    }
+};
+
 const submitComment = async ({ content, parentId = null }) => {
     if (!activeTask.value) {
         return false;
@@ -1636,11 +1807,16 @@ const submitTaskUpdate = () => {
                     :format-status="formatStatus"
                     v-model:comment-draft="commentDraft"
                     v-model:reply-draft="replyDraft"
+                    v-model:checklist-draft="checklistDraft"
                     :comment-errors="commentErrors"
                     :submitting-comment="submittingComment"
                     :reply-errors="replyErrors"
                     :active-reply-comment-id="activeReplyCommentId"
                     :replying-comment-id="replyingCommentId"
+                    :checklist-errors="checklistErrors"
+                    :adding-checklist-item="addingChecklistItem"
+                    :updating-checklist-item-id="updatingChecklistItemId"
+                    :deleting-checklist-item-id="deletingChecklistItemId"
                     @close="closeTaskDetails"
                     @open-edit="openEditFromDetails"
                     @request-archive="requestArchiveTask(activeTask)"
@@ -1650,6 +1826,10 @@ const submitTaskUpdate = () => {
                     @start-reply="startReply"
                     @cancel-reply="cancelReply"
                     @submit-reply="submitReply"
+                    @add-checklist-item="submitChecklistItem"
+                    @toggle-checklist-item="toggleChecklistItem"
+                    @rename-checklist-item="renameChecklistItem"
+                    @delete-checklist-item="deleteChecklistItem"
                 />
 
                 <TaskFormModal

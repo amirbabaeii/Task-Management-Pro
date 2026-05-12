@@ -119,6 +119,21 @@ const emit = defineEmits([
             </div>
         </div>
 
+        <div
+            v-if="task.checklist_items?.length"
+            class="mt-3 flex items-center justify-between rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] text-gray-600"
+        >
+            <span class="font-semibold uppercase tracking-wide">
+                Checklist
+            </span>
+            <span>
+                {{
+                    task.checklist_items.filter((item) => item.completed)
+                        .length
+                }}/{{ task.checklist_items.length }}
+            </span>
+        </div>
+
         <div class="mt-3 flex flex-wrap items-center gap-2">
             <AvatarGroup
                 v-if="task.assignees && task.assignees.length"
