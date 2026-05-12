@@ -87,6 +87,13 @@ class Task extends Model
             ->orderBy('id');
     }
 
+    public function checklistItems(): HasMany
+    {
+        return $this->hasMany(TaskChecklistItem::class)
+            ->orderBy('position')
+            ->orderBy('id');
+    }
+
     public function activities(): HasMany
     {
         return $this->hasMany(TaskActivity::class)

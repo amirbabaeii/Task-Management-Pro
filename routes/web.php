@@ -7,6 +7,7 @@ use App\Http\Controllers\BoardMemberController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TaskChecklistItemController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskController;
 use Illuminate\Foundation\Application;
@@ -69,6 +70,12 @@ Route::middleware('auth')->group(function () {
         ->name('tasks.restore');
     Route::delete('/tasks/board/{board}/tasks/{task}', [TaskController::class, 'destroy'])
         ->name('tasks.destroy');
+    Route::post('/tasks/board/{board}/tasks/{task}/checklist-items', [TaskChecklistItemController::class, 'store'])
+        ->name('tasks.checklist-items.store');
+    Route::patch('/tasks/board/{board}/tasks/{task}/checklist-items/{checklistItem}', [TaskChecklistItemController::class, 'update'])
+        ->name('tasks.checklist-items.update');
+    Route::delete('/tasks/board/{board}/tasks/{task}/checklist-items/{checklistItem}', [TaskChecklistItemController::class, 'destroy'])
+        ->name('tasks.checklist-items.destroy');
 
     Route::get('/notifications', [NotificationController::class, 'index'])
         ->name('notifications.index');

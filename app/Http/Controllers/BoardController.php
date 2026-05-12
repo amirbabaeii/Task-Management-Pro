@@ -13,11 +13,13 @@ use App\Models\Board;
 use App\Models\BoardColumn;
 use App\Models\Task;
 use App\Models\TaskActivity;
+use App\Models\TaskChecklistItem;
 use App\Models\TaskComment;
 use App\Models\User;
 use App\Support\Presenters\BoardFilterPreferencePresenter;
 use App\Support\Presenters\BoardPresenter;
 use App\Support\Presenters\TaskActivityPresenter;
+use App\Support\Presenters\TaskChecklistItemPresenter;
 use App\Support\Presenters\TaskCommentPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -150,6 +152,7 @@ class BoardController extends Controller
                 'activities' => fn ($query) => $query
                     ->with('actor:id,name')
                     ->limit(20),
+                'checklistItems',
             ])
             ->when(
                 $archived,
@@ -184,6 +187,10 @@ class BoardController extends Controller
                     ->all(),
                 'activities' => $task->activities
                     ->map(fn (TaskActivity $activity): array => TaskActivityPresenter::toArray($activity))
+                    ->values()
+                    ->all(),
+                'checklist_items' => $task->checklistItems
+                    ->map(fn (TaskChecklistItem $item): array => TaskChecklistItemPresenter::toArray($item))
                     ->values()
                     ->all(),
             ])
