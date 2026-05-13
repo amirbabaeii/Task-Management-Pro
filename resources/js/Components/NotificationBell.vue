@@ -79,6 +79,14 @@ const summarize = (notification) => {
     if (data.kind === 'comment_reply') {
         return `${data.author?.name ?? 'Someone'} replied to your comment on “${data.task?.title ?? 'a task'}”`;
     }
+    if (data.kind === 'task_deadline_reminder') {
+        const title = data.task?.title ?? 'a task';
+        const board = data.board?.name ?? 'a board';
+
+        return data.deadline_state === 'overdue'
+            ? `“${title}” is overdue on ${board}`
+            : `“${title}” is due today on ${board}`;
+    }
     return 'You have a new notification';
 };
 
