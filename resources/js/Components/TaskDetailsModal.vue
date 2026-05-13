@@ -46,19 +46,7 @@ const props = defineProps({
         type: Number,
         default: null,
     },
-    checklistErrors: {
-        type: Object,
-        default: () => ({}),
-    },
-    addingChecklistItem: {
-        type: Boolean,
-        default: false,
-    },
     updatingChecklistItemId: {
-        type: Number,
-        default: null,
-    },
-    deletingChecklistItemId: {
         type: Number,
         default: null,
     },
@@ -74,10 +62,7 @@ const emit = defineEmits([
     'start-reply',
     'cancel-reply',
     'submit-reply',
-    'add-checklist-item',
     'toggle-checklist-item',
-    'rename-checklist-item',
-    'delete-checklist-item',
 ]);
 
 const commentDraft = defineModel('commentDraft', {
@@ -90,25 +75,10 @@ const replyDraft = defineModel('replyDraft', {
     default: '',
 });
 
-const checklistDraft = defineModel('checklistDraft', {
-    type: String,
-    default: '',
-});
-
 const checklistItems = computed(() => props.task?.checklist_items ?? []);
 const completedChecklistCount = computed(
     () => checklistItems.value.filter((item) => item.completed).length,
 );
-
-const renameChecklistItem = (item, value) => {
-    const title = `${value ?? ''}`.trim();
-
-    if (title === '' || title === item.title) {
-        return;
-    }
-
-    emit('rename-checklist-item', { item, title });
-};
 
 const activityDotClass = (kind) => {
     switch (kind) {
@@ -343,68 +313,17 @@ const activityDotClass = (kind) => {
                                     })
                                 "
                             />
-                            <input
-                                type="text"
-                                class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-gray-700 focus:ring-0"
+                            <span
+                                class="min-w-0 flex-1 text-sm text-gray-700"
                                 :class="{ 'line-through text-gray-400': item.completed }"
-                                :value="item.title"
-                                :disabled="
-                                    task.archived_at ||
-                                    updatingChecklistItemId === item.id
-                                "
-                                maxlength="180"
-                                @change="renameChecklistItem(item, $event.target.value)"
-                                @keydown.enter.prevent="$event.target.blur()"
-                            />
-                            <button
-                                type="button"
-                                class="rounded-md px-2 py-1 text-xs font-semibold uppercase tracking-wide text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:opacity-40"
-                                :disabled="
-                                    task.archived_at ||
-                                    deletingChecklistItemId === item.id
-                                "
-                                @click="emit('delete-checklist-item', item)"
                             >
-                                Delete
-                            </button>
+                                {{ item.title }}
+                            </span>
                         </li>
                     </ul>
                     <p v-else class="text-sm text-gray-500">
                         No checklist items yet.
                     </p>
-
-                    <form
-                        v-if="!task.archived_at"
-                        class="flex flex-col gap-2 sm:flex-row"
-                        @submit.prevent="emit('add-checklist-item')"
-                    >
-                        <div class="min-w-0 flex-1">
-                            <input
-                                v-model="checklistDraft"
-                                type="text"
-                                maxlength="180"
-                                class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                                placeholder="Add a checklist item..."
-                            />
-                            <InputError
-                                class="mt-2"
-                                :message="checklistErrors.title?.[0]"
-                            />
-                        </div>
-                        <PrimaryButton
-                            class="self-start"
-                            :class="{
-                                'opacity-25':
-                                    addingChecklistItem ||
-                                    !checklistDraft.trim(),
-                            }"
-                            :disabled="
-                                addingChecklistItem || !checklistDraft.trim()
-                            "
-                        >
-                            {{ addingChecklistItem ? 'Adding...' : 'Add Item' }}
-                        </PrimaryButton>
-                    </form>
                 </section>
 
                 <section

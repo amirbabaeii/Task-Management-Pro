@@ -52,9 +52,40 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    checklistItems: {
+        type: Array,
+        default: () => [],
+    },
+    checklistErrors: {
+        type: Object,
+        default: () => ({}),
+    },
+    addingChecklistItem: {
+        type: Boolean,
+        default: false,
+    },
+    updatingChecklistItemId: {
+        type: Number,
+        default: null,
+    },
+    deletingChecklistItemId: {
+        type: Number,
+        default: null,
+    },
 });
 
-const emit = defineEmits(['close', 'submit']);
+const emit = defineEmits([
+    'close',
+    'submit',
+    'add-checklist-item',
+    'rename-checklist-item',
+    'delete-checklist-item',
+]);
+
+const checklistDraft = defineModel('checklistDraft', {
+    type: String,
+    default: '',
+});
 
 const idPrefix = computed(() => (props.mode === 'edit' ? 'edit-' : ''));
 const heading = computed(() =>
@@ -71,6 +102,19 @@ const submitIdle = computed(() =>
 const submitBusy = computed(() =>
     props.mode === 'edit' ? 'Saving...' : 'Creating...',
 );
+const completedChecklistCount = computed(
+    () => props.checklistItems.filter((item) => item.completed).length,
+);
+
+const renameChecklistItem = (item, value) => {
+    const title = `${value ?? ''}`.trim();
+
+    if (title === '' || title === item.title) {
+        return;
+    }
+
+    emit('rename-checklist-item', { item, title });
+};
 </script>
 
 <template>
@@ -189,6 +233,91 @@ const submitBusy = computed(() =>
                     </div>
                     <InputError class="mt-2" :message="form.errors.progress" />
                 </div>
+
+                <section
+                    v-if="mode === 'edit'"
+                    class="space-y-3 border-t border-gray-100 pt-4 md:col-span-2"
+                >
+                    <div class="flex items-center justify-between">
+                        <InputLabel value="Checklist" />
+                        <span class="text-xs text-gray-500">
+                            {{ completedChecklistCount }}/{{ checklistItems.length }}
+                            done
+                        </span>
+                    </div>
+
+                    <ul v-if="checklistItems.length" class="space-y-2">
+                        <li
+                            v-for="item in checklistItems"
+                            :key="item.id"
+                            class="flex items-center gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                        >
+                            <span
+                                class="h-2.5 w-2.5 shrink-0 rounded-full"
+                                :class="
+                                    item.completed
+                                        ? 'bg-emerald-400'
+                                        : 'bg-gray-300'
+                                "
+                                aria-hidden="true"
+                            />
+                            <input
+                                type="text"
+                                class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-gray-700 focus:ring-0"
+                                :class="{ 'line-through text-gray-400': item.completed }"
+                                :value="item.title"
+                                :disabled="
+                                    updatingChecklistItemId === item.id ||
+                                    deletingChecklistItemId === item.id
+                                "
+                                maxlength="180"
+                                @change="renameChecklistItem(item, $event.target.value)"
+                                @keydown.enter.prevent="$event.target.blur()"
+                            />
+                            <button
+                                type="button"
+                                class="rounded-md px-2 py-1 text-xs font-semibold uppercase tracking-wide text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:opacity-40"
+                                :disabled="
+                                    updatingChecklistItemId === item.id ||
+                                    deletingChecklistItemId === item.id
+                                "
+                                @click="emit('delete-checklist-item', item)"
+                            >
+                                Delete
+                            </button>
+                        </li>
+                    </ul>
+                    <p v-else class="text-sm text-gray-500">
+                        No checklist items yet.
+                    </p>
+
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <div class="min-w-0 flex-1">
+                            <input
+                                v-model="checklistDraft"
+                                type="text"
+                                maxlength="180"
+                                class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                placeholder="Add a checklist item..."
+                                @keydown.enter.prevent="emit('add-checklist-item')"
+                            />
+                            <InputError
+                                class="mt-2"
+                                :message="checklistErrors.title?.[0]"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center self-start rounded-md border border-transparent bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-gray-700 focus:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
+                            :disabled="
+                                addingChecklistItem || !checklistDraft.trim()
+                            "
+                            @click="emit('add-checklist-item')"
+                        >
+                            {{ addingChecklistItem ? 'Adding...' : 'Add Item' }}
+                        </button>
+                    </div>
+                </section>
 
                 <div :class="mode === 'edit' ? 'md:col-span-2' : ''">
                     <InputLabel

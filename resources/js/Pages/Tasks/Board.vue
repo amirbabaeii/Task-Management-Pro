@@ -297,6 +297,12 @@ const activeTask = computed(() =>
         (task) => task.id === selectedTaskId.value,
     ) ?? null,
 );
+const editingTask = computed(() =>
+    [...tasks.value, ...archivedTasks.value].find(
+        (task) => task.id === editingTaskId.value,
+    ) ?? null,
+);
+const checklistTask = computed(() => activeTask.value ?? editingTask.value);
 
 const currentTaskList = computed(() =>
     showingArchived.value ? archivedTasks.value : tasks.value,
@@ -320,6 +326,14 @@ const resolveFieldError = (errors = {}, field) =>
     Object.entries(errors).find(([key]) => key.startsWith(`${field}.`))?.[1] ??
     '';
 
+const resetChecklistForm = () => {
+    checklistDraft.value = '';
+    checklistErrors.value = {};
+    addingChecklistItem.value = false;
+    updatingChecklistItemId.value = null;
+    deletingChecklistItemId.value = null;
+};
+
 const resetCommentForm = () => {
     commentDraft.value = '';
     commentErrors.value = {};
@@ -328,11 +342,7 @@ const resetCommentForm = () => {
     replyDraft.value = '';
     replyErrors.value = {};
     replyingCommentId.value = null;
-    checklistDraft.value = '';
-    checklistErrors.value = {};
-    addingChecklistItem.value = false;
-    updatingChecklistItemId.value = null;
-    deletingChecklistItemId.value = null;
+    resetChecklistForm();
 };
 
 const closeCreateModal = () => {
@@ -962,6 +972,7 @@ const openEditModal = (task) => {
             : [],
     });
     editForm.clearErrors();
+    resetChecklistForm();
     showingEditModal.value = true;
 };
 
@@ -970,6 +981,7 @@ const closeEditModal = () => {
     editingTaskId.value = null;
     setTaskFormValues(editForm, blankTaskData());
     editForm.clearErrors();
+    resetChecklistForm();
 };
 
 const openEditFromDetails = () => {
@@ -1314,7 +1326,9 @@ const removeChecklistItemFromTask = (taskId, itemId) => {
 };
 
 const submitChecklistItem = async () => {
-    if (!activeTask.value || addingChecklistItem.value) {
+    const targetTask = checklistTask.value;
+
+    if (!targetTask || addingChecklistItem.value) {
         return;
     }
 
@@ -1332,14 +1346,14 @@ const submitChecklistItem = async () => {
         const response = await axios.post(
             route('tasks.checklist-items.store', {
                 board: currentBoardId.value,
-                task: activeTask.value.id,
+                task: targetTask.id,
             }),
             { title },
         );
 
         if (response?.data?.checklist_item) {
             appendChecklistItemToTask(
-                activeTask.value.id,
+                targetTask.id,
                 response.data.checklist_item,
             );
         }
@@ -1360,7 +1374,9 @@ const submitChecklistItem = async () => {
 };
 
 const updateChecklistItem = async (item, payload) => {
-    if (!activeTask.value || updatingChecklistItemId.value === item.id) {
+    const targetTask = checklistTask.value;
+
+    if (!targetTask || updatingChecklistItemId.value === item.id) {
         return;
     }
 
@@ -1372,7 +1388,7 @@ const updateChecklistItem = async (item, payload) => {
         const response = await axios.patch(
             route('tasks.checklist-items.update', {
                 board: currentBoardId.value,
-                task: activeTask.value.id,
+                task: targetTask.id,
                 checklistItem: item.id,
             }),
             payload,
@@ -1380,7 +1396,7 @@ const updateChecklistItem = async (item, payload) => {
 
         if (response?.data?.checklist_item) {
             replaceChecklistItemOnTask(
-                activeTask.value.id,
+                targetTask.id,
                 response.data.checklist_item,
             );
         }
@@ -1407,7 +1423,9 @@ const renameChecklistItem = ({ item, title }) => {
 };
 
 const deleteChecklistItem = async (item) => {
-    if (!activeTask.value || deletingChecklistItemId.value === item.id) {
+    const targetTask = checklistTask.value;
+
+    if (!targetTask || deletingChecklistItemId.value === item.id) {
         return;
     }
 
@@ -1418,13 +1436,13 @@ const deleteChecklistItem = async (item) => {
         const response = await axios.delete(
             route('tasks.checklist-items.destroy', {
                 board: currentBoardId.value,
-                task: activeTask.value.id,
+                task: targetTask.id,
                 checklistItem: item.id,
             }),
         );
 
         removeChecklistItemFromTask(
-            activeTask.value.id,
+            targetTask.id,
             Number(response?.data?.id ?? item.id),
         );
     } catch (error) {
@@ -1807,16 +1825,12 @@ const submitTaskUpdate = () => {
                     :format-status="formatStatus"
                     v-model:comment-draft="commentDraft"
                     v-model:reply-draft="replyDraft"
-                    v-model:checklist-draft="checklistDraft"
                     :comment-errors="commentErrors"
                     :submitting-comment="submittingComment"
                     :reply-errors="replyErrors"
                     :active-reply-comment-id="activeReplyCommentId"
                     :replying-comment-id="replyingCommentId"
-                    :checklist-errors="checklistErrors"
-                    :adding-checklist-item="addingChecklistItem"
                     :updating-checklist-item-id="updatingChecklistItemId"
-                    :deleting-checklist-item-id="deletingChecklistItemId"
                     @close="closeTaskDetails"
                     @open-edit="openEditFromDetails"
                     @request-archive="requestArchiveTask(activeTask)"
@@ -1826,10 +1840,7 @@ const submitTaskUpdate = () => {
                     @start-reply="startReply"
                     @cancel-reply="cancelReply"
                     @submit-reply="submitReply"
-                    @add-checklist-item="submitChecklistItem"
                     @toggle-checklist-item="toggleChecklistItem"
-                    @rename-checklist-item="renameChecklistItem"
-                    @delete-checklist-item="deleteChecklistItem"
                 />
 
                 <TaskFormModal
@@ -1858,8 +1869,17 @@ const submitTaskUpdate = () => {
                     :max-tag-length="maxTaskTagLength"
                     :resolve-field-error="resolveFieldError"
                     :members="members"
+                    v-model:checklist-draft="checklistDraft"
+                    :checklist-items="editingTask?.checklist_items ?? []"
+                    :checklist-errors="checklistErrors"
+                    :adding-checklist-item="addingChecklistItem"
+                    :updating-checklist-item-id="updatingChecklistItemId"
+                    :deleting-checklist-item-id="deletingChecklistItemId"
                     @close="closeEditModal"
                     @submit="submitTaskUpdate"
+                    @add-checklist-item="submitChecklistItem"
+                    @rename-checklist-item="renameChecklistItem"
+                    @delete-checklist-item="deleteChecklistItem"
                 />
             </div>
         </div>
