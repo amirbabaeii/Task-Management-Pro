@@ -5,6 +5,7 @@ namespace App\Support\Presenters;
 use App\Enums\TaskStatus;
 use App\Models\Board;
 use App\Models\Task;
+use App\Models\TaskActivity;
 use App\Models\User;
 use BackedEnum;
 use Illuminate\Support\Collection;
@@ -16,7 +17,8 @@ class DashboardPresenter
      * @return array{
      *     summary: array<string, int>,
      *     boards: list<array<string, mixed>>,
-     *     upcoming_tasks: list<array<string, mixed>>
+     *     upcoming_tasks: list<array<string, mixed>>,
+     *     recent_activity: list<array<string, mixed>>
      * }
      */
     public static function forUser(User $user): array
@@ -28,6 +30,7 @@ class DashboardPresenter
             'summary' => self::taskStatsForUser($user, $boardIds),
             'boards' => self::boardsForUser($boards, $user),
             'upcoming_tasks' => self::upcomingTasksForUser($user, $boards, $boardIds),
+            'recent_activity' => self::recentActivityForUser($boards, $boardIds),
         ];
     }
 
@@ -125,6 +128,79 @@ class DashboardPresenter
                         : null,
                 ];
             })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, Board>  $boards
+     * @param  list<int>  $boardIds
+     * @return list<array<string, mixed>>
+     */
+    private static function recentActivityForUser(Collection $boards, array $boardIds): array
+    {
+        if ($boardIds === []) {
+            return [];
+        }
+
+        $activityRows = DB::table('task_activities')
+            ->join('task_user', function ($join) use ($boardIds): void {
+                $join->on('task_user.task_id', '=', 'task_activities.task_id')
+                    ->where('task_user.role', 'assignee')
+                    ->whereIn('task_user.board_id', $boardIds);
+            })
+            ->select([
+                'task_activities.id',
+                'task_user.board_id',
+            ])
+            ->distinct()
+            ->orderByDesc('task_activities.created_at')
+            ->orderByDesc('task_activities.id')
+            ->limit(10)
+            ->get()
+            ->unique('id')
+            ->values();
+
+        if ($activityRows->isEmpty()) {
+            return [];
+        }
+
+        $activityIds = $activityRows->pluck('id')->map(fn (int $id): int => $id)->all();
+        $boardIdsByActivity = $activityRows->mapWithKeys(
+            fn (object $row): array => [(int) $row->id => (int) $row->board_id],
+        );
+        $activities = TaskActivity::query()
+            ->with([
+                'actor:id,name',
+                'task:id,title',
+            ])
+            ->whereIn('id', $activityIds)
+            ->get()
+            ->keyBy('id');
+        $boardsById = $boards->keyBy('id');
+
+        return collect($activityIds)
+            ->map(function (int $activityId) use ($activities, $boardIdsByActivity, $boardsById): ?array {
+                $activity = $activities->get($activityId);
+                $board = $boardsById->get($boardIdsByActivity->get($activityId));
+
+                if (! $activity || ! $activity->task || ! $board) {
+                    return null;
+                }
+
+                return [
+                    ...TaskActivityPresenter::toArray($activity),
+                    'task' => [
+                        'id' => $activity->task->id,
+                        'title' => $activity->task->title,
+                    ],
+                    'board' => [
+                        'id' => $board->id,
+                        'name' => $board->name,
+                    ],
+                ];
+            })
+            ->filter()
             ->values()
             ->all();
     }

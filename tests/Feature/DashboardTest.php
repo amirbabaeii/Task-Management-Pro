@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Enums\BoardRole;
+use App\Enums\TaskActivityKind;
 use App\Models\Board;
 use App\Models\Task;
+use App\Models\TaskActivity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -29,8 +31,10 @@ class DashboardTest extends TestCase
 
         $user = User::factory()->create();
         $sharedOwner = User::factory()->create();
+        $foreignOwner = User::factory()->create();
         $ownedBoard = $this->boardFor($user);
         $sharedBoard = $this->boardFor($sharedOwner);
+        $foreignBoard = $this->boardFor($foreignOwner);
         $ownedBoard->update(['name' => 'Launch Board']);
         $sharedBoard->update(['name' => 'Shared Ops']);
         $sharedBoard->members()->attach($user->id, [
@@ -85,7 +89,30 @@ class DashboardTest extends TestCase
         $this->attachAssignee($user, $ownedBoard, $soonTask, 2);
         $this->attachAssignee($user, $ownedBoard, $completedTask, 3);
         $this->attachAssignee($user, $ownedBoard, $archivedTask, 4);
-        $this->attachAssignee($sharedOwner, $sharedBoard, $foreignTask, 2);
+        $this->attachAssignee($foreignOwner, $foreignBoard, $foreignTask, 2);
+
+        TaskActivity::create([
+            'task_id' => $overdueTask->id,
+            'user_id' => $user->id,
+            'kind' => TaskActivityKind::Created->value,
+            'created_at' => Carbon::parse('2026-05-10 08:00:00'),
+        ]);
+        TaskActivity::create([
+            'task_id' => $todayTask->id,
+            'user_id' => $sharedOwner->id,
+            'kind' => TaskActivityKind::StatusChanged->value,
+            'payload' => [
+                'from' => 'pending',
+                'to' => 'in-progress',
+            ],
+            'created_at' => Carbon::parse('2026-05-10 08:30:00'),
+        ]);
+        TaskActivity::create([
+            'task_id' => $foreignTask->id,
+            'user_id' => $sharedOwner->id,
+            'kind' => TaskActivityKind::Created->value,
+            'created_at' => Carbon::parse('2026-05-10 08:45:00'),
+        ]);
 
         $this->actingAs($user)
             ->get(route('dashboard'))
@@ -109,7 +136,13 @@ class DashboardTest extends TestCase
                 ->where('dashboard.upcoming_tasks.0.deadline_state', 'overdue')
                 ->where('dashboard.upcoming_tasks.1.id', $todayTask->id)
                 ->where('dashboard.upcoming_tasks.1.board.id', $sharedBoard->id)
-                ->where('dashboard.upcoming_tasks.2.id', $soonTask->id));
+                ->where('dashboard.upcoming_tasks.2.id', $soonTask->id)
+                ->has('dashboard.recent_activity', 2)
+                ->where('dashboard.recent_activity.0.task.id', $todayTask->id)
+                ->where('dashboard.recent_activity.0.board.id', $sharedBoard->id)
+                ->where('dashboard.recent_activity.0.kind', TaskActivityKind::StatusChanged->value)
+                ->where('dashboard.recent_activity.1.task.id', $overdueTask->id)
+                ->where('dashboard.recent_activity.1.board.id', $ownedBoard->id));
     }
 
     private function boardFor(User $user): Board

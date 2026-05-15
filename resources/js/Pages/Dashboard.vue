@@ -3,6 +3,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import {
     deadlineBadgeClass,
     formatDeadlineLabel,
+    formatDateTime,
     formatPriority,
     formatStatus,
     priorityBadgeClass,
@@ -17,6 +18,7 @@ const props = defineProps({
             summary: {},
             boards: [],
             upcoming_tasks: [],
+            recent_activity: [],
         }),
     },
 });
@@ -24,6 +26,7 @@ const props = defineProps({
 const summary = computed(() => props.dashboard.summary ?? {});
 const boards = computed(() => props.dashboard.boards ?? []);
 const upcomingTasks = computed(() => props.dashboard.upcoming_tasks ?? []);
+const recentActivity = computed(() => props.dashboard.recent_activity ?? []);
 const primaryBoardHref = computed(() =>
     boards.value.length
         ? route('tasks.board', { board: boards.value[0].id })
@@ -71,6 +74,25 @@ const completionPercent = (counts = {}) => {
     }
 
     return Math.round(((counts.completed_tasks ?? 0) / total) * 100);
+};
+
+const activityDotClass = (kind) => {
+    switch (kind) {
+        case 'created':
+            return 'bg-emerald-400';
+        case 'status_changed':
+            return 'bg-indigo-400';
+        case 'assignees_changed':
+            return 'bg-amber-400';
+        case 'comment_added':
+            return 'bg-sky-400';
+        case 'archived':
+            return 'bg-gray-400';
+        case 'restored':
+            return 'bg-emerald-400';
+        default:
+            return 'bg-gray-300';
+    }
 };
 </script>
 
@@ -254,6 +276,55 @@ const completionPercent = (counts = {}) => {
                         >
                             No dated active tasks.
                         </div>
+                    </div>
+                </section>
+
+                <section>
+                    <div class="mb-3 flex items-center justify-between">
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">
+                            Recent Activity
+                        </h3>
+                        <span class="text-xs text-gray-500">
+                            {{ recentActivity.length }} updates
+                        </span>
+                    </div>
+
+                    <div
+                        v-if="recentActivity.length"
+                        class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+                    >
+                        <Link
+                            v-for="activity in recentActivity"
+                            :key="activity.id"
+                            :href="route('tasks.board', { board: activity.board.id })"
+                            class="flex flex-col gap-2 border-b border-gray-100 px-4 py-3 transition last:border-b-0 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:flex-row sm:items-start sm:gap-3"
+                        >
+                            <span class="flex min-w-0 flex-1 gap-3">
+                                <span
+                                    class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+                                    :class="activityDotClass(activity.kind)"
+                                    aria-hidden="true"
+                                />
+                                <span class="min-w-0 flex-1">
+                                    <span class="block text-sm text-gray-700">
+                                        {{ activity.text }}
+                                    </span>
+                                    <span class="mt-1 block truncate text-xs text-gray-500">
+                                        {{ activity.task.title }} · {{ activity.board.name }}
+                                    </span>
+                                </span>
+                            </span>
+                            <span class="shrink-0 pl-5 text-xs text-gray-400 sm:pl-0">
+                                {{ formatDateTime(activity.created_at) }}
+                            </span>
+                        </Link>
+                    </div>
+
+                    <div
+                        v-else
+                        class="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-sm text-gray-500"
+                    >
+                        No recent activity yet.
                     </div>
                 </section>
             </div>
