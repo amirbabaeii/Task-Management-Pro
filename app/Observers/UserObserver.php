@@ -14,7 +14,10 @@ class UserObserver
 
     public function created(User $user): void
     {
-        $this->ensureDefaultBoard->execute($user);
+        if (! $user->is_agent) {
+            $this->ensureDefaultBoard->execute($user);
+        }
+
         $this->assignDefaultRole($user);
     }
 

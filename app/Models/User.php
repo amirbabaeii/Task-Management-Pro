@@ -3,7 +3,9 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -25,6 +27,12 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'is_agent',
+        'agent_manager_id',
+        'agent_title',
+        'agent_profile',
+        'agent_personality',
+        'agent_skills',
     ];
 
     /**
@@ -47,7 +55,27 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_agent' => 'boolean',
+            'agent_skills' => 'array',
         ];
+    }
+
+    public function agentManager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'agent_manager_id');
+    }
+
+    public function managedAgents(): HasMany
+    {
+        return $this->hasMany(User::class, 'agent_manager_id')
+            ->where('is_agent', true);
+    }
+
+    public function scopeAgentsManagedBy(Builder $query, User $manager): Builder
+    {
+        return $query
+            ->where('is_agent', true)
+            ->where('agent_manager_id', $manager->id);
     }
 
     /**

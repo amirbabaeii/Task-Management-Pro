@@ -199,7 +199,7 @@ class BoardController extends Controller
     }
 
     /**
-     * @return list<array{id: int, name: string, email: string, role: string}>
+     * @return list<array{id: int, name: string, email: string, role: string, is_agent: bool, agent_title: string|null}>
      */
     private function boardMembersForBoard(Board $board): array
     {
@@ -212,6 +212,8 @@ class BoardController extends Controller
                 'name' => $member->name,
                 'email' => $member->email,
                 'role' => $member->pivot->role,
+                'is_agent' => $member->is_agent,
+                'agent_title' => $member->agent_title,
             ])
             ->values()
             ->all();
