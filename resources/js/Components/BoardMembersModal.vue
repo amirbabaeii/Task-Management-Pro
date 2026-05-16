@@ -166,12 +166,14 @@ watch(
                         <span
                             class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                             :class="
-                                member.role === 'owner'
-                                    ? 'bg-amber-100 text-amber-700'
+                                member.is_agent
+                                    ? 'bg-teal-50 text-teal-700'
+                                    : member.role === 'owner'
+                                        ? 'bg-amber-100 text-amber-700'
                                     : 'bg-gray-100 text-gray-600'
                             "
                         >
-                            {{ member.role === 'owner' ? 'Owner' : 'Collaborator' }}
+                            {{ member.is_agent ? 'Agent' : (member.role === 'owner' ? 'Owner' : 'Collaborator') }}
                         </span>
                         <DangerButton
                             v-if="isOwner && member.role !== 'owner'"

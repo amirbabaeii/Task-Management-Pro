@@ -75,6 +75,12 @@ const submitBoard = () => {
                                 >
                                     Dashboard
                                 </NavLink>
+                                <NavLink
+                                    :href="route('agents.index')"
+                                    :active="route().current('agents.index')"
+                                >
+                                    Agents
+                                </NavLink>
                                 <Dropdown align="left" width="64" content-classes="bg-white">
                                     <template #trigger>
                                         <button
@@ -246,6 +252,12 @@ const submitBoard = () => {
                             :active="route().current('dashboard')"
                         >
                             Dashboard
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            :href="route('agents.index')"
+                            :active="route().current('agents.index')"
+                        >
+                            Agents
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
                             :href="currentBoardHref"

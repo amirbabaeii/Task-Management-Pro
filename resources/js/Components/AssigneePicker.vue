@@ -94,6 +94,12 @@ const selectedCount = computed(() => selectedIds.value.length);
                     Owner
                 </span>
                 <span
+                    v-else-if="member.is_agent"
+                    class="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700"
+                >
+                    Agent
+                </span>
+                <span
                     class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition"
                     :class="
                         isSelected(member.id)
