@@ -85,6 +85,7 @@ class DashboardTest extends TestCase
         ]);
 
         $this->attachAssignee($user, $ownedBoard, $overdueTask, 1);
+        $this->attachAssignee($sharedOwner, $ownedBoard, $overdueTask, 1);
         $this->attachAssignee($user, $sharedBoard, $todayTask, 1);
         $this->attachAssignee($user, $ownedBoard, $soonTask, 2);
         $this->attachAssignee($user, $ownedBoard, $completedTask, 3);

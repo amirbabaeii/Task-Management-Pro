@@ -151,6 +151,7 @@ class DashboardPresenter
             })
             ->select([
                 'task_activities.id',
+                'task_activities.created_at',
                 'task_user.board_id',
             ])
             ->distinct()
