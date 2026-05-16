@@ -94,6 +94,12 @@ const activityDotClass = (kind) => {
             return 'bg-gray-400';
         case 'restored':
             return 'bg-emerald-400';
+        case 'checklist_item_added':
+        case 'checklist_item_completed':
+        case 'checklist_item_reopened':
+        case 'checklist_item_renamed':
+        case 'checklist_item_deleted':
+            return 'bg-teal-400';
         default:
             return 'bg-gray-300';
     }

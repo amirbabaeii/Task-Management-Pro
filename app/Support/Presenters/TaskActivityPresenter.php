@@ -43,6 +43,32 @@ class TaskActivityPresenter
             TaskActivityKind::CommentAdded => "{$actorName} commented",
             TaskActivityKind::Archived => "{$actorName} archived this task",
             TaskActivityKind::Restored => "{$actorName} restored this task",
+            TaskActivityKind::ChecklistItemAdded => sprintf(
+                '%s added "%s" to the checklist',
+                $actorName,
+                $payload['title'] ?? 'an item',
+            ),
+            TaskActivityKind::ChecklistItemCompleted => sprintf(
+                '%s completed "%s"',
+                $actorName,
+                $payload['title'] ?? 'a checklist item',
+            ),
+            TaskActivityKind::ChecklistItemReopened => sprintf(
+                '%s reopened "%s"',
+                $actorName,
+                $payload['title'] ?? 'a checklist item',
+            ),
+            TaskActivityKind::ChecklistItemRenamed => sprintf(
+                '%s renamed "%s" to "%s"',
+                $actorName,
+                $payload['from'] ?? 'a checklist item',
+                $payload['to'] ?? 'a checklist item',
+            ),
+            TaskActivityKind::ChecklistItemDeleted => sprintf(
+                '%s deleted "%s" from the checklist',
+                $actorName,
+                $payload['title'] ?? 'an item',
+            ),
         };
     }
 

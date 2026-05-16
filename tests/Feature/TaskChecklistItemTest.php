@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Enums\BoardRole;
+use App\Enums\TaskActivityKind;
 use App\Models\Board;
 use App\Models\Task;
+use App\Models\TaskActivity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -34,6 +36,13 @@ class TaskChecklistItemTest extends TestCase
             'title' => 'Confirm rollout owner',
             'position' => 1,
         ]);
+
+        $activity = TaskActivity::query()
+            ->where('task_id', $task->id)
+            ->firstOrFail();
+
+        $this->assertSame(TaskActivityKind::ChecklistItemAdded, $activity->kind);
+        $this->assertSame(['title' => 'Confirm rollout owner'], $activity->payload);
     }
 
     public function test_board_member_can_update_checklist_item(): void
@@ -65,6 +74,29 @@ class TaskChecklistItemTest extends TestCase
 
         $this->assertSame('Draft launch notes', $item->title);
         $this->assertNotNull($item->completed_at);
+
+        $this->assertDatabaseHas('task_activities', [
+            'task_id' => $task->id,
+            'kind' => TaskActivityKind::ChecklistItemRenamed->value,
+        ]);
+        $this->assertDatabaseHas('task_activities', [
+            'task_id' => $task->id,
+            'kind' => TaskActivityKind::ChecklistItemCompleted->value,
+        ]);
+
+        $this->actingAs($collaborator)
+            ->patchJson(route('tasks.checklist-items.update', [
+                'board' => $board,
+                'task' => $task,
+                'checklistItem' => $item,
+            ]), ['completed' => false])
+            ->assertOk()
+            ->assertJsonPath('checklist_item.completed', false);
+
+        $this->assertDatabaseHas('task_activities', [
+            'task_id' => $task->id,
+            'kind' => TaskActivityKind::ChecklistItemReopened->value,
+        ]);
     }
 
     public function test_board_member_can_delete_checklist_item(): void
@@ -87,6 +119,13 @@ class TaskChecklistItemTest extends TestCase
         $this->assertDatabaseMissing('task_checklist_items', [
             'id' => $item->id,
         ]);
+
+        $activity = TaskActivity::query()
+            ->where('task_id', $task->id)
+            ->firstOrFail();
+
+        $this->assertSame(TaskActivityKind::ChecklistItemDeleted, $activity->kind);
+        $this->assertSame(['title' => 'Remove me'], $activity->payload);
     }
 
     public function test_non_member_cannot_add_checklist_item(): void

@@ -2,12 +2,18 @@
 
 namespace App\Actions\TaskChecklistItems;
 
+use App\Actions\Tasks\RecordTaskActivityAction;
+use App\Enums\TaskActivityKind;
 use App\Models\Task;
 use App\Models\TaskChecklistItem;
 use Illuminate\Support\Facades\DB;
 
 class CreateTaskChecklistItemAction
 {
+    public function __construct(
+        private readonly RecordTaskActivityAction $recordActivity,
+    ) {}
+
     /**
      * @param  array{title: string}  $data
      */
@@ -16,10 +22,18 @@ class CreateTaskChecklistItemAction
         return DB::transaction(function () use ($task, $data): TaskChecklistItem {
             $position = ((int) $task->checklistItems()->max('position')) + 1;
 
-            return $task->checklistItems()->create([
+            $item = $task->checklistItems()->create([
                 'title' => $data['title'],
                 'position' => $position,
             ]);
+
+            $this->recordActivity->execute(
+                $task,
+                TaskActivityKind::ChecklistItemAdded,
+                ['title' => $item->title],
+            );
+
+            return $item;
         });
     }
 }
