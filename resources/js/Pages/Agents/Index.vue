@@ -1,10 +1,8 @@
 <script setup>
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
+import AgentCard from '@/Components/AgentCard.vue';
+import AgentFormModal from '@/Components/AgentFormModal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TagInput from '@/Components/TagInput.vue';
-import TextInput from '@/Components/TextInput.vue';
+import UndoToast from '@/Components/UndoToast.vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head } from '@inertiajs/vue3';
 import axios from 'axios';
@@ -15,14 +13,24 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    archivedAgents: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const agents = ref([...props.agents]);
+const archivedAgents = ref([...props.archivedAgents]);
+const showingArchived = ref(false);
+const showingFormModal = ref(false);
 const editingAgentId = ref(null);
 const saving = ref(false);
-const deletingAgentId = ref(null);
+const archivingAgentId = ref(null);
+const restoringAgentId = ref(null);
 const errors = ref({});
 const errorMessage = ref('');
+const pendingAgentDeletion = ref(null);
+let pendingAgentDeletionTimer = null;
 
 const blankForm = () => ({
     name: '',
@@ -34,16 +42,56 @@ const blankForm = () => ({
 });
 
 const form = reactive(blankForm());
+
+const activeAgents = computed(() => agents.value);
+const currentAgents = computed(() =>
+    showingArchived.value ? archivedAgents.value : agents.value,
+);
+const currentAgentsLabel = computed(() =>
+    showingArchived.value ? 'archived' : 'active',
+);
 const editingAgent = computed(
-    () => agents.value.find((agent) => agent.id === editingAgentId.value) ?? null,
+    () =>
+        [...agents.value, ...archivedAgents.value].find(
+            (agent) => agent.id === editingAgentId.value,
+        ) ?? null,
 );
 const isEditing = computed(() => editingAgent.value !== null);
+
+const sortAgents = (items) =>
+    [...items].sort((a, b) => a.name.localeCompare(b.name));
+
+const removeAgentFromLists = (id) => {
+    agents.value = agents.value.filter((agent) => agent.id !== id);
+    archivedAgents.value = archivedAgents.value.filter((agent) => agent.id !== id);
+};
+
+const upsertAgent = (agent) => {
+    removeAgentFromLists(agent.id);
+
+    if (agent.archived_at) {
+        archivedAgents.value = sortAgents([...archivedAgents.value, agent]);
+        return;
+    }
+
+    agents.value = sortAgents([...agents.value, agent]);
+};
 
 const resetForm = () => {
     Object.assign(form, blankForm());
     editingAgentId.value = null;
     errors.value = {};
     errorMessage.value = '';
+};
+
+const openCreateModal = () => {
+    resetForm();
+    showingFormModal.value = true;
+};
+
+const dismissFormModal = () => {
+    showingFormModal.value = false;
+    resetForm();
 };
 
 const editAgent = (agent) => {
@@ -58,21 +106,15 @@ const editAgent = (agent) => {
     });
     errors.value = {};
     errorMessage.value = '';
+    showingFormModal.value = true;
 };
 
-const upsertAgent = (agent) => {
-    const index = agents.value.findIndex((item) => item.id === agent.id);
-
-    if (index === -1) {
-        agents.value = [...agents.value, agent].sort((a, b) =>
-            a.name.localeCompare(b.name),
-        );
+const closeFormModal = () => {
+    if (saving.value) {
         return;
     }
 
-    agents.value = agents.value.map((item) =>
-        item.id === agent.id ? agent : item,
-    );
+    dismissFormModal();
 };
 
 const submit = async () => {
@@ -102,9 +144,10 @@ const submit = async () => {
 
         if (response?.data?.agent) {
             upsertAgent(response.data.agent);
+            showingArchived.value = Boolean(response.data.agent.archived_at);
         }
 
-        resetForm();
+        dismissFormModal();
     } catch (error) {
         if (error?.response?.status === 422) {
             errors.value = error.response.data.errors ?? {};
@@ -119,31 +162,145 @@ const submit = async () => {
     }
 };
 
-const deleteAgent = async (agent) => {
-    if (deletingAgentId.value !== null) {
+const clearPendingAgentTimer = () => {
+    if (pendingAgentDeletionTimer !== null) {
+        window.clearTimeout(pendingAgentDeletionTimer);
+        pendingAgentDeletionTimer = null;
+    }
+};
+
+const flushPendingAgentDeletion = async () => {
+    if (!pendingAgentDeletion.value) {
         return;
     }
 
-    deletingAgentId.value = agent.id;
+    const pending = pendingAgentDeletion.value;
+    pendingAgentDeletion.value = null;
+    clearPendingAgentTimer();
+
+    try {
+        await axios.delete(route('agents.destroy', { agent: pending.agentId }));
+    } catch (error) {
+        agents.value = pending.activeSnapshot;
+        archivedAgents.value = pending.archivedSnapshot;
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to delete agent right now. Please try again.';
+    }
+};
+
+const undoPendingAgentDeletion = () => {
+    if (!pendingAgentDeletion.value) {
+        return;
+    }
+
+    const pending = pendingAgentDeletion.value;
+    pendingAgentDeletion.value = null;
+    clearPendingAgentTimer();
+
+    agents.value = pending.activeSnapshot;
+    archivedAgents.value = pending.archivedSnapshot;
+};
+
+const requestDeleteAgent = async (agent) => {
+    if (pendingAgentDeletion.value) {
+        await flushPendingAgentDeletion();
+    }
+
+    errorMessage.value = '';
+
+    pendingAgentDeletion.value = {
+        agentId: agent.id,
+        name: agent.name,
+        activeSnapshot: [...agents.value],
+        archivedSnapshot: [...archivedAgents.value],
+    };
+
+    removeAgentFromLists(agent.id);
+
+    if (editingAgentId.value === agent.id) {
+        closeFormModal();
+    }
+
+    pendingAgentDeletionTimer = window.setTimeout(() => {
+        flushPendingAgentDeletion();
+    }, 5100);
+};
+
+const archiveAgent = async (agent) => {
+    if (archivingAgentId.value !== null) {
+        return;
+    }
+
+    if (pendingAgentDeletion.value) {
+        await flushPendingAgentDeletion();
+    }
+
+    archivingAgentId.value = agent.id;
     errorMessage.value = '';
 
     try {
-        const response = await axios.delete(
-            route('agents.destroy', { agent: agent.id }),
+        const response = await axios.patch(
+            route('agents.archive', { agent: agent.id }),
         );
-        const id = Number(response?.data?.id ?? agent.id);
-        agents.value = agents.value.filter((item) => item.id !== id);
 
-        if (editingAgentId.value === id) {
-            resetForm();
+        if (response?.data?.agent) {
+            upsertAgent(response.data.agent);
+            showingArchived.value = true;
         }
     } catch (error) {
         errorMessage.value =
             error?.response?.data?.message ||
-            'Unable to delete agent right now. Please try again.';
+            'Unable to archive agent right now. Please try again.';
     } finally {
-        deletingAgentId.value = null;
+        archivingAgentId.value = null;
     }
+};
+
+const restoreAgent = async (agent) => {
+    if (restoringAgentId.value !== null) {
+        return;
+    }
+
+    if (pendingAgentDeletion.value) {
+        await flushPendingAgentDeletion();
+    }
+
+    restoringAgentId.value = agent.id;
+    errorMessage.value = '';
+
+    try {
+        const response = await axios.patch(
+            route('agents.restore', { agent: agent.id }),
+        );
+
+        if (response?.data?.agent) {
+            upsertAgent(response.data.agent);
+            showingArchived.value = false;
+        }
+    } catch (error) {
+        errorMessage.value =
+            error?.response?.data?.message ||
+            'Unable to restore agent right now. Please try again.';
+    } finally {
+        restoringAgentId.value = null;
+    }
+};
+
+const workingActionFor = (agent) => {
+    if (pendingAgentDeletion.value?.agentId === agent.id) {
+        return 'delete';
+    }
+
+    if (archivingAgentId.value === agent.id) {
+        return 'archive';
+    }
+
+    if (restoringAgentId.value === agent.id) {
+        return 'restore';
+    }
+
+    return null;
 };
 </script>
 
@@ -152,199 +309,124 @@ const deleteAgent = async (agent) => {
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex flex-col gap-1">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                    Agents
-                </h2>
-                <p class="text-sm text-gray-500">
-                    Create AI teammates, define how they work, then invite them to boards like other users.
-                </p>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-xl font-semibold leading-tight text-gray-800">
+                        Agents
+                    </h2>
+                    <p class="mt-1 text-sm text-gray-500">
+                        Manage AI teammates for boards and task assignments.
+                    </p>
+                </div>
+                <PrimaryButton @click="openCreateModal">
+                    New Agent
+                </PrimaryButton>
             </div>
         </template>
 
-        <div class="py-8">
-            <div class="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)] lg:px-8">
-                <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                    <div class="mb-5 flex items-center justify-between">
-                        <div>
-                            <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">
-                                {{ isEditing ? 'Edit Agent' : 'New Agent' }}
-                            </h3>
-                            <p class="mt-1 text-xs text-gray-500">
-                                Agents are users managed by you.
-                            </p>
-                        </div>
-                        <SecondaryButton v-if="isEditing" @click="resetForm">
-                            Clear
-                        </SecondaryButton>
-                    </div>
-
-                    <form class="space-y-4" @submit.prevent="submit">
-                        <div>
-                            <InputLabel for="agent-name" value="Name" />
-                            <TextInput
-                                id="agent-name"
-                                v-model="form.name"
-                                type="text"
-                                class="mt-1 block w-full"
-                                maxlength="120"
-                                required
-                            />
-                            <InputError class="mt-2" :message="errors.name?.[0]" />
-                        </div>
-
-                        <div>
-                            <InputLabel for="agent-email" value="Email" />
-                            <TextInput
-                                id="agent-email"
-                                v-model="form.email"
-                                type="email"
-                                class="mt-1 block w-full"
-                                maxlength="255"
-                                required
-                            />
-                            <InputError class="mt-2" :message="errors.email?.[0]" />
-                        </div>
-
-                        <div>
-                            <InputLabel for="agent-title" value="Profile Title" />
-                            <TextInput
-                                id="agent-title"
-                                v-model="form.agent_title"
-                                type="text"
-                                class="mt-1 block w-full"
-                                maxlength="120"
-                                placeholder="QA analyst, planner, researcher"
-                            />
-                            <InputError class="mt-2" :message="errors.agent_title?.[0]" />
-                        </div>
-
-                        <div>
-                            <InputLabel for="agent-profile" value="Profile" />
-                            <textarea
-                                id="agent-profile"
-                                v-model="form.agent_profile"
-                                rows="3"
-                                maxlength="1000"
-                                class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                            />
-                            <InputError class="mt-2" :message="errors.agent_profile?.[0]" />
-                        </div>
-
-                        <div>
-                            <InputLabel for="agent-personality" value="Personality" />
-                            <textarea
-                                id="agent-personality"
-                                v-model="form.agent_personality"
-                                rows="3"
-                                maxlength="1000"
-                                class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
-                            />
-                            <InputError class="mt-2" :message="errors.agent_personality?.[0]" />
-                        </div>
-
-                        <div>
-                            <InputLabel for="agent-skills" value="Skills" />
-                            <TagInput
-                                id="agent-skills"
-                                v-model="form.agent_skills"
-                                placeholder="Add a skill, e.g. testing"
-                                :max-tags="12"
-                                :max-tag-length="40"
-                                :error="errors.agent_skills?.[0] || errors['agent_skills.0']?.[0]"
-                            />
-                        </div>
-
-                        <InputError :message="errorMessage" />
-
-                        <div class="flex items-center justify-end gap-3 pt-2">
-                            <SecondaryButton type="button" @click="resetForm">
-                                Cancel
-                            </SecondaryButton>
-                            <PrimaryButton
-                                :class="{ 'opacity-25': saving }"
-                                :disabled="saving"
-                            >
-                                {{ saving ? 'Saving...' : (isEditing ? 'Save Agent' : 'Create Agent') }}
-                            </PrimaryButton>
-                        </div>
-                    </form>
-                </section>
-
-                <section>
-                    <div class="mb-3 flex items-center justify-between">
-                        <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">
-                            Managed Agents
-                        </h3>
-                        <span class="text-xs text-gray-500">
-                            {{ agents.length }} total
-                        </span>
-                    </div>
-
-                    <div
-                        v-if="agents.length"
-                        class="grid gap-3 md:grid-cols-2"
-                    >
-                        <article
-                            v-for="agent in agents"
-                            :key="agent.id"
-                            class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+        <div class="min-h-[calc(100vh-9rem)] py-5">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div
+                    class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm"
+                >
+                    <div class="inline-flex shrink-0 rounded-md border border-gray-200 bg-gray-50 p-0.5">
+                        <button
+                            type="button"
+                            class="rounded px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                            :class="
+                                !showingArchived
+                                    ? 'bg-gray-800 text-white shadow-sm'
+                                    : 'text-gray-500 hover:bg-white hover:text-gray-700'
+                            "
+                            :aria-pressed="!showingArchived"
+                            @click="showingArchived = false"
                         >
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <div class="truncate text-sm font-semibold text-gray-900">
-                                        {{ agent.name }}
-                                    </div>
-                                    <div class="mt-1 truncate text-xs text-gray-500">
-                                        {{ agent.title || 'AI agent' }} · {{ agent.email }}
-                                    </div>
-                                </div>
-                                <span class="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700">
-                                    Agent
-                                </span>
-                            </div>
-
-                            <p class="mt-4 text-sm leading-6 text-gray-600">
-                                {{ agent.profile || 'No profile yet.' }}
-                            </p>
-
-                            <div
-                                v-if="agent.skills?.length"
-                                class="mt-4 flex flex-wrap gap-2"
-                            >
-                                <span
-                                    v-for="skill in agent.skills"
-                                    :key="`${agent.id}-${skill}`"
-                                    class="rounded-full border border-gray-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600"
-                                >
-                                    {{ skill }}
-                                </span>
-                            </div>
-
-                            <div class="mt-4 flex items-center justify-end gap-2">
-                                <SecondaryButton @click="editAgent(agent)">
-                                    Edit
-                                </SecondaryButton>
-                                <button
-                                    type="button"
-                                    class="rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-widest text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:opacity-40"
-                                    :disabled="deletingAgentId === agent.id"
-                                    @click="deleteAgent(agent)"
-                                >
-                                    {{ deletingAgentId === agent.id ? 'Deleting...' : 'Delete' }}
-                                </button>
-                            </div>
-                        </article>
+                            Active {{ activeAgents.length }}
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                            :class="
+                                showingArchived
+                                    ? 'bg-gray-800 text-white shadow-sm'
+                                    : 'text-gray-500 hover:bg-white hover:text-gray-700'
+                            "
+                            :aria-pressed="showingArchived"
+                            @click="showingArchived = true"
+                        >
+                            Archived {{ archivedAgents.length }}
+                        </button>
                     </div>
 
-                    <div
-                        v-else
-                        class="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500"
+                    <span class="text-xs text-gray-500">
+                        {{ currentAgents.length }} {{ currentAgentsLabel }}
+                    </span>
+
+                    <p
+                        v-if="errorMessage"
+                        class="text-sm font-medium text-rose-600 sm:ml-auto"
                     >
-                        No agents yet.
+                        {{ errorMessage }}
+                    </p>
+                </div>
+
+                <div
+                    v-if="currentAgents.length"
+                    class="grid gap-4 pb-6 sm:grid-cols-2 xl:grid-cols-3"
+                >
+                    <AgentCard
+                        v-for="agent in currentAgents"
+                        :key="agent.id"
+                        :agent="agent"
+                        :archived="showingArchived"
+                        :working-action="workingActionFor(agent)"
+                        @edit="editAgent"
+                        @archive="archiveAgent"
+                        @restore="restoreAgent"
+                        @delete="requestDeleteAgent"
+                    />
+                </div>
+
+                <div
+                    v-else
+                    class="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500"
+                >
+                    <div class="font-semibold text-gray-700">
+                        No {{ currentAgentsLabel }} agents.
                     </div>
-                </section>
+                    <button
+                        v-if="!showingArchived"
+                        type="button"
+                        class="mt-4 rounded-md bg-gray-800 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        @click="openCreateModal"
+                    >
+                        Create Agent
+                    </button>
+                </div>
             </div>
         </div>
+
+        <AgentFormModal
+            v-model:name="form.name"
+            v-model:email="form.email"
+            v-model:title="form.agent_title"
+            v-model:profile="form.agent_profile"
+            v-model:personality="form.agent_personality"
+            v-model:skills="form.agent_skills"
+            :show="showingFormModal"
+            :is-editing="isEditing"
+            :saving="saving"
+            :errors="errors"
+            :error-message="errorMessage"
+            @close="closeFormModal"
+            @submit="submit"
+        />
+
+        <UndoToast
+            :show="pendingAgentDeletion !== null"
+            :message="`Agent ${pendingAgentDeletion?.name ?? ''} deleted`"
+            @undo="undoPendingAgentDeletion"
+            @expire="flushPendingAgentDeletion"
+        />
     </AuthenticatedLayout>
 </template>
