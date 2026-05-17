@@ -14,6 +14,10 @@ const props = defineProps({
         type: String,
         default: 'py-1 bg-white',
     },
+    fullHeight: {
+        type: Boolean,
+        default: true,
+    },
 });
 
 const closeOnEscape = (e) => {
@@ -47,8 +51,15 @@ const open = ref(false);
 </script>
 
 <template>
-    <div class="relative h-full">
-        <div class="flex h-full" @click="open = !open">
+    <div
+        class="relative"
+        :class="{ 'h-full': fullHeight }"
+    >
+        <div
+            class="flex items-center"
+            :class="{ 'h-full': fullHeight }"
+            @click="open = !open"
+        >
             <slot name="trigger" />
         </div>
 
@@ -69,7 +80,7 @@ const open = ref(false);
         >
             <div
                 v-show="open"
-                class="absolute z-50 mt-2 rounded-md shadow-lg"
+                class="absolute top-full z-50 mt-2 rounded-md shadow-lg"
                 :class="[widthClass, alignmentClasses]"
                 style="display: none"
                 @click="open = false"

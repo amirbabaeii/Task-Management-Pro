@@ -103,7 +103,13 @@ const linkFor = (notification) => {
 </script>
 
 <template>
-    <Dropdown align="right" width="80" content-classes="overflow-hidden bg-white" @click="onOpen">
+    <Dropdown
+        align="right"
+        width="80"
+        content-classes="overflow-hidden bg-white"
+        :full-height="false"
+        @click="onOpen"
+    >
         <template #trigger>
             <button
                 type="button"
