@@ -90,9 +90,11 @@ const assigneeOptions = computed(() => {
 
 <template>
     <div
-        class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm sm:gap-3"
+        class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm"
     >
-        <div class="relative min-w-0 flex-1 basis-full sm:min-w-[14rem] sm:basis-auto">
+        <slot name="leading" />
+
+        <div class="relative min-w-0 flex-1 basis-full sm:min-w-[14rem] sm:basis-auto xl:flex-[1_1_18rem]">
             <svg
                 class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
                 viewBox="0 0 20 20"
@@ -192,7 +194,7 @@ const assigneeOptions = computed(() => {
                 class="rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                 @click="emit('clear')"
             >
-                Clear filters
+                Clear
             </button>
             <button
                 v-if="canSaveFilters"
@@ -215,7 +217,7 @@ const assigneeOptions = computed(() => {
                 :disabled="savingFilters"
                 @click="emit('reset-saved-filters')"
             >
-                Reset saved
+                Reset
             </button>
         </div>
     </div>

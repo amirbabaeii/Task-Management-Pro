@@ -1630,45 +1630,11 @@ const submitTaskUpdate = () => {
             </BoardHeader>
         </template>
 
-        <div class="min-h-[calc(100vh-9rem)] pt-8">
+        <div class="min-h-[calc(100vh-9rem)] pt-5">
             <div class="w-full px-4 sm:px-6 lg:px-8">
                 <template v-if="boardStatuses.length">
-                    <div
-                        v-if="tasks.length || archivedTasks.length"
-                        class="mb-4 flex flex-wrap items-center justify-between gap-3"
-                    >
-                        <div class="inline-flex rounded-md border border-gray-200 bg-white p-1 shadow-sm">
-                            <button
-                                type="button"
-                                class="rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                                :class="
-                                    !showingArchived
-                                        ? 'bg-gray-800 text-white'
-                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-                                "
-                                :aria-pressed="!showingArchived"
-                                @click="showingArchived = false"
-                            >
-                                Active {{ tasks.length }}
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                                :class="
-                                    showingArchived
-                                        ? 'bg-gray-800 text-white'
-                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-                                "
-                                :aria-pressed="showingArchived"
-                                @click="showingArchived = true"
-                            >
-                                Archived {{ archivedTasks.length }}
-                            </button>
-                        </div>
-                    </div>
-
                     <BoardFilters
-                        v-if="currentTaskList.length"
+                        v-if="tasks.length || archivedTasks.length"
                         v-model:search-query="searchQuery"
                         v-model:assignee-filter="assigneeFilter"
                         v-model:deadline-filter="deadlineFilter"
@@ -1682,12 +1648,43 @@ const submitTaskUpdate = () => {
                         :can-save-filters="currentBoardId !== null"
                         :has-saved-filter-changes="hasSavedFilterChanges"
                         :saving-filters="savingFilterPreferences"
-                        class="mb-4"
+                        class="mb-3"
                         @toggle-priority="togglePriority"
                         @clear="clearFilters"
                         @save-filters="saveFilterPreferences"
                         @reset-saved-filters="resetSavedFilterPreferences"
-                    />
+                    >
+                        <template #leading>
+                            <div class="inline-flex shrink-0 rounded-md border border-gray-200 bg-gray-50 p-0.5">
+                                <button
+                                    type="button"
+                                    class="rounded px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                    :class="
+                                        !showingArchived
+                                            ? 'bg-gray-800 text-white shadow-sm'
+                                            : 'text-gray-500 hover:bg-white hover:text-gray-700'
+                                    "
+                                    :aria-pressed="!showingArchived"
+                                    @click="showingArchived = false"
+                                >
+                                    Active {{ tasks.length }}
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                    :class="
+                                        showingArchived
+                                            ? 'bg-gray-800 text-white shadow-sm'
+                                            : 'text-gray-500 hover:bg-white hover:text-gray-700'
+                                    "
+                                    :aria-pressed="showingArchived"
+                                    @click="showingArchived = true"
+                                >
+                                    Archived {{ archivedTasks.length }}
+                                </button>
+                            </div>
+                        </template>
+                    </BoardFilters>
 
                     <template v-if="showingArchived">
                         <div
