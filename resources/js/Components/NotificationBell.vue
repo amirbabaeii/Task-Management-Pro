@@ -76,6 +76,9 @@ const summarize = (notification) => {
     if (data.kind === 'task_assigned') {
         return `${data.assigned_by?.name ?? 'Someone'} assigned “${data.task?.title ?? 'a task'}” to you on ${data.board?.name ?? 'a board'}`;
     }
+    if (data.kind === 'board_member_added') {
+        return `${data.invited_by?.name ?? 'Someone'} added you to ${data.board?.name ?? 'a board'}`;
+    }
     if (data.kind === 'comment_reply') {
         return `${data.author?.name ?? 'Someone'} replied to your comment on “${data.task?.title ?? 'a task'}”`;
     }
@@ -100,7 +103,7 @@ const linkFor = (notification) => {
 </script>
 
 <template>
-    <Dropdown align="right" width="64" @click="onOpen">
+    <Dropdown align="right" width="80" content-classes="overflow-hidden bg-white" @click="onOpen">
         <template #trigger>
             <button
                 type="button"
@@ -130,9 +133,9 @@ const linkFor = (notification) => {
             </button>
         </template>
         <template #content>
-            <div class="w-80">
+            <div class="w-full">
                 <div
-                    class="flex items-center justify-between border-b border-gray-100 px-4 py-2"
+                    class="flex items-center justify-between border-b border-gray-100 px-4 py-3"
                 >
                     <h4 class="text-sm font-semibold text-gray-900">
                         Notifications
@@ -148,15 +151,33 @@ const linkFor = (notification) => {
                 </div>
                 <div
                     v-if="loading && notifications.length === 0"
-                    class="px-4 py-6 text-center text-xs text-gray-500"
+                    class="px-4 py-8 text-center text-xs text-gray-500"
                 >
                     Loading...
                 </div>
                 <div
                     v-else-if="notifications.length === 0"
-                    class="px-4 py-6 text-center text-xs text-gray-500"
+                    class="px-4 py-8 text-center"
                 >
-                    You're all caught up.
+                    <div class="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+                        <svg
+                            class="h-4 w-4"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            aria-hidden="true"
+                        >
+                            <path
+                                d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z"
+                            />
+                            <path d="M8.5 16a1.5 1.5 0 003 0h-3z" />
+                        </svg>
+                    </div>
+                    <p class="mt-3 text-sm font-medium text-gray-700">
+                        No notifications
+                    </p>
+                    <p class="mt-1 text-xs text-gray-500">
+                        You're all caught up.
+                    </p>
                 </div>
                 <ul
                     v-else
