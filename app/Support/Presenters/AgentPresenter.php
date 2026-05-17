@@ -19,6 +19,7 @@ class AgentPresenter
             'profile' => $agent->agent_profile,
             'personality' => $agent->agent_personality,
             'skills' => $agent->agent_skills ?? [],
+            'archived_at' => $agent->agent_archived_at,
             'created_at' => $agent->created_at,
         ];
     }

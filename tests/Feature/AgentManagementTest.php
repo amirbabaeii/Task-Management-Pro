@@ -14,7 +14,7 @@ class AgentManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_create_update_and_delete_managed_agent(): void
+    public function test_user_can_create_update_archive_restore_and_delete_managed_agent(): void
     {
         $manager = User::factory()->create();
 
@@ -23,7 +23,8 @@ class AgentManagementTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Agents/Index')
-                ->has('agents', 0));
+                ->has('agents', 0)
+                ->has('archivedAgents', 0));
 
         $createResponse = $this->actingAs($manager)->postJson(route('agents.store'), [
             'name' => 'Noah Analyst',
@@ -65,6 +66,28 @@ class AgentManagementTest extends TestCase
             ->assertJsonPath('agent.skills.0', 'testing');
 
         $this->assertSame('QA Agent', $agent->fresh()->agent_title);
+
+        $this->actingAs($manager)
+            ->patchJson(route('agents.archive', ['agent' => $agent]))
+            ->assertOk()
+            ->assertJsonPath('agent.id', $agent->id);
+
+        $this->assertNotNull($agent->fresh()->agent_archived_at);
+
+        $this->actingAs($manager)
+            ->get(route('agents.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('agents', 0)
+                ->has('archivedAgents', 1)
+                ->where('archivedAgents.0.id', $agent->id));
+
+        $this->actingAs($manager)
+            ->patchJson(route('agents.restore', ['agent' => $agent]))
+            ->assertOk()
+            ->assertJsonPath('agent.archived_at', null);
+
+        $this->assertNull($agent->fresh()->agent_archived_at);
 
         $this->actingAs($manager)
             ->deleteJson(route('agents.destroy', ['agent' => $agent]))

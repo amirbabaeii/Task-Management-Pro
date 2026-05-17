@@ -44,6 +44,10 @@ Route::middleware('auth')->group(function () {
         ->name('agents.store');
     Route::patch('/agents/{agent}', [AgentController::class, 'update'])
         ->name('agents.update');
+    Route::patch('/agents/{agent}/archive', [AgentController::class, 'archive'])
+        ->name('agents.archive');
+    Route::patch('/agents/{agent}/restore', [AgentController::class, 'restore'])
+        ->name('agents.restore');
     Route::delete('/agents/{agent}', [AgentController::class, 'destroy'])
         ->name('agents.destroy');
 

@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Agents\ArchiveAgentAction;
 use App\Actions\Agents\CreateAgentAction;
 use App\Actions\Agents\DeleteAgentAction;
+use App\Actions\Agents\RestoreAgentAction;
 use App\Actions\Agents\UpdateAgentAction;
 use App\Http\Requests\Agents\StoreAgentRequest;
 use App\Http\Requests\Agents\UpdateAgentRequest;
@@ -19,6 +21,8 @@ class AgentController extends Controller
     public function __construct(
         private readonly CreateAgentAction $createAgent,
         private readonly UpdateAgentAction $updateAgent,
+        private readonly ArchiveAgentAction $archiveAgent,
+        private readonly RestoreAgentAction $restoreAgent,
         private readonly DeleteAgentAction $deleteAgent,
     ) {}
 
@@ -26,7 +30,14 @@ class AgentController extends Controller
     {
         return Inertia::render('Agents/Index', [
             'agents' => User::query()
-                ->agentsManagedBy($request->user())
+                ->agentsManagedBy($request->user(), false)
+                ->orderBy('name')
+                ->get()
+                ->map(fn (User $agent): array => AgentPresenter::toArray($agent))
+                ->values()
+                ->all(),
+            'archivedAgents' => User::query()
+                ->agentsManagedBy($request->user(), true)
                 ->orderBy('name')
                 ->get()
                 ->map(fn (User $agent): array => AgentPresenter::toArray($agent))
@@ -48,6 +59,26 @@ class AgentController extends Controller
     {
         $agent = $this->resolveManagedAgent($request, $agent);
         $agent = $this->updateAgent->execute($agent, $request->validated());
+
+        return response()->json([
+            'agent' => AgentPresenter::toArray($agent),
+        ]);
+    }
+
+    public function archive(Request $request, User $agent): JsonResponse
+    {
+        $agent = $this->resolveManagedAgent($request, $agent);
+        $agent = $this->archiveAgent->execute($agent);
+
+        return response()->json([
+            'agent' => AgentPresenter::toArray($agent),
+        ]);
+    }
+
+    public function restore(Request $request, User $agent): JsonResponse
+    {
+        $agent = $this->resolveManagedAgent($request, $agent);
+        $agent = $this->restoreAgent->execute($agent);
 
         return response()->json([
             'agent' => AgentPresenter::toArray($agent),

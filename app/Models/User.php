@@ -33,6 +33,7 @@ class User extends Authenticatable
         'agent_profile',
         'agent_personality',
         'agent_skills',
+        'agent_archived_at',
     ];
 
     /**
@@ -57,6 +58,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_agent' => 'boolean',
             'agent_skills' => 'array',
+            'agent_archived_at' => 'datetime',
         ];
     }
 
@@ -71,11 +73,17 @@ class User extends Authenticatable
             ->where('is_agent', true);
     }
 
-    public function scopeAgentsManagedBy(Builder $query, User $manager): Builder
+    public function scopeAgentsManagedBy(Builder $query, User $manager, ?bool $archived = null): Builder
     {
         return $query
             ->where('is_agent', true)
-            ->where('agent_manager_id', $manager->id);
+            ->where('agent_manager_id', $manager->id)
+            ->when(
+                $archived !== null,
+                fn (Builder $query): Builder => $archived
+                    ? $query->whereNotNull('agent_archived_at')
+                    : $query->whereNull('agent_archived_at'),
+            );
     }
 
     /**
