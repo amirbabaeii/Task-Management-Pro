@@ -35,7 +35,12 @@ class BoardMemberController extends Controller
         $invitee = $request->invitee();
         abort_if($invitee === null, Response::HTTP_UNPROCESSABLE_ENTITY);
 
-        $this->addMember->execute($board, $invitee, BoardRole::Collaborator);
+        $this->addMember->execute(
+            $board,
+            $invitee,
+            BoardRole::Collaborator,
+            $request->user(),
+        );
 
         return response()->json([
             'members' => $this->serialize($board->fresh()),

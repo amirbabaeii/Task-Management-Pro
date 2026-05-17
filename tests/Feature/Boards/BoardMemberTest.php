@@ -7,6 +7,7 @@ use App\Enums\BoardRole;
 use App\Models\Board;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\BoardMemberAddedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -45,6 +46,14 @@ class BoardMemberTest extends TestCase
             'user_id' => $invitee->id,
             'role' => BoardRole::Collaborator->value,
         ]);
+
+        $notification = $invitee->notifications()
+            ->where('type', BoardMemberAddedNotification::class)
+            ->firstOrFail();
+
+        $this->assertSame('board_member_added', $notification->data['kind']);
+        $this->assertSame($board->id, $notification->data['board']['id']);
+        $this->assertSame($owner->id, $notification->data['invited_by']['id']);
     }
 
     public function test_invite_rejects_unknown_email(): void

@@ -53,7 +53,7 @@ app/
 - **Boards/collaboration** — `board_members` is the source of access. `Board::accessibleForUser($user)` returns owned + collaborated boards for navigation/dashboard. `Board::orderedForUser($user)` is only for owned-board positioning. Do not add a `BoardMember` model unless there is real behavior that belongs on it.
 - **API responses** — API controllers under `Controllers/Api/*` return `ApiResponse::success($data, $message, $status)` or `ApiResponse::error($message, $status, $data)`. Never return bare arrays from API controllers. Never use the Resource-as-envelope pattern. Web JSON endpoints may use `response()->json(...)` for Inertia/Axios interactions.
 - **Resources** — `JsonResource` subclasses shape one entity. No `$message`/`$statusCode` constructor args.
-- **Notifications** — use Laravel database notifications. Notification payloads include a `kind` field (`task_assigned`, `comment_reply`, `task_deadline_reminder`) consumed by `NotificationBell.vue`.
+- **Notifications** — use Laravel database notifications. Notification payloads include a `kind` field (`task_assigned`, `board_member_added`, `comment_reply`, `task_deadline_reminder`) consumed by `NotificationBell.vue`.
 
 ## What's deliberately gone (don't reintroduce)
 
