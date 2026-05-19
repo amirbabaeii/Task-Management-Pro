@@ -78,6 +78,7 @@ const initialFilterPreferences = normalizeBoardFilterPreferences(
 );
 const tasks = ref(props.tasks.map(normalizeTask));
 const archivedTasks = ref(props.archivedTasks.map(normalizeTask));
+const taskMembers = ref([...props.members]);
 const updatingId = ref(null);
 const movingColumnStatus = ref(null);
 const editingStatusLabel = ref(null);
@@ -159,8 +160,10 @@ const isBoardOwner = computed(() => props.currentBoard?.is_owner === true);
 // Members management state
 const showingMembersModal = ref(false);
 const boardMembers = ref([]);
+const availableBoardAgents = ref([]);
 const loadingMembers = ref(false);
 const invitingMember = ref(false);
+const addingAgentId = ref(null);
 const removingMemberId = ref(null);
 const memberInviteError = ref('');
 
@@ -178,6 +181,8 @@ const openMembersModal = async () => {
             route('boards.members.index', { board: currentBoardId.value }),
         );
         boardMembers.value = response?.data?.members ?? [];
+        taskMembers.value = boardMembers.value;
+        availableBoardAgents.value = response?.data?.available_agents ?? [];
     } catch (error) {
         errorMessage.value =
             error?.response?.data?.message ||
@@ -193,6 +198,24 @@ const closeMembersModal = () => {
     memberInviteError.value = '';
 };
 
+const applyMemberPayload = (response) => {
+    const members = response?.data?.members;
+
+    if (members) {
+        boardMembers.value = members;
+        taskMembers.value = members;
+    }
+
+    availableBoardAgents.value =
+        response?.data?.available_agents ?? availableBoardAgents.value;
+};
+
+const memberRequestError = (error, fallback) =>
+    error?.response?.data?.errors?.email?.[0] ||
+    error?.response?.data?.data?.errors?.email?.[0] ||
+    error?.response?.data?.message ||
+    fallback;
+
 const inviteMember = async (email) => {
     if (!currentBoardId.value || !email) {
         return;
@@ -206,13 +229,13 @@ const inviteMember = async (email) => {
             route('boards.members.store', { board: currentBoardId.value }),
             { email },
         );
-        boardMembers.value = response?.data?.members ?? boardMembers.value;
+        applyMemberPayload(response);
     } catch (error) {
         if (error?.response?.status === 422) {
-            memberInviteError.value =
-                error.response.data?.data?.errors?.email?.[0] ||
-                error.response.data?.message ||
-                'Unable to invite that user.';
+            memberInviteError.value = memberRequestError(
+                error,
+                'Unable to invite that user.',
+            );
         } else {
             memberInviteError.value =
                 error?.response?.data?.message ||
@@ -220,6 +243,30 @@ const inviteMember = async (email) => {
         }
     } finally {
         invitingMember.value = false;
+    }
+};
+
+const addAgentMember = async (agent) => {
+    if (!currentBoardId.value || !agent?.email || addingAgentId.value !== null) {
+        return;
+    }
+
+    addingAgentId.value = agent.id;
+    memberInviteError.value = '';
+
+    try {
+        const response = await axios.post(
+            route('boards.members.store', { board: currentBoardId.value }),
+            { email: agent.email },
+        );
+        applyMemberPayload(response);
+    } catch (error) {
+        memberInviteError.value = memberRequestError(
+            error,
+            'Unable to add that agent. Please try again.',
+        );
+    } finally {
+        addingAgentId.value = null;
     }
 };
 
@@ -237,7 +284,7 @@ const removeMember = async (userId) => {
                 user: userId,
             }),
         );
-        boardMembers.value = response?.data?.members ?? boardMembers.value;
+        applyMemberPayload(response);
     } catch (error) {
         errorMessage.value =
             error?.response?.data?.message ||
@@ -271,6 +318,13 @@ watch(
     () => props.archivedTasks,
     (nextTasks) => {
         archivedTasks.value = nextTasks.map(normalizeTask);
+    },
+);
+
+watch(
+    () => props.members,
+    (nextMembers) => {
+        taskMembers.value = [...nextMembers];
     },
 );
 
@@ -1640,7 +1694,7 @@ const submitTaskUpdate = () => {
                         v-model:deadline-filter="deadlineFilter"
                         :priorities="priorityOptions"
                         :active-priorities="priorityFilter"
-                        :members="members"
+                        :members="taskMembers"
                         :current-user-id="$page.props.auth.user?.id ?? null"
                         :has-active-filters="hasActiveFilters"
                         :matched-count="filteredTasks.length"
@@ -1790,13 +1844,16 @@ const submitTaskUpdate = () => {
                 <BoardMembersModal
                     :show="showingMembersModal"
                     :members="boardMembers"
+                    :available-agents="availableBoardAgents"
                     :is-owner="isBoardOwner"
                     :loading="loadingMembers"
                     :inviting="invitingMember"
+                    :adding-agent-id="addingAgentId"
                     :removing-user-id="removingMemberId"
                     :invite-error="memberInviteError"
                     @close="closeMembersModal"
                     @invite="inviteMember"
+                    @add-agent="addAgentMember"
                     @remove="removeMember"
                 />
 
@@ -1850,7 +1907,7 @@ const submitTaskUpdate = () => {
                     :max-tags="maxTaskTags"
                     :max-tag-length="maxTaskTagLength"
                     :resolve-field-error="resolveFieldError"
-                    :members="members"
+                    :members="taskMembers"
                     @close="closeCreateModal"
                     @submit="submitTask"
                 />
@@ -1865,7 +1922,7 @@ const submitTaskUpdate = () => {
                     :max-tags="maxTaskTags"
                     :max-tag-length="maxTaskTagLength"
                     :resolve-field-error="resolveFieldError"
-                    :members="members"
+                    :members="taskMembers"
                     v-model:checklist-draft="checklistDraft"
                     :checklist-items="editingTask?.checklist_items ?? []"
                     :checklist-errors="checklistErrors"

@@ -53,6 +53,15 @@ class AddBoardMemberRequest extends FormRequest
                 return;
             }
 
+            if ($invitee->is_agent && $invitee->agent_archived_at !== null) {
+                $validator->errors()->add(
+                    'email',
+                    'Archived agents cannot be added to boards.',
+                );
+
+                return;
+            }
+
             $board = $this->route('board');
 
             if ($board instanceof Board && $board->hasMember($invitee)) {

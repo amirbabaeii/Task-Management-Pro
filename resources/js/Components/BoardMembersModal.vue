@@ -17,6 +17,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    availableAgents: {
+        type: Array,
+        default: () => [],
+    },
     isOwner: {
         type: Boolean,
         default: false,
@@ -33,13 +37,17 @@ const props = defineProps({
         type: Number,
         default: null,
     },
+    addingAgentId: {
+        type: Number,
+        default: null,
+    },
     inviteError: {
         type: String,
         default: '',
     },
 });
 
-const emit = defineEmits(['close', 'invite', 'remove']);
+const emit = defineEmits(['close', 'invite', 'add-agent', 'remove']);
 
 const inviteEmail = ref('');
 
@@ -53,6 +61,10 @@ const sortedMembers = computed(() =>
         }
         return a.name.localeCompare(b.name);
     }),
+);
+
+const sortedAvailableAgents = computed(() =>
+    [...props.availableAgents].sort((a, b) => a.name.localeCompare(b.name)),
 );
 
 const initials = (name = '') =>
@@ -136,6 +148,49 @@ watch(
                     {{ inviting ? 'Inviting...' : 'Invite' }}
                 </PrimaryButton>
             </form>
+
+            <div
+                v-if="isOwner && sortedAvailableAgents.length"
+                class="mt-5 rounded-md border border-gray-200 bg-gray-50"
+            >
+                <div class="flex items-center justify-between border-b border-gray-200 px-3 py-2">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Managed Agents
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        {{ sortedAvailableAgents.length }} available
+                    </div>
+                </div>
+                <ul class="divide-y divide-gray-200">
+                    <li
+                        v-for="agent in sortedAvailableAgents"
+                        :key="agent.id"
+                        class="flex items-center gap-3 px-3 py-2"
+                    >
+                        <div
+                            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-100 text-[11px] font-semibold text-teal-700"
+                        >
+                            {{ initials(agent.name) }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="truncate text-sm font-medium text-gray-900">
+                                {{ agent.name }}
+                            </div>
+                            <div class="truncate text-xs text-gray-500">
+                                {{ agent.agent_title || 'AI agent' }} - {{ agent.email }}
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
+                            :disabled="addingAgentId !== null"
+                            @click="emit('add-agent', agent)"
+                        >
+                            {{ addingAgentId === agent.id ? 'Adding...' : 'Add' }}
+                        </button>
+                    </li>
+                </ul>
+            </div>
 
             <div class="mt-6">
                 <div

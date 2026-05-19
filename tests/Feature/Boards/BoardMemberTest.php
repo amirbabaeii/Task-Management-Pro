@@ -56,6 +56,80 @@ class BoardMemberTest extends TestCase
         $this->assertSame($owner->id, $notification->data['invited_by']['id']);
     }
 
+    public function test_members_endpoint_lists_available_managed_agents(): void
+    {
+        $owner = User::factory()->create();
+        $board = $this->boardFor($owner);
+        $availableAgent = User::factory()->create([
+            'name' => 'Scout Agent',
+            'email' => 'scout.agent@example.com',
+            'is_agent' => true,
+            'agent_manager_id' => $owner->id,
+            'agent_title' => 'Research Agent',
+        ]);
+        $archivedAgent = User::factory()->create([
+            'email' => 'archived.agent@example.com',
+            'is_agent' => true,
+            'agent_manager_id' => $owner->id,
+            'agent_archived_at' => now(),
+        ]);
+
+        $response = $this->actingAs($owner)
+            ->getJson(route('boards.members.index', ['board' => $board]));
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('available_agents.0.id', $availableAgent->id)
+            ->assertJsonMissing([
+                'id' => $archivedAgent->id,
+            ]);
+    }
+
+    public function test_inviting_available_agent_removes_them_from_picker(): void
+    {
+        $owner = User::factory()->create();
+        $board = $this->boardFor($owner);
+        $agent = User::factory()->create([
+            'email' => 'planner.agent@example.com',
+            'is_agent' => true,
+            'agent_manager_id' => $owner->id,
+            'agent_title' => 'Planning Agent',
+        ]);
+
+        $response = $this->actingAs($owner)->postJson(
+            route('boards.members.store', ['board' => $board]),
+            ['email' => $agent->email],
+        );
+
+        $response
+            ->assertCreated()
+            ->assertJsonFragment([
+                'id' => $agent->id,
+                'is_agent' => true,
+                'agent_title' => 'Planning Agent',
+            ])
+            ->assertJsonPath('available_agents', []);
+    }
+
+    public function test_invite_rejects_archived_agent(): void
+    {
+        $owner = User::factory()->create();
+        $board = $this->boardFor($owner);
+        $agent = User::factory()->create([
+            'email' => 'retired.agent@example.com',
+            'is_agent' => true,
+            'agent_manager_id' => $owner->id,
+            'agent_archived_at' => now(),
+        ]);
+
+        $this->actingAs($owner)
+            ->postJson(route('boards.members.store', ['board' => $board]), [
+                'email' => $agent->email,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['email']);
+    }
+
     public function test_invite_rejects_unknown_email(): void
     {
         $owner = User::factory()->create();

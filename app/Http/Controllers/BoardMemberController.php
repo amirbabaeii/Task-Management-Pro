@@ -25,6 +25,7 @@ class BoardMemberController extends Controller
 
         return response()->json([
             'members' => $this->serialize($board),
+            'available_agents' => $this->availableAgents($request->user(), $board),
         ]);
     }
 
@@ -44,6 +45,7 @@ class BoardMemberController extends Controller
 
         return response()->json([
             'members' => $this->serialize($board->fresh()),
+            'available_agents' => $this->availableAgents($request->user(), $board),
         ], Response::HTTP_CREATED);
     }
 
@@ -55,6 +57,7 @@ class BoardMemberController extends Controller
 
         return response()->json([
             'members' => $this->serialize($board->fresh()),
+            'available_agents' => $this->availableAgents($request->user(), $board),
         ]);
     }
 
@@ -75,6 +78,30 @@ class BoardMemberController extends Controller
                 'joined_at' => $member->pivot->joined_at,
                 'is_agent' => $member->is_agent,
                 'agent_title' => $member->agent_title,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, name: string, email: string, agent_title: string|null}>
+     */
+    private function availableAgents(User $manager, Board $board): array
+    {
+        $memberIds = $board->members()
+            ->select('users.id')
+            ->pluck('users.id');
+
+        return User::query()
+            ->agentsManagedBy($manager, false)
+            ->whereNotIn('id', $memberIds)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (User $agent): array => [
+                'id' => $agent->id,
+                'name' => $agent->name,
+                'email' => $agent->email,
+                'agent_title' => $agent->agent_title,
             ])
             ->values()
             ->all();
