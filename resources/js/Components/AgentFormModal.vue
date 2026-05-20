@@ -49,7 +49,7 @@ const skills = defineModel('skills', { type: Array, default: () => [] });
                         {{ isEditing ? 'Edit Agent' : 'New Agent' }}
                     </h3>
                     <p class="mt-1 text-sm text-gray-500">
-                        Managed teammate profile
+                        Managed agent profile
                     </p>
                 </div>
                 <SecondaryButton type="button" @click="emit('close')">
