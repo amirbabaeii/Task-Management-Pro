@@ -80,6 +80,8 @@ Route::middleware('auth')->group(function () {
         ->name('tasks.status');
     Route::patch('/tasks/board/{board}/tasks/{task}/archive', [TaskController::class, 'archive'])
         ->name('tasks.archive');
+    Route::post('/tasks/board/{board}/tasks/{task}/duplicate', [TaskController::class, 'duplicate'])
+        ->name('tasks.duplicate');
     Route::patch('/tasks/board/{board}/tasks/{task}/restore', [TaskController::class, 'restore'])
         ->name('tasks.restore');
     Route::delete('/tasks/board/{board}/tasks/{task}', [TaskController::class, 'destroy'])

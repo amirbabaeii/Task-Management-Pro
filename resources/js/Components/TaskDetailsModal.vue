@@ -58,6 +58,7 @@ const emit = defineEmits([
     'request-archive',
     'request-restore',
     'request-delete',
+    'request-duplicate',
     'submit-comment',
     'start-reply',
     'cancel-reply',
@@ -144,7 +145,15 @@ const activityDotClass = (kind) => {
                         Restore
                     </SecondaryButton>
                     <button
-                        v-else
+                        v-if="!task.archived_at"
+                        type="button"
+                        class="rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-widest text-gray-600 transition hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                        @click="emit('request-duplicate')"
+                    >
+                        Duplicate
+                    </button>
+                    <button
+                        v-if="!task.archived_at"
                         type="button"
                         class="rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-widest text-gray-600 transition hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
                         @click="emit('request-archive')"

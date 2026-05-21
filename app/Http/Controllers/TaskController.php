@@ -7,11 +7,13 @@ use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Actions\Tasks\ArchiveTaskAction;
 use App\Actions\Tasks\CreateTaskAction;
 use App\Actions\Tasks\DeleteTaskAction;
+use App\Actions\Tasks\DuplicateTaskAction;
 use App\Actions\Tasks\ReorderTaskAction;
 use App\Actions\Tasks\RestoreTaskAction;
 use App\Actions\Tasks\UpdateTaskAction;
 use App\Actions\Tasks\UpdateTaskStatusAction;
 use App\Http\Requests\Tasks\ArchiveTaskRequest;
+use App\Http\Requests\Tasks\DuplicateTaskRequest;
 use App\Http\Requests\Tasks\ReorderTaskRequest;
 use App\Http\Requests\Tasks\RestoreTaskRequest;
 use App\Http\Requests\Tasks\StoreTaskRequest;
@@ -39,6 +41,7 @@ class TaskController extends Controller
         private readonly DeleteTaskAction $deleteTask,
         private readonly ArchiveTaskAction $archiveTask,
         private readonly RestoreTaskAction $restoreTask,
+        private readonly DuplicateTaskAction $duplicateTask,
     ) {}
 
     public function store(StoreTaskRequest $request, Board $board): RedirectResponse
@@ -138,6 +141,17 @@ class TaskController extends Controller
             'id' => $task->id,
             'archived_at' => $task->fresh()->archived_at,
         ]);
+    }
+
+    public function duplicate(DuplicateTaskRequest $request, Board $board, Task $task): RedirectResponse
+    {
+        $user = $request->user();
+        $board = $this->resolveBoard($user, $board);
+        $this->ensureTaskIsOnBoard($board, $task);
+
+        $this->duplicateTask->execute($user, $board, $task);
+
+        return redirect()->route('tasks.board', ['board' => $board]);
     }
 
     public function restore(RestoreTaskRequest $request, Board $board, Task $task): JsonResponse

@@ -999,6 +999,33 @@ const requestRestoreTask = async (task) => {
     }
 };
 
+const requestDuplicateTask = (task) => {
+    if (!task || updatingId.value) {
+        return;
+    }
+
+    errorMessage.value = '';
+    updatingId.value = task.id;
+    closeTaskDetails();
+
+    router.post(
+        route('tasks.duplicate', {
+            board: currentBoardId.value,
+            task: task.id,
+        }),
+        {},
+        {
+            preserveScroll: true,
+            onError: () => {
+                errorMessage.value = 'Unable to duplicate task. Please try again.';
+            },
+            onFinish: () => {
+                updatingId.value = null;
+            },
+        },
+    );
+};
+
 const openTaskDetails = (task) => {
     resetCommentForm();
     selectedTaskId.value = task.id;
@@ -1890,6 +1917,7 @@ const submitTaskUpdate = () => {
                     @request-archive="requestArchiveTask(activeTask)"
                     @request-restore="requestRestoreTask(activeTask)"
                     @request-delete="requestDeleteTask(activeTask)"
+                    @request-duplicate="requestDuplicateTask(activeTask)"
                     @submit-comment="submitTaskComment"
                     @start-reply="startReply"
                     @cancel-reply="cancelReply"

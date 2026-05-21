@@ -332,6 +332,70 @@ class TaskBoardTest extends TestCase
                 ->has('archivedTasks', 0));
     }
 
+    public function test_assignee_can_duplicate_a_task_on_the_board(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+        $task = Task::factory()->create([
+            'title' => 'Ship onboarding',
+            'description' => 'Original description',
+            'status' => 'pending',
+            'priority' => 'high',
+            'progress' => 25,
+            'tags' => ['frontend', 'inertia'],
+            'deadline_at' => '2026-05-25',
+        ]);
+        $this->attachAssignee($user, $board, $task, 1);
+
+        $response = $this->actingAs($user)->post(
+            route('tasks.duplicate', ['board' => $board, 'task' => $task]),
+        );
+
+        $response
+            ->assertRedirect(route('tasks.board', ['board' => $board]))
+            ->assertSessionHasNoErrors();
+
+        $duplicate = Task::query()
+            ->where('title', 'Ship onboarding (copy)')
+            ->first();
+
+        $this->assertNotNull($duplicate);
+        $this->assertNotSame($task->id, $duplicate->id);
+        $this->assertSame('Original description', $duplicate->description);
+        $this->assertSame('pending', $duplicate->status);
+        $this->assertSame(TaskPriority::High, $duplicate->priority);
+        $this->assertSame(25, $duplicate->progress);
+        $this->assertSame(['frontend', 'inertia'], $duplicate->tags);
+        $this->assertSame('2026-05-25', $duplicate->deadline_at?->toDateString());
+
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $duplicate->id,
+            'user_id' => $user->id,
+            'board_id' => $board->id,
+            'role' => 'assignee',
+        ]);
+
+        $this->assertDatabaseHas('task_activities', [
+            'task_id' => $duplicate->id,
+            'user_id' => $user->id,
+            'kind' => TaskActivityKind::Created->value,
+        ]);
+    }
+
+    public function test_cannot_duplicate_a_task_that_is_not_on_the_board(): void
+    {
+        $user = User::factory()->create();
+        $board = $this->defaultBoardFor($user);
+        $task = Task::factory()->create(['status' => 'pending']);
+
+        $response = $this->actingAs($user)->post(
+            route('tasks.duplicate', ['board' => $board, 'task' => $task]),
+        );
+
+        $response->assertNotFound();
+        $this->assertDatabaseMissing('tasks', ['title' => $task->title.' (copy)']);
+    }
+
     public function test_cannot_archive_a_task_that_is_not_on_the_board(): void
     {
         $user = User::factory()->create();
