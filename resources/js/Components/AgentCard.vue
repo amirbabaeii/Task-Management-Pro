@@ -22,6 +22,7 @@ const visibleSkills = computed(() => (props.agent.skills ?? []).slice(0, 5));
 const hiddenSkillCount = computed(() =>
     Math.max(0, (props.agent.skills?.length ?? 0) - visibleSkills.value.length),
 );
+const workloadCount = (key) => Number(props.agent.workload?.[key] ?? 0);
 </script>
 
 <template>
@@ -53,6 +54,40 @@ const hiddenSkillCount = computed(() =>
         <p class="mt-3 text-sm leading-6 text-gray-600">
             {{ agent.profile || 'No profile yet.' }}
         </p>
+
+        <div class="mt-3 grid grid-cols-3 divide-x divide-gray-200 border-y border-gray-200 py-2 text-center">
+            <div>
+                <div class="text-sm font-semibold text-gray-900">
+                    {{ workloadCount('boards') }}
+                </div>
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                    Boards
+                </div>
+            </div>
+            <div>
+                <div class="text-sm font-semibold text-gray-900">
+                    {{ workloadCount('active_tasks') }}
+                </div>
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                    Active
+                </div>
+            </div>
+            <div>
+                <div
+                    class="text-sm font-semibold"
+                    :class="
+                        workloadCount('overdue_tasks') > 0
+                            ? 'text-rose-600'
+                            : 'text-gray-900'
+                    "
+                >
+                    {{ workloadCount('overdue_tasks') }}
+                </div>
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                    Overdue
+                </div>
+            </div>
+        </div>
 
         <div
             v-if="agent.personality"

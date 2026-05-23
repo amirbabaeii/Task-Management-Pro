@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
+use App\Enums\BoardRole;
 use App\Models\Board;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -115,6 +117,56 @@ class AgentManagementTest extends TestCase
                 'agent_skills' => [],
             ])
             ->assertNotFound();
+    }
+
+    public function test_agent_index_includes_workload_counts(): void
+    {
+        $manager = User::factory()->create();
+        $board = $this->boardFor($manager);
+        $agent = User::factory()->create([
+            'name' => 'Scout Agent',
+            'email' => 'scout.workload@example.com',
+            'is_agent' => true,
+            'agent_manager_id' => $manager->id,
+        ]);
+
+        $board->members()->attach($agent->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
+        ]);
+
+        $activeTask = Task::factory()->create([
+            'title' => 'Research options',
+            'deadline_at' => now()->addDay(),
+            'archived_at' => null,
+        ]);
+        $overdueTask = Task::factory()->create([
+            'title' => 'Audit backlog',
+            'deadline_at' => now()->subDay(),
+            'archived_at' => null,
+        ]);
+        $archivedTask = Task::factory()->create([
+            'title' => 'Old import review',
+            'deadline_at' => now()->subDays(2),
+            'archived_at' => now(),
+        ]);
+
+        foreach ([$activeTask, $overdueTask, $archivedTask] as $index => $task) {
+            $task->users()->attach($agent->id, [
+                'board_id' => $board->id,
+                'role' => 'assignee',
+                'sort_order' => $index + 1,
+            ]);
+        }
+
+        $this->actingAs($manager)
+            ->get(route('agents.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('agents.0.id', $agent->id)
+                ->where('agents.0.workload.boards', 1)
+                ->where('agents.0.workload.active_tasks', 2)
+                ->where('agents.0.workload.overdue_tasks', 1));
     }
 
     public function test_managed_agent_can_join_board_and_receive_tasks(): void

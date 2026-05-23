@@ -31,6 +31,7 @@ class AgentController extends Controller
         return Inertia::render('Agents/Index', [
             'agents' => User::query()
                 ->agentsManagedBy($request->user(), false)
+                ->withAgentWorkload()
                 ->orderBy('name')
                 ->get()
                 ->map(fn (User $agent): array => AgentPresenter::toArray($agent))
@@ -38,6 +39,7 @@ class AgentController extends Controller
                 ->all(),
             'archivedAgents' => User::query()
                 ->agentsManagedBy($request->user(), true)
+                ->withAgentWorkload()
                 ->orderBy('name')
                 ->get()
                 ->map(fn (User $agent): array => AgentPresenter::toArray($agent))
