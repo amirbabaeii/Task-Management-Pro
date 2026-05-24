@@ -315,7 +315,7 @@ const workingActionFor = (agent) => {
                         Agents
                     </h2>
                     <p class="mt-1 text-sm text-gray-500">
-                        Manage AI teammates for boards and task assignments.
+                        Manage AI agents for boards and task assignments.
                     </p>
                 </div>
                 <PrimaryButton @click="openCreateModal">
