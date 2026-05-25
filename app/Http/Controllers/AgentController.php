@@ -9,8 +9,10 @@ use App\Actions\Agents\RestoreAgentAction;
 use App\Actions\Agents\UpdateAgentAction;
 use App\Http\Requests\Agents\StoreAgentRequest;
 use App\Http\Requests\Agents\UpdateAgentRequest;
+use App\Models\Board;
 use App\Models\User;
 use App\Support\Presenters\AgentPresenter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -29,22 +31,10 @@ class AgentController extends Controller
     public function index(Request $request): Response
     {
         return Inertia::render('Agents/Index', [
-            'agents' => User::query()
-                ->agentsManagedBy($request->user(), false)
-                ->withAgentWorkload()
-                ->orderBy('name')
-                ->get()
-                ->map(fn (User $agent): array => AgentPresenter::toArray($agent))
-                ->values()
-                ->all(),
-            'archivedAgents' => User::query()
-                ->agentsManagedBy($request->user(), true)
-                ->withAgentWorkload()
-                ->orderBy('name')
-                ->get()
-                ->map(fn (User $agent): array => AgentPresenter::toArray($agent))
-                ->values()
-                ->all(),
+            'agents' => $this->agentPayloads(User::query()
+                ->agentsManagedBy($request->user(), false)),
+            'archivedAgents' => $this->agentPayloads(User::query()
+                ->agentsManagedBy($request->user(), true)),
         ]);
     }
 
@@ -105,5 +95,33 @@ class AgentController extends Controller
         );
 
         return $agent;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function agentPayloads(Builder $query): array
+    {
+        $agents = $query
+            ->withAgentWorkload()
+            ->orderBy('name')
+            ->get();
+
+        $boardIds = $agents
+            ->flatMap(fn (User $agent) => $agent->assignedTasks
+                ->map(fn ($task) => $task->pivot?->board_id))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $boardNames = Board::query()
+            ->whereIn('id', $boardIds)
+            ->pluck('name', 'id')
+            ->all();
+
+        return $agents
+            ->map(fn (User $agent): array => AgentPresenter::toArray($agent, $boardNames))
+            ->values()
+            ->all();
     }
 }

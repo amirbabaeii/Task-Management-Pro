@@ -123,6 +123,7 @@ class AgentManagementTest extends TestCase
     {
         $manager = User::factory()->create();
         $board = $this->boardFor($manager);
+        $board->update(['name' => 'Research Board']);
         $agent = User::factory()->create([
             'name' => 'Scout Agent',
             'email' => 'scout.workload@example.com',
@@ -166,7 +167,11 @@ class AgentManagementTest extends TestCase
                 ->where('agents.0.id', $agent->id)
                 ->where('agents.0.workload.boards', 1)
                 ->where('agents.0.workload.active_tasks', 2)
-                ->where('agents.0.workload.overdue_tasks', 1));
+                ->where('agents.0.workload.overdue_tasks', 1)
+                ->has('agents.0.next_tasks', 2)
+                ->where('agents.0.next_tasks.0.title', 'Audit backlog')
+                ->where('agents.0.next_tasks.0.board_name', 'Research Board')
+                ->where('agents.0.next_tasks.1.title', 'Research options'));
     }
 
     public function test_managed_agent_can_join_board_and_receive_tasks(): void

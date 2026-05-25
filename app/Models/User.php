@@ -88,15 +88,30 @@ class User extends Authenticatable
 
     public function scopeWithAgentWorkload(Builder $query): Builder
     {
-        return $query->withCount([
-            'accessibleBoards as boards_count',
-            'assignedTasks as active_tasks_count' => fn (Builder $query): Builder => $query
-                ->whereNull('tasks.archived_at'),
-            'assignedTasks as overdue_tasks_count' => fn (Builder $query): Builder => $query
-                ->whereNull('tasks.archived_at')
-                ->whereNotNull('tasks.deadline_at')
-                ->where('tasks.deadline_at', '<', now()),
-        ]);
+        return $query
+            ->with([
+                'assignedTasks' => fn ($query) => $query
+                    ->whereNull('tasks.archived_at')
+                    ->select([
+                        'tasks.id',
+                        'tasks.title',
+                        'tasks.status',
+                        'tasks.priority',
+                        'tasks.deadline_at',
+                    ])
+                    ->orderByRaw('tasks.deadline_at is null')
+                    ->orderBy('tasks.deadline_at')
+                    ->orderBy('tasks.id'),
+            ])
+            ->withCount([
+                'accessibleBoards as boards_count',
+                'assignedTasks as active_tasks_count' => fn (Builder $query): Builder => $query
+                    ->whereNull('tasks.archived_at'),
+                'assignedTasks as overdue_tasks_count' => fn (Builder $query): Builder => $query
+                    ->whereNull('tasks.archived_at')
+                    ->whereNotNull('tasks.deadline_at')
+                    ->where('tasks.deadline_at', '<', now()),
+            ]);
     }
 
     /**
