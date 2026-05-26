@@ -22,6 +22,8 @@ const props = defineProps({
 const agents = ref([...props.agents]);
 const archivedAgents = ref([...props.archivedAgents]);
 const showingArchived = ref(false);
+const searchQuery = ref('');
+const workloadFilter = ref('all');
 const showingFormModal = ref(false);
 const editingAgentId = ref(null);
 const saving = ref(false);
@@ -50,6 +52,12 @@ const currentAgents = computed(() =>
 const currentAgentsLabel = computed(() =>
     showingArchived.value ? 'archived' : 'active',
 );
+const workloadFilterOptions = [
+    { value: 'all', label: 'All' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'working', label: 'Working' },
+    { value: 'idle', label: 'Idle' },
+];
 const editingAgent = computed(
     () =>
         [...agents.value, ...archivedAgents.value].find(
@@ -57,9 +65,63 @@ const editingAgent = computed(
         ) ?? null,
 );
 const isEditing = computed(() => editingAgent.value !== null);
+const hasAgentFilters = computed(
+    () => searchQuery.value.trim() !== '' || workloadFilter.value !== 'all',
+);
+
+const searchableText = (agent) =>
+    [
+        agent.name,
+        agent.email,
+        agent.title,
+        agent.profile,
+        agent.personality,
+        ...(agent.skills ?? []),
+        ...(agent.next_tasks ?? []).flatMap((task) => [
+            task.title,
+            task.board_name,
+        ]),
+    ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+const matchesWorkloadFilter = (agent) => {
+    const activeTasks = Number(agent.workload?.active_tasks ?? 0);
+    const overdueTasks = Number(agent.workload?.overdue_tasks ?? 0);
+
+    if (workloadFilter.value === 'overdue') {
+        return overdueTasks > 0;
+    }
+
+    if (workloadFilter.value === 'working') {
+        return activeTasks > 0;
+    }
+
+    if (workloadFilter.value === 'idle') {
+        return activeTasks === 0;
+    }
+
+    return true;
+};
+
+const visibleAgents = computed(() => {
+    const query = searchQuery.value.trim().toLowerCase();
+
+    return currentAgents.value.filter((agent) => {
+        const matchesSearch = query === '' || searchableText(agent).includes(query);
+
+        return matchesSearch && matchesWorkloadFilter(agent);
+    });
+});
 
 const sortAgents = (items) =>
     [...items].sort((a, b) => a.name.localeCompare(b.name));
+
+const clearAgentFilters = () => {
+    searchQuery.value = '';
+    workloadFilter.value = 'all';
+};
 
 const removeAgentFromLists = (id) => {
     agents.value = agents.value.filter((agent) => agent.id !== id);
@@ -358,9 +420,61 @@ const workingActionFor = (agent) => {
                         </button>
                     </div>
 
+                    <div class="relative min-w-0 flex-1 basis-full sm:min-w-[14rem] sm:basis-auto xl:flex-[1_1_18rem]">
+                        <svg
+                            class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            aria-hidden="true"
+                        >
+                            <path
+                                fill-rule="evenodd"
+                                d="M9 3a6 6 0 104.472 10.027l3.25 3.25a1 1 0 001.414-1.414l-3.25-3.25A6 6 0 009 3zm-4 6a4 4 0 118 0 4 4 0 01-8 0z"
+                                clip-rule="evenodd"
+                            />
+                        </svg>
+                        <input
+                            v-model="searchQuery"
+                            type="search"
+                            placeholder="Search agents, skills, or assignments..."
+                            class="block w-full rounded-md border-gray-300 py-1.5 pl-8 pr-3 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                            autocomplete="off"
+                        />
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            Workload
+                        </span>
+                        <button
+                            v-for="option in workloadFilterOptions"
+                            :key="option.value"
+                            type="button"
+                            class="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                            :class="
+                                workloadFilter === option.value
+                                    ? 'border-gray-700 bg-gray-800 text-white'
+                                    : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+                            "
+                            :aria-pressed="workloadFilter === option.value"
+                            @click="workloadFilter = option.value"
+                        >
+                            {{ option.label }}
+                        </button>
+                    </div>
+
                     <span class="text-xs text-gray-500">
-                        {{ currentAgents.length }} {{ currentAgentsLabel }}
+                        {{ visibleAgents.length }} of {{ currentAgents.length }} {{ currentAgentsLabel }}
                     </span>
+
+                    <button
+                        v-if="hasAgentFilters"
+                        type="button"
+                        class="rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        @click="clearAgentFilters"
+                    >
+                        Clear
+                    </button>
 
                     <p
                         v-if="errorMessage"
@@ -371,11 +485,11 @@ const workingActionFor = (agent) => {
                 </div>
 
                 <div
-                    v-if="currentAgents.length"
+                    v-if="visibleAgents.length"
                     class="grid gap-4 pb-6 sm:grid-cols-2 xl:grid-cols-3"
                 >
                     <AgentCard
-                        v-for="agent in currentAgents"
+                        v-for="agent in visibleAgents"
                         :key="agent.id"
                         :agent="agent"
                         :archived="showingArchived"
@@ -392,10 +506,18 @@ const workingActionFor = (agent) => {
                     class="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500"
                 >
                     <div class="font-semibold text-gray-700">
-                        No {{ currentAgentsLabel }} agents.
+                        {{ hasAgentFilters ? 'No matching agents.' : `No ${currentAgentsLabel} agents.` }}
                     </div>
                     <button
-                        v-if="!showingArchived"
+                        v-if="hasAgentFilters"
+                        type="button"
+                        class="mt-4 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        @click="clearAgentFilters"
+                    >
+                        Clear Filters
+                    </button>
+                    <button
+                        v-else-if="!showingArchived"
                         type="button"
                         class="mt-4 rounded-md bg-gray-800 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                         @click="openCreateModal"
