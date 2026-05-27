@@ -1,4 +1,5 @@
 <script setup>
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -24,6 +25,8 @@ const hiddenSkillCount = computed(() =>
 );
 const nextTasks = computed(() => (props.agent.next_tasks ?? []).slice(0, 3));
 const workloadCount = (key) => Number(props.agent.workload?.[key] ?? 0);
+const assignmentHref = (task) =>
+    task.board_id ? route('tasks.board', { board: task.board_id }) : null;
 const formatDeadline = (value) => {
     if (!value) {
         return 'No date';
@@ -136,21 +139,48 @@ const isOverdue = (value) => {
                 <li
                     v-for="task in nextTasks"
                     :key="`${agent.id}-task-${task.id}`"
-                    class="px-3 py-2"
+                    class="px-2 py-1.5"
                 >
-                    <div class="truncate text-xs font-semibold text-gray-800">
-                        {{ task.title }}
-                    </div>
-                    <div class="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
-                        <span class="truncate">
-                            {{ task.board_name || 'Board' }}
-                        </span>
-                        <span
-                            class="shrink-0 font-medium"
-                            :class="isOverdue(task.deadline_at) ? 'text-rose-600' : 'text-gray-500'"
-                        >
-                            {{ formatDeadline(task.deadline_at) }}
-                        </span>
+                    <Link
+                        v-if="assignmentHref(task)"
+                        :href="assignmentHref(task)"
+                        class="block rounded px-1 py-0.5 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    >
+                        <div class="flex items-center gap-2">
+                            <div class="min-w-0 flex-1 truncate text-xs font-semibold text-gray-800">
+                                {{ task.title }}
+                            </div>
+                            <span class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-indigo-600">
+                                Open
+                            </span>
+                        </div>
+                        <div class="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
+                            <span class="truncate">
+                                {{ task.board_name || 'Board' }}
+                            </span>
+                            <span
+                                class="shrink-0 font-medium"
+                                :class="isOverdue(task.deadline_at) ? 'text-rose-600' : 'text-gray-500'"
+                            >
+                                {{ formatDeadline(task.deadline_at) }}
+                            </span>
+                        </div>
+                    </Link>
+                    <div v-else class="px-1 py-0.5">
+                        <div class="truncate text-xs font-semibold text-gray-800">
+                            {{ task.title }}
+                        </div>
+                        <div class="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
+                            <span class="truncate">
+                                {{ task.board_name || 'Board' }}
+                            </span>
+                            <span
+                                class="shrink-0 font-medium"
+                                :class="isOverdue(task.deadline_at) ? 'text-rose-600' : 'text-gray-500'"
+                            >
+                                {{ formatDeadline(task.deadline_at) }}
+                            </span>
+                        </div>
                     </div>
                 </li>
             </ul>
