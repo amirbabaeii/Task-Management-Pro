@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import AddColumnModal from '@/Components/AddColumnModal.vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import BoardColumn from '@/Components/BoardColumn.vue';
@@ -79,6 +79,7 @@ const initialFilterPreferences = normalizeBoardFilterPreferences(
 const tasks = ref(props.tasks.map(normalizeTask));
 const archivedTasks = ref(props.archivedTasks.map(normalizeTask));
 const taskMembers = ref([...props.members]);
+const page = usePage();
 const updatingId = ref(null);
 const movingColumnStatus = ref(null);
 const editingStatusLabel = ref(null);
@@ -357,6 +358,64 @@ const editingTask = computed(() =>
     ) ?? null,
 );
 const checklistTask = computed(() => activeTask.value ?? editingTask.value);
+const lastOpenedQueryTaskId = ref(null);
+
+const taskIdFromPageUrl = (url) => {
+    const parsed = new URL(url, 'http://task-management.local');
+    const id = Number.parseInt(parsed.searchParams.get('task') ?? '', 10);
+
+    return Number.isNaN(id) ? null : id;
+};
+
+const openTaskFromQuery = (url) => {
+    const taskId = taskIdFromPageUrl(url);
+
+    if (!taskId) {
+        lastOpenedQueryTaskId.value = null;
+        return;
+    }
+
+    if (lastOpenedQueryTaskId.value === taskId) {
+        return;
+    }
+
+    const task = [...tasks.value, ...archivedTasks.value].find(
+        (candidate) => candidate.id === taskId,
+    );
+
+    if (!task) {
+        return;
+    }
+
+    lastOpenedQueryTaskId.value = taskId;
+    showingArchived.value = Boolean(task.archived_at);
+    openTaskDetails(task);
+};
+
+const clearTaskQueryFromUrl = () => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    const url = new URL(window.location.href);
+
+    if (!url.searchParams.has('task')) {
+        return;
+    }
+
+    url.searchParams.delete('task');
+    window.history.replaceState(
+        window.history.state,
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+    );
+    lastOpenedQueryTaskId.value = null;
+};
+
+const currentBrowserUrl = () =>
+    typeof window === 'undefined'
+        ? page.url
+        : `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
 const currentTaskList = computed(() =>
     showingArchived.value ? archivedTasks.value : tasks.value,
@@ -1036,7 +1095,16 @@ const closeTaskDetails = () => {
     showingDetailsModal.value = false;
     selectedTaskId.value = null;
     resetCommentForm();
+    clearTaskQueryFromUrl();
 };
+
+watch(
+    () => page.url,
+    (url) => openTaskFromQuery(url),
+    { immediate: true },
+);
+
+watch([tasks, archivedTasks], () => openTaskFromQuery(currentBrowserUrl()));
 
 const openEditModal = (task) => {
     editingTaskId.value = task.id;

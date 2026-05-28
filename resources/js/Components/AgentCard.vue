@@ -25,8 +25,15 @@ const hiddenSkillCount = computed(() =>
 );
 const nextTasks = computed(() => (props.agent.next_tasks ?? []).slice(0, 3));
 const workloadCount = (key) => Number(props.agent.workload?.[key] ?? 0);
-const assignmentHref = (task) =>
-    task.board_id ? route('tasks.board', { board: task.board_id }) : null;
+const assignmentHref = (task) => {
+    if (!task.board_id || !task.id) {
+        return null;
+    }
+
+    const query = new URLSearchParams({ task: task.id }).toString();
+
+    return `${route('tasks.board', { board: task.board_id })}?${query}`;
+};
 const formatDeadline = (value) => {
     if (!value) {
         return 'No date';
