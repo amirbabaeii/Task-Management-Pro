@@ -276,6 +276,46 @@ class BoardMemberTest extends TestCase
                 ->where('tasks.0.assignees.0.id', $owner->id));
     }
 
+    public function test_board_page_marks_archived_agent_members_and_assignees(): void
+    {
+        $owner = User::factory()->create(['name' => 'Owner User']);
+        $agent = User::factory()->create([
+            'name' => 'Retired Agent',
+            'email' => 'retired.agent@example.com',
+            'is_agent' => true,
+            'agent_manager_id' => $owner->id,
+            'agent_title' => 'Planning Agent',
+            'agent_archived_at' => now(),
+        ]);
+        $board = $this->boardFor($owner);
+        $board->members()->attach($agent->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
+        ]);
+
+        $task = Task::factory()->create([
+            'title' => 'Carry over existing work',
+            'status' => 'pending',
+        ]);
+        $task->users()->attach($agent->id, [
+            'board_id' => $board->id,
+            'role' => 'assignee',
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('tasks.board', ['board' => $board]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Board')
+                ->where('members.1.id', $agent->id)
+                ->where('members.1.is_agent', true)
+                ->where('members.1.is_archived_agent', true)
+                ->where('tasks.0.id', $task->id)
+                ->where('tasks.0.assignees.0.id', $agent->id)
+                ->where('tasks.0.assignees.0.is_archived_agent', true));
+    }
+
     public function test_collaborator_can_update_existing_board_tasks(): void
     {
         $owner = User::factory()->create();
@@ -436,6 +476,35 @@ class BoardMemberTest extends TestCase
         $response->assertSessionHasErrors(['assignee_ids.0']);
     }
 
+    public function test_cannot_assign_an_archived_agent_to_a_new_task(): void
+    {
+        $owner = User::factory()->create();
+        $agent = User::factory()->create([
+            'is_agent' => true,
+            'agent_manager_id' => $owner->id,
+            'agent_archived_at' => now(),
+        ]);
+        $board = $this->boardFor($owner);
+        $board->members()->attach($agent->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
+        ]);
+
+        $response = $this->actingAs($owner)
+            ->from(route('tasks.board', ['board' => $board]))
+            ->post(route('tasks.store', ['board' => $board]), [
+                'title' => 'Bad archived assignment',
+                'status' => 'pending',
+                'priority' => 'medium',
+                'assignee_ids' => [$agent->id],
+            ]);
+
+        $response->assertSessionHasErrors(['assignee_ids']);
+        $this->assertDatabaseMissing('tasks', [
+            'title' => 'Bad archived assignment',
+        ]);
+    }
+
     public function test_updating_a_task_replaces_the_assignee_set(): void
     {
         $owner = User::factory()->create();
@@ -473,6 +542,89 @@ class BoardMemberTest extends TestCase
         $this->assertDatabaseMissing('task_user', [
             'task_id' => $task->id,
             'user_id' => $owner->id,
+        ]);
+    }
+
+    public function test_cannot_add_an_archived_agent_when_updating_a_task(): void
+    {
+        $owner = User::factory()->create();
+        $agent = User::factory()->create([
+            'is_agent' => true,
+            'agent_manager_id' => $owner->id,
+            'agent_archived_at' => now(),
+        ]);
+        $board = $this->boardFor($owner);
+        $board->members()->attach($agent->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
+        ]);
+
+        $task = Task::factory()->create(['status' => 'pending']);
+        $task->users()->attach($owner->id, [
+            'board_id' => $board->id,
+            'role' => 'assignee',
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($owner)
+            ->from(route('tasks.board', ['board' => $board]))
+            ->patch(route('tasks.update', ['board' => $board, 'task' => $task]), [
+                'title' => $task->title,
+                'description' => $task->description,
+                'status' => 'pending',
+                'priority' => 'medium',
+                'progress' => 0,
+                'assignee_ids' => [$agent->id],
+            ])
+            ->assertSessionHasErrors(['assignee_ids']);
+
+        $this->assertDatabaseMissing('task_user', [
+            'task_id' => $task->id,
+            'user_id' => $agent->id,
+            'role' => 'assignee',
+        ]);
+    }
+
+    public function test_existing_archived_agent_assignment_can_be_kept_on_update(): void
+    {
+        $owner = User::factory()->create();
+        $agent = User::factory()->create([
+            'is_agent' => true,
+            'agent_manager_id' => $owner->id,
+            'agent_archived_at' => now(),
+        ]);
+        $board = $this->boardFor($owner);
+        $board->members()->attach($agent->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
+        ]);
+
+        $task = Task::factory()->create([
+            'title' => 'Existing archived task',
+            'status' => 'pending',
+        ]);
+        $task->users()->attach($agent->id, [
+            'board_id' => $board->id,
+            'role' => 'assignee',
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($owner)
+            ->patch(route('tasks.update', ['board' => $board, 'task' => $task]), [
+                'title' => 'Existing archived task updated',
+                'description' => $task->description,
+                'status' => 'pending',
+                'priority' => 'medium',
+                'progress' => 20,
+                'assignee_ids' => [$agent->id],
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $task->id,
+            'user_id' => $agent->id,
+            'role' => 'assignee',
         ]);
     }
 

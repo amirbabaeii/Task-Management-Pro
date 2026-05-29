@@ -81,6 +81,9 @@ const completedChecklistCount = computed(
     () => checklistItems.value.filter((item) => item.completed).length,
 );
 
+const isArchivedAgent = (user) =>
+    Boolean(user.is_archived_agent || (user.is_agent && user.agent_archived_at));
+
 const activityDotClass = (kind) => {
     switch (kind) {
         case 'created':
@@ -224,7 +227,12 @@ const activityDotClass = (kind) => {
                             class="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2 py-1"
                         >
                             <span
-                                class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700"
+                                class="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold"
+                                :class="
+                                    isArchivedAgent(assignee)
+                                        ? 'bg-gray-100 text-gray-500'
+                                        : 'bg-indigo-100 text-indigo-700'
+                                "
                             >
                                 {{
                                     assignee.name
@@ -237,6 +245,12 @@ const activityDotClass = (kind) => {
                             </span>
                             <span class="text-sm text-gray-700">
                                 {{ assignee.name }}
+                            </span>
+                            <span
+                                v-if="isArchivedAgent(assignee)"
+                                class="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500"
+                            >
+                                Archived
                             </span>
                         </li>
                     </ul>

@@ -159,6 +159,20 @@ class BoardTaskAssignments
             ->exists();
     }
 
+    /**
+     * @return list<int>
+     */
+    public static function assigneeIdsForBoardTask(int $boardId, int $taskId): array
+    {
+        return DB::table('task_user')
+            ->where('board_id', $boardId)
+            ->where('task_id', $taskId)
+            ->where('role', 'assignee')
+            ->pluck('user_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+    }
+
     public static function userHasTaskInStatus(
         int $userId,
         int $boardId,

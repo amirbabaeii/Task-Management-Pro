@@ -148,7 +148,14 @@ class BoardController extends Controller
                     ->orderBy('id'),
                 'assignees' => fn ($query) => $query
                     ->wherePivot('board_id', $board->id)
-                    ->select(['users.id', 'users.name', 'users.email']),
+                    ->select([
+                        'users.id',
+                        'users.name',
+                        'users.email',
+                        'users.is_agent',
+                        'users.agent_title',
+                        'users.agent_archived_at',
+                    ]),
                 'activities' => fn ($query) => $query
                     ->with('actor:id,name')
                     ->limit(20),
@@ -178,6 +185,10 @@ class BoardController extends Controller
                         'id' => $assignee->id,
                         'name' => $assignee->name,
                         'email' => $assignee->email,
+                        'is_agent' => $assignee->is_agent,
+                        'agent_title' => $assignee->agent_title,
+                        'agent_archived_at' => $assignee->agent_archived_at,
+                        'is_archived_agent' => $assignee->is_agent && $assignee->agent_archived_at !== null,
                     ])
                     ->values()
                     ->all(),
@@ -199,7 +210,7 @@ class BoardController extends Controller
     }
 
     /**
-     * @return list<array{id: int, name: string, email: string, role: string, is_agent: bool, agent_title: string|null}>
+     * @return list<array{id: int, name: string, email: string, role: string, is_agent: bool, agent_title: string|null, agent_archived_at: mixed, is_archived_agent: bool}>
      */
     private function boardMembersForBoard(Board $board): array
     {
@@ -214,6 +225,8 @@ class BoardController extends Controller
                 'role' => $member->pivot->role,
                 'is_agent' => $member->is_agent,
                 'agent_title' => $member->agent_title,
+                'agent_archived_at' => $member->agent_archived_at,
+                'is_archived_agent' => $member->is_agent && $member->agent_archived_at !== null,
             ])
             ->values()
             ->all();

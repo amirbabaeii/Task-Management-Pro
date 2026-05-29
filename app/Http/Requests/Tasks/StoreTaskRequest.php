@@ -4,15 +4,17 @@ namespace App\Http\Requests\Tasks;
 
 use App\Enums\TaskPriority;
 use App\Http\Requests\Concerns\NormalizesTaskInput;
+use App\Http\Requests\Concerns\RejectsArchivedAgentAssignees;
 use App\Models\Board;
 use App\Models\BoardColumn;
 use App\Models\Task;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreTaskRequest extends FormRequest
 {
-    use NormalizesTaskInput;
+    use NormalizesTaskInput, RejectsArchivedAgentAssignees;
 
     public function authorize(): bool
     {
@@ -22,6 +24,13 @@ class StoreTaskRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge($this->normalizedTaskInput());
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $this->rejectArchivedAgentAssignees($validator);
+        });
     }
 
     public function rules(): array

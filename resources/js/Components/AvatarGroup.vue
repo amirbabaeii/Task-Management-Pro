@@ -22,6 +22,9 @@ const initials = (name = '') =>
 
 const visible = computed(() => props.users.slice(0, props.max));
 const overflow = computed(() => Math.max(props.users.length - props.max, 0));
+
+const isArchivedAgent = (user) =>
+    Boolean(user.is_archived_agent || (user.is_agent && user.agent_archived_at));
 </script>
 
 <template>
@@ -29,8 +32,13 @@ const overflow = computed(() => Math.max(props.users.length - props.max, 0));
         <span
             v-for="user in visible"
             :key="user.id"
-            class="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-indigo-100 text-[10px] font-semibold text-indigo-700"
-            :title="user.name"
+            class="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-[10px] font-semibold"
+            :class="
+                isArchivedAgent(user)
+                    ? 'bg-gray-100 text-gray-500'
+                    : 'bg-indigo-100 text-indigo-700'
+            "
+            :title="isArchivedAgent(user) ? `${user.name} (archived)` : user.name"
         >
             {{ initials(user.name) }}
         </span>

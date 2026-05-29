@@ -75,6 +75,37 @@ const initials = (name = '') =>
         .map((part) => part[0]?.toUpperCase() ?? '')
         .join('') || '?';
 
+const isArchivedAgent = (member) =>
+    Boolean(
+        member.is_archived_agent || (member.is_agent && member.agent_archived_at),
+    );
+
+const memberBadgeLabel = (member) => {
+    if (isArchivedAgent(member)) {
+        return 'Archived';
+    }
+
+    if (member.is_agent) {
+        return 'Agent';
+    }
+
+    return member.role === 'owner' ? 'Owner' : 'Collaborator';
+};
+
+const memberBadgeClass = (member) => {
+    if (isArchivedAgent(member)) {
+        return 'bg-gray-100 text-gray-500';
+    }
+
+    if (member.is_agent) {
+        return 'bg-teal-50 text-teal-700';
+    }
+
+    return member.role === 'owner'
+        ? 'bg-amber-100 text-amber-700'
+        : 'bg-gray-100 text-gray-600';
+};
+
 const submitInvite = () => {
     const email = inviteEmail.value.trim();
     if (! email) {
@@ -206,7 +237,12 @@ watch(
                         class="flex items-center gap-3 py-3"
                     >
                         <div
-                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700"
+                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                            :class="
+                                isArchivedAgent(member)
+                                    ? 'bg-gray-100 text-gray-500'
+                                    : 'bg-indigo-100 text-indigo-700'
+                            "
                         >
                             {{ initials(member.name) }}
                         </div>
@@ -220,15 +256,9 @@ watch(
                         </div>
                         <span
                             class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                            :class="
-                                member.is_agent
-                                    ? 'bg-teal-50 text-teal-700'
-                                    : member.role === 'owner'
-                                        ? 'bg-amber-100 text-amber-700'
-                                    : 'bg-gray-100 text-gray-600'
-                            "
+                            :class="memberBadgeClass(member)"
                         >
-                            {{ member.is_agent ? 'Agent' : (member.role === 'owner' ? 'Owner' : 'Collaborator') }}
+                            {{ memberBadgeLabel(member) }}
                         </span>
                         <DangerButton
                             v-if="isOwner && member.role !== 'owner'"

@@ -62,7 +62,7 @@ class BoardMemberController extends Controller
     }
 
     /**
-     * @return list<array{id: int, name: string, email: string, role: string, joined_at: mixed, is_agent: bool, agent_title: string|null}>
+     * @return list<array{id: int, name: string, email: string, role: string, joined_at: mixed, is_agent: bool, agent_title: string|null, agent_archived_at: mixed, is_archived_agent: bool}>
      */
     private function serialize(Board $board): array
     {
@@ -78,6 +78,8 @@ class BoardMemberController extends Controller
                 'joined_at' => $member->pivot->joined_at,
                 'is_agent' => $member->is_agent,
                 'agent_title' => $member->agent_title,
+                'agent_archived_at' => $member->agent_archived_at,
+                'is_archived_agent' => $member->is_agent && $member->agent_archived_at !== null,
             ])
             ->values()
             ->all();

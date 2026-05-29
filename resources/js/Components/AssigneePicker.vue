@@ -15,7 +15,19 @@ const selectedIds = defineModel('selectedIds', {
 
 const isSelected = (id) => selectedIds.value.includes(id);
 
-const toggle = (id) => {
+const isArchivedAgent = (member) =>
+    Boolean(
+        member.is_archived_agent || (member.is_agent && member.agent_archived_at),
+    );
+
+const canToggle = (member) => ! isArchivedAgent(member) || isSelected(member.id);
+
+const toggle = (member) => {
+    if (! canToggle(member)) {
+        return;
+    }
+
+    const id = member.id;
     const next = [...selectedIds.value];
     const index = next.indexOf(id);
     if (index === -1) {
@@ -65,17 +77,28 @@ const selectedCount = computed(() => selectedIds.value.length);
             <li
                 v-for="member in sortedMembers"
                 :key="member.id"
-                class="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-3 py-2 transition last:border-b-0 hover:bg-gray-50"
-                :class="{ 'bg-indigo-50': isSelected(member.id) }"
+                class="flex items-center gap-3 border-b border-gray-100 px-3 py-2 transition last:border-b-0"
+                :class="[
+                    isSelected(member.id) ? 'bg-indigo-50' : '',
+                    canToggle(member)
+                        ? 'cursor-pointer hover:bg-gray-50'
+                        : 'cursor-not-allowed opacity-60',
+                ]"
                 role="checkbox"
                 :aria-checked="isSelected(member.id)"
-                tabindex="0"
-                @click="toggle(member.id)"
-                @keydown.enter.prevent="toggle(member.id)"
-                @keydown.space.prevent="toggle(member.id)"
+                :aria-disabled="! canToggle(member)"
+                :tabindex="canToggle(member) ? 0 : -1"
+                @click="toggle(member)"
+                @keydown.enter.prevent="toggle(member)"
+                @keydown.space.prevent="toggle(member)"
             >
                 <div
-                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[11px] font-semibold text-indigo-700"
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
+                    :class="
+                        isArchivedAgent(member)
+                            ? 'bg-gray-100 text-gray-500'
+                            : 'bg-indigo-100 text-indigo-700'
+                    "
                 >
                     {{ initials(member.name) }}
                 </div>
@@ -88,7 +111,13 @@ const selectedCount = computed(() => selectedIds.value.length);
                     </div>
                 </div>
                 <span
-                    v-if="member.role === 'owner'"
+                    v-if="isArchivedAgent(member)"
+                    class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500"
+                >
+                    Archived
+                </span>
+                <span
+                    v-else-if="member.role === 'owner'"
                     class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700"
                 >
                     Owner

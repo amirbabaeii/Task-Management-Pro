@@ -31,6 +31,14 @@ export const normalizeTask = (task) => ({
         ? task.assignees.map((assignee) => ({
               id: Number(assignee.id ?? 0),
               name: assignee.name ?? 'Unknown user',
+              email: assignee.email ?? '',
+              is_agent: Boolean(assignee.is_agent),
+              agent_title: assignee.agent_title ?? null,
+              agent_archived_at: assignee.agent_archived_at ?? null,
+              is_archived_agent: Boolean(
+                  assignee.is_archived_agent ||
+                      (assignee.is_agent && assignee.agent_archived_at),
+              ),
           }))
         : [],
     checklist_items: Array.isArray(task.checklist_items)
