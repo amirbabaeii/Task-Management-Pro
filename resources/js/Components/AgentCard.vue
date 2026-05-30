@@ -23,8 +23,19 @@ const visibleSkills = computed(() => (props.agent.skills ?? []).slice(0, 5));
 const hiddenSkillCount = computed(() =>
     Math.max(0, (props.agent.skills?.length ?? 0) - visibleSkills.value.length),
 );
+const visibleBoards = computed(() => (props.agent.boards ?? []).slice(0, 3));
+const hiddenBoardCount = computed(() =>
+    Math.max(0, (props.agent.boards?.length ?? 0) - visibleBoards.value.length),
+);
 const nextTasks = computed(() => (props.agent.next_tasks ?? []).slice(0, 3));
 const workloadCount = (key) => Number(props.agent.workload?.[key] ?? 0);
+const boardHref = (board) => {
+    if (!board.id) {
+        return null;
+    }
+
+    return route('tasks.board', { board: board.id });
+};
 const assignmentHref = (task) => {
     if (!task.board_id || !task.id) {
         return null;
@@ -122,6 +133,31 @@ const isOverdue = (value) => {
                 <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
                     Overdue
                 </div>
+            </div>
+        </div>
+
+        <div
+            v-if="visibleBoards.length"
+            class="mt-3 space-y-2"
+        >
+            <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                Board Access
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+                <Link
+                    v-for="board in visibleBoards"
+                    :key="`${agent.id}-board-${board.id}`"
+                    :href="boardHref(board)"
+                    class="max-w-full truncate rounded-full border border-indigo-100 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 transition hover:border-indigo-200 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                >
+                    {{ board.name }}
+                </Link>
+                <span
+                    v-if="hiddenBoardCount"
+                    class="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500"
+                >
+                    +{{ hiddenBoardCount }}
+                </span>
             </div>
         </div>
 

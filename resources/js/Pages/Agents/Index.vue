@@ -77,6 +77,7 @@ const searchableText = (agent) =>
         agent.profile,
         agent.personality,
         ...(agent.skills ?? []),
+        ...(agent.boards ?? []).map((board) => board.name),
         ...(agent.next_tasks ?? []).flatMap((task) => [
             task.title,
             task.board_name,

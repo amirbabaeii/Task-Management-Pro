@@ -90,6 +90,14 @@ class User extends Authenticatable
     {
         return $query
             ->with([
+                'accessibleBoards' => fn ($query) => $query
+                    ->select([
+                        'boards.id',
+                        'boards.name',
+                    ])
+                    ->orderByRaw("CASE board_members.role WHEN 'owner' THEN 0 ELSE 1 END")
+                    ->orderBy('boards.name')
+                    ->orderBy('boards.id'),
                 'assignedTasks' => fn ($query) => $query
                     ->whereNull('tasks.archived_at')
                     ->select([

@@ -2,6 +2,7 @@
 
 namespace App\Support\Presenters;
 
+use App\Models\Board;
 use App\Models\Task;
 use App\Models\User;
 use BackedEnum;
@@ -35,6 +36,7 @@ class AgentPresenter
                     ->where('tasks.deadline_at', '<', now())
                     ->count()),
             ],
+            'boards' => self::boards($agent),
             'next_tasks' => self::nextTasks($agent, $boardNamesById),
             'created_at' => $agent->created_at,
         ];
@@ -68,6 +70,41 @@ class AgentPresenter
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function boards(User $agent): array
+    {
+        return self::boardModels($agent)
+            ->map(fn (Board $board): array => [
+                'id' => $board->id,
+                'name' => $board->name,
+                'role' => $board->pivot?->role,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, \App\Models\Board>
+     */
+    private static function boardModels(User $agent): Collection
+    {
+        if ($agent->relationLoaded('accessibleBoards')) {
+            return $agent->accessibleBoards;
+        }
+
+        return $agent->accessibleBoards()
+            ->select([
+                'boards.id',
+                'boards.name',
+            ])
+            ->orderByRaw("CASE board_members.role WHEN 'owner' THEN 0 ELSE 1 END")
+            ->orderBy('boards.name')
+            ->orderBy('boards.id')
+            ->get();
     }
 
     /**

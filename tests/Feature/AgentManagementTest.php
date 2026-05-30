@@ -174,6 +174,44 @@ class AgentManagementTest extends TestCase
                 ->where('agents.0.next_tasks.1.title', 'Research options'));
     }
 
+    public function test_agent_index_includes_board_access(): void
+    {
+        $manager = User::factory()->create();
+        $alphaBoard = $this->boardFor($manager);
+        $alphaBoard->update(['name' => 'Alpha Launch']);
+        $betaBoard = Board::factory()->create([
+            'user_id' => $manager->id,
+            'name' => 'Beta Support',
+            'position' => 2,
+        ]);
+        $agent = User::factory()->create([
+            'name' => 'Board Scout',
+            'email' => 'board.scout@example.com',
+            'is_agent' => true,
+            'agent_manager_id' => $manager->id,
+        ]);
+
+        foreach ([$alphaBoard, $betaBoard] as $board) {
+            $board->members()->attach($agent->id, [
+                'role' => BoardRole::Collaborator->value,
+                'joined_at' => now(),
+            ]);
+        }
+
+        $this->actingAs($manager)
+            ->get(route('agents.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('agents.0.id', $agent->id)
+                ->where('agents.0.workload.boards', 2)
+                ->has('agents.0.boards', 2)
+                ->where('agents.0.boards.0.id', $alphaBoard->id)
+                ->where('agents.0.boards.0.name', 'Alpha Launch')
+                ->where('agents.0.boards.0.role', BoardRole::Collaborator->value)
+                ->where('agents.0.boards.1.id', $betaBoard->id)
+                ->where('agents.0.boards.1.name', 'Beta Support'));
+    }
+
     public function test_managed_agent_can_join_board_and_receive_tasks(): void
     {
         $manager = User::factory()->create();
