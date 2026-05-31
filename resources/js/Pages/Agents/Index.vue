@@ -23,6 +23,7 @@ const agents = ref([...props.agents]);
 const archivedAgents = ref([...props.archivedAgents]);
 const showingArchived = ref(false);
 const searchQuery = ref('');
+const boardFilter = ref(null);
 const workloadFilter = ref('all');
 const showingFormModal = ref(false);
 const editingAgentId = ref(null);
@@ -66,8 +67,29 @@ const editingAgent = computed(
 );
 const isEditing = computed(() => editingAgent.value !== null);
 const hasAgentFilters = computed(
-    () => searchQuery.value.trim() !== '' || workloadFilter.value !== 'all',
+    () =>
+        searchQuery.value.trim() !== '' ||
+        boardFilter.value !== null ||
+        workloadFilter.value !== 'all',
 );
+const boardFilterOptions = computed(() => {
+    const boardsById = new Map();
+
+    currentAgents.value.forEach((agent) => {
+        (agent.boards ?? []).forEach((board) => {
+            if (board.id && ! boardsById.has(Number(board.id))) {
+                boardsById.set(Number(board.id), {
+                    id: Number(board.id),
+                    name: board.name,
+                });
+            }
+        });
+    });
+
+    return [...boardsById.values()].sort((a, b) =>
+        a.name.localeCompare(b.name),
+    );
+});
 
 const searchableText = (agent) =>
     [
@@ -106,13 +128,23 @@ const matchesWorkloadFilter = (agent) => {
     return true;
 };
 
+const matchesBoardFilter = (agent) =>
+    boardFilter.value === null ||
+    (agent.boards ?? []).some(
+        (board) => Number(board.id) === Number(boardFilter.value),
+    );
+
 const visibleAgents = computed(() => {
     const query = searchQuery.value.trim().toLowerCase();
 
     return currentAgents.value.filter((agent) => {
         const matchesSearch = query === '' || searchableText(agent).includes(query);
 
-        return matchesSearch && matchesWorkloadFilter(agent);
+        return (
+            matchesSearch &&
+            matchesBoardFilter(agent) &&
+            matchesWorkloadFilter(agent)
+        );
     });
 });
 
@@ -121,6 +153,7 @@ const sortAgents = (items) =>
 
 const clearAgentFilters = () => {
     searchQuery.value = '';
+    boardFilter.value = null;
     workloadFilter.value = 'all';
 };
 
@@ -442,6 +475,25 @@ const workingActionFor = (agent) => {
                             autocomplete="off"
                         />
                     </div>
+
+                    <label class="flex items-center gap-2 text-xs">
+                        <span class="font-semibold uppercase tracking-wide text-gray-500">
+                            Board
+                        </span>
+                        <select
+                            v-model="boardFilter"
+                            class="rounded-md border-gray-300 py-1 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                        >
+                            <option :value="null">Any board</option>
+                            <option
+                                v-for="board in boardFilterOptions"
+                                :key="board.id"
+                                :value="board.id"
+                            >
+                                {{ board.name }}
+                            </option>
+                        </select>
+                    </label>
 
                     <div class="flex flex-wrap items-center gap-1.5">
                         <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">
