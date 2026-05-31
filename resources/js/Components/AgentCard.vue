@@ -1,5 +1,10 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
+import {
+    formatPriority,
+    formatStatus,
+    priorityBadgeClass,
+} from '@/lib/format';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -29,6 +34,17 @@ const hiddenBoardCount = computed(() =>
 );
 const nextTasks = computed(() => (props.agent.next_tasks ?? []).slice(0, 3));
 const workloadCount = (key) => Number(props.agent.workload?.[key] ?? 0);
+const statusBadgeClass = (status) => {
+    if (status === 'completed') {
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    }
+
+    if (status === 'in-progress') {
+        return 'border-indigo-200 bg-indigo-50 text-indigo-700';
+    }
+
+    return 'border-gray-200 bg-gray-50 text-gray-600';
+};
 const boardHref = (board) => {
     if (!board.id) {
         return null;
@@ -197,12 +213,24 @@ const isOverdue = (value) => {
                                 Open
                             </span>
                         </div>
-                        <div class="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
-                            <span class="truncate">
+                        <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+                            <span
+                                class="rounded-full border px-1.5 py-0.5 font-semibold uppercase tracking-wide"
+                                :class="statusBadgeClass(task.status)"
+                            >
+                                {{ formatStatus(task.status) }}
+                            </span>
+                            <span
+                                class="rounded-full border px-1.5 py-0.5 font-semibold uppercase tracking-wide"
+                                :class="priorityBadgeClass(task.priority)"
+                            >
+                                {{ formatPriority(task.priority) }}
+                            </span>
+                            <span class="truncate text-[11px] text-gray-500">
                                 {{ task.board_name || 'Board' }}
                             </span>
                             <span
-                                class="shrink-0 font-medium"
+                                class="shrink-0 text-[11px] font-medium"
                                 :class="isOverdue(task.deadline_at) ? 'text-rose-600' : 'text-gray-500'"
                             >
                                 {{ formatDeadline(task.deadline_at) }}
@@ -213,12 +241,24 @@ const isOverdue = (value) => {
                         <div class="truncate text-xs font-semibold text-gray-800">
                             {{ task.title }}
                         </div>
-                        <div class="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
-                            <span class="truncate">
+                        <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+                            <span
+                                class="rounded-full border px-1.5 py-0.5 font-semibold uppercase tracking-wide"
+                                :class="statusBadgeClass(task.status)"
+                            >
+                                {{ formatStatus(task.status) }}
+                            </span>
+                            <span
+                                class="rounded-full border px-1.5 py-0.5 font-semibold uppercase tracking-wide"
+                                :class="priorityBadgeClass(task.priority)"
+                            >
+                                {{ formatPriority(task.priority) }}
+                            </span>
+                            <span class="truncate text-[11px] text-gray-500">
                                 {{ task.board_name || 'Board' }}
                             </span>
                             <span
-                                class="shrink-0 font-medium"
+                                class="shrink-0 text-[11px] font-medium"
                                 :class="isOverdue(task.deadline_at) ? 'text-rose-600' : 'text-gray-500'"
                             >
                                 {{ formatDeadline(task.deadline_at) }}
