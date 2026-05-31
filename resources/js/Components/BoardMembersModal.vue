@@ -67,6 +67,21 @@ const sortedAvailableAgents = computed(() =>
     [...props.availableAgents].sort((a, b) => a.name.localeCompare(b.name)),
 );
 
+const memberStats = computed(() => [
+    {
+        label: 'Total',
+        value: props.members.length,
+    },
+    {
+        label: 'People',
+        value: props.members.filter((member) => ! member.is_agent).length,
+    },
+    {
+        label: 'Agents',
+        value: props.members.filter((member) => member.is_agent).length,
+    },
+]);
+
 const initials = (name = '') =>
     name
         .split(/\s+/)
@@ -148,6 +163,15 @@ watch(
                             : 'You are collaborating on this board.'
                     }}
                 </p>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    <span
+                        v-for="stat in memberStats"
+                        :key="stat.label"
+                        class="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500"
+                    >
+                        {{ stat.label }} {{ stat.value }}
+                    </span>
+                </div>
             </div>
 
             <form
