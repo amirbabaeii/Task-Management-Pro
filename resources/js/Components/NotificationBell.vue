@@ -96,7 +96,15 @@ const summarize = (notification) => {
 const linkFor = (notification) => {
     const data = notification.data ?? {};
     if (data.board?.id) {
-        return route('tasks.board', { board: data.board.id });
+        const boardHref = route('tasks.board', { board: data.board.id });
+
+        if (data.task?.id) {
+            const query = new URLSearchParams({ task: data.task.id }).toString();
+
+            return `${boardHref}?${query}`;
+        }
+
+        return boardHref;
     }
     return route('dashboard');
 };
