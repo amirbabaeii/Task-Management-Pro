@@ -32,6 +32,26 @@ const primaryBoardHref = computed(() =>
         ? route('tasks.board', { board: boards.value[0].id })
         : route('tasks.board'),
 );
+const taskHref = (task) => {
+    if (! task?.board?.id) {
+        return route('tasks.board');
+    }
+
+    const boardHref = route('tasks.board', { board: task.board.id });
+
+    if (! task.id) {
+        return boardHref;
+    }
+
+    const query = new URLSearchParams({ task: task.id }).toString();
+
+    return `${boardHref}?${query}`;
+};
+const activityHref = (activity) =>
+    taskHref({
+        id: activity.task?.id,
+        board: activity.board,
+    });
 
 const metrics = computed(() => [
     {
@@ -242,7 +262,7 @@ const activityDotClass = (kind) => {
                             <Link
                                 v-for="task in upcomingTasks"
                                 :key="task.id"
-                                :href="route('tasks.board', { board: task.board.id })"
+                                :href="taskHref(task)"
                                 class="block rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-300 hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                             >
                                 <div class="flex items-start justify-between gap-3">
@@ -302,7 +322,7 @@ const activityDotClass = (kind) => {
                         <Link
                             v-for="activity in recentActivity"
                             :key="activity.id"
-                            :href="route('tasks.board', { board: activity.board.id })"
+                            :href="activityHref(activity)"
                             class="flex flex-col gap-2 border-b border-gray-100 px-4 py-3 transition last:border-b-0 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:flex-row sm:items-start sm:gap-3"
                         >
                             <span class="flex min-w-0 flex-1 gap-3">
