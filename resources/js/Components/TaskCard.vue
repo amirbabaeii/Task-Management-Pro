@@ -47,6 +47,23 @@ const emit = defineEmits([
     'drag-end',
     'drop',
 ]);
+
+const completedChecklistCount = (task) =>
+    Array.isArray(task.checklist_items)
+        ? task.checklist_items.filter((item) => item.completed).length
+        : 0;
+
+const checklistPercent = (task) => {
+    const total = Array.isArray(task.checklist_items)
+        ? task.checklist_items.length
+        : 0;
+
+    if (total === 0) {
+        return 0;
+    }
+
+    return Math.round((completedChecklistCount(task) / total) * 100);
+};
 </script>
 
 <template>
@@ -121,17 +138,23 @@ const emit = defineEmits([
 
         <div
             v-if="task.checklist_items?.length"
-            class="mt-3 flex items-center justify-between rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] text-gray-600"
+            class="mt-3 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] text-gray-600"
         >
-            <span class="font-semibold uppercase tracking-wide">
-                Checklist
-            </span>
-            <span>
-                {{
-                    task.checklist_items.filter((item) => item.completed)
-                        .length
-                }}/{{ task.checklist_items.length }}
-            </span>
+            <div class="flex items-center justify-between gap-3">
+                <span class="font-semibold uppercase tracking-wide">
+                    Checklist
+                </span>
+                <span>
+                    {{ completedChecklistCount(task) }}/{{ task.checklist_items.length }}
+                    done
+                </span>
+            </div>
+            <div class="mt-1.5 h-1.5 rounded-full bg-gray-100">
+                <div
+                    class="h-1.5 rounded-full bg-teal-500"
+                    :style="{ width: `${checklistPercent(task)}%` }"
+                />
+            </div>
         </div>
 
         <div class="mt-3 flex flex-wrap items-center gap-2">
