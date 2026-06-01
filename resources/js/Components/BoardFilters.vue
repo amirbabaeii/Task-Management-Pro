@@ -162,6 +162,23 @@ const assigneeOptions = computed(() => {
             <span class="font-semibold uppercase tracking-wide text-gray-500">
                 Assignee
             </span>
+            <button
+                v-if="currentUserId"
+                type="button"
+                class="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                :class="
+                    assigneeFilter === currentUserId
+                        ? 'border-gray-700 bg-gray-800 text-white'
+                        : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+                "
+                :aria-pressed="assigneeFilter === currentUserId"
+                @click="
+                    assigneeFilter =
+                        assigneeFilter === currentUserId ? null : currentUserId
+                "
+            >
+                Mine
+            </button>
             <select
                 v-model="assigneeFilter"
                 class="rounded-md border-gray-300 py-1 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
