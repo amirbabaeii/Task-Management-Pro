@@ -93,6 +93,48 @@ const summarize = (notification) => {
     return 'You have a new notification';
 };
 
+const kindLabel = (notification) => {
+    const data = notification.data ?? {};
+
+    if (data.kind === 'task_assigned') {
+        return 'Assignment';
+    }
+
+    if (data.kind === 'board_member_added') {
+        return 'Board';
+    }
+
+    if (data.kind === 'comment_reply') {
+        return 'Reply';
+    }
+
+    if (data.kind === 'task_deadline_reminder') {
+        return data.deadline_state === 'overdue' ? 'Overdue' : 'Due today';
+    }
+
+    return 'Update';
+};
+
+const kindBadgeClass = (notification) => {
+    const data = notification.data ?? {};
+
+    if (data.kind === 'task_deadline_reminder') {
+        return data.deadline_state === 'overdue'
+            ? 'border-rose-200 bg-rose-50 text-rose-700'
+            : 'border-amber-200 bg-amber-50 text-amber-700';
+    }
+
+    if (data.kind === 'task_assigned') {
+        return 'border-indigo-200 bg-indigo-50 text-indigo-700';
+    }
+
+    if (data.kind === 'comment_reply') {
+        return 'border-sky-200 bg-sky-50 text-sky-700';
+    }
+
+    return 'border-gray-200 bg-gray-50 text-gray-600';
+};
+
 const linkFor = (notification) => {
     const data = notification.data ?? {};
     if (data.board?.id) {
@@ -210,6 +252,12 @@ const linkFor = (notification) => {
                             class="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
                             @click="markAsRead(notification)"
                         >
+                            <span
+                                class="mb-1.5 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                :class="kindBadgeClass(notification)"
+                            >
+                                {{ kindLabel(notification) }}
+                            </span>
                             <p class="leading-snug">
                                 {{ summarize(notification) }}
                             </p>
