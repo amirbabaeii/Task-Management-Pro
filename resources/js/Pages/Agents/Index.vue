@@ -157,6 +157,47 @@ const clearAgentFilters = () => {
     workloadFilter.value = 'all';
 };
 
+const selectedBoardName = computed(
+    () =>
+        boardFilterOptions.value.find(
+            (board) => Number(board.id) === Number(boardFilter.value),
+        )?.name ?? null,
+);
+
+const emptyStateTitle = computed(() => {
+    if (hasAgentFilters.value) {
+        return 'No matching agents.';
+    }
+
+    return `No ${currentAgentsLabel.value} agents.`;
+});
+
+const emptyStateDetail = computed(() => {
+    if (! hasAgentFilters.value) {
+        return showingArchived.value
+            ? 'Archived agents will appear here after you remove them from active rotation.'
+            : 'Create an agent to start assigning AI teammates to board work.';
+    }
+
+    const parts = [];
+
+    if (searchQuery.value.trim()) {
+        parts.push(`search "${searchQuery.value.trim()}"`);
+    }
+
+    if (selectedBoardName.value) {
+        parts.push(`board ${selectedBoardName.value}`);
+    }
+
+    if (workloadFilter.value !== 'all') {
+        parts.push(`${workloadFilter.value} workload`);
+    }
+
+    return parts.length
+        ? `No agents match ${parts.join(', ')}.`
+        : 'No agents match the current filters.';
+});
+
 const removeAgentFromLists = (id) => {
     agents.value = agents.value.filter((agent) => agent.id !== id);
     archivedAgents.value = archivedAgents.value.filter((agent) => agent.id !== id);
@@ -559,8 +600,11 @@ const workingActionFor = (agent) => {
                     class="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500"
                 >
                     <div class="font-semibold text-gray-700">
-                        {{ hasAgentFilters ? 'No matching agents.' : `No ${currentAgentsLabel} agents.` }}
+                        {{ emptyStateTitle }}
                     </div>
+                    <p class="mx-auto mt-2 max-w-md text-xs text-gray-500">
+                        {{ emptyStateDetail }}
+                    </p>
                     <button
                         v-if="hasAgentFilters"
                         type="button"
