@@ -1766,6 +1766,12 @@ const submitTaskUpdate = () => {
                 @error="errorMessage = $event"
             >
                 <template #actions>
+                    <span
+                        v-if="tasks.length || archivedTasks.length"
+                        class="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500 shadow-sm"
+                    >
+                        {{ tasks.length }} active / {{ archivedTasks.length }} archived
+                    </span>
                     <SecondaryButton @click="openMembersModal">
                         Members
                     </SecondaryButton>
