@@ -80,6 +80,15 @@ const checklistItems = computed(() => props.task?.checklist_items ?? []);
 const completedChecklistCount = computed(
     () => checklistItems.value.filter((item) => item.completed).length,
 );
+const checklistPercent = computed(() => {
+    if (checklistItems.value.length === 0) {
+        return 0;
+    }
+
+    return Math.round(
+        (completedChecklistCount.value / checklistItems.value.length) * 100,
+    );
+});
 
 const isArchivedAgent = (user) =>
     Boolean(user.is_archived_agent || (user.is_agent && user.agent_archived_at));
@@ -317,8 +326,18 @@ const activityDotClass = (kind) => {
                         </h4>
                         <span class="text-xs text-gray-500">
                             {{ completedChecklistCount }}/{{ checklistItems.length }}
-                            done
+                            done · {{ checklistPercent }}%
                         </span>
+                    </div>
+
+                    <div
+                        v-if="checklistItems.length"
+                        class="h-2 rounded-full bg-gray-100"
+                    >
+                        <div
+                            class="h-2 rounded-full bg-teal-500"
+                            :style="{ width: `${checklistPercent}%` }"
+                        />
                     </div>
 
                     <ul v-if="checklistItems.length" class="space-y-2">
