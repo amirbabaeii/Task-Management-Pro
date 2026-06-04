@@ -25,6 +25,7 @@ const showingArchived = ref(false);
 const searchQuery = ref('');
 const boardFilter = ref(null);
 const workloadFilter = ref('all');
+const sortMode = ref('name');
 const showingFormModal = ref(false);
 const editingAgentId = ref(null);
 const saving = ref(false);
@@ -58,6 +59,12 @@ const workloadFilterOptions = [
     { value: 'overdue', label: 'Overdue' },
     { value: 'working', label: 'Working' },
     { value: 'idle', label: 'Idle' },
+];
+const sortOptions = [
+    { value: 'name', label: 'Name' },
+    { value: 'active', label: 'Active tasks' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'boards', label: 'Boards' },
 ];
 const editingAgent = computed(
     () =>
@@ -147,6 +154,35 @@ const visibleAgents = computed(() => {
         );
     });
 });
+
+const sortedVisibleAgents = computed(() =>
+    [...visibleAgents.value].sort((a, b) => {
+        const nameSort = (a.name ?? '').localeCompare(b.name ?? '');
+
+        if (sortMode.value === 'active') {
+            return (
+                Number(b.workload?.active_tasks ?? 0) -
+                    Number(a.workload?.active_tasks ?? 0) || nameSort
+            );
+        }
+
+        if (sortMode.value === 'overdue') {
+            return (
+                Number(b.workload?.overdue_tasks ?? 0) -
+                    Number(a.workload?.overdue_tasks ?? 0) || nameSort
+            );
+        }
+
+        if (sortMode.value === 'boards') {
+            return (
+                Number(b.workload?.boards ?? 0) -
+                    Number(a.workload?.boards ?? 0) || nameSort
+            );
+        }
+
+        return nameSort;
+    }),
+);
 
 const sortAgents = (items) =>
     [...items].sort((a, b) => a.name.localeCompare(b.name));
@@ -557,6 +593,24 @@ const workingActionFor = (agent) => {
                         </button>
                     </div>
 
+                    <label class="flex items-center gap-2 text-xs">
+                        <span class="font-semibold uppercase tracking-wide text-gray-500">
+                            Sort
+                        </span>
+                        <select
+                            v-model="sortMode"
+                            class="rounded-md border-gray-300 py-1 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                        >
+                            <option
+                                v-for="option in sortOptions"
+                                :key="option.value"
+                                :value="option.value"
+                            >
+                                {{ option.label }}
+                            </option>
+                        </select>
+                    </label>
+
                     <span class="text-xs text-gray-500">
                         {{ visibleAgents.length }} of {{ currentAgents.length }} {{ currentAgentsLabel }}
                     </span>
@@ -579,11 +633,11 @@ const workingActionFor = (agent) => {
                 </div>
 
                 <div
-                    v-if="visibleAgents.length"
+                    v-if="sortedVisibleAgents.length"
                     class="grid gap-4 pb-6 sm:grid-cols-2 xl:grid-cols-3"
                 >
                     <AgentCard
-                        v-for="agent in visibleAgents"
+                        v-for="agent in sortedVisibleAgents"
                         :key="agent.id"
                         :agent="agent"
                         :archived="showingArchived"
