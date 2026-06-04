@@ -18,6 +18,10 @@ watch(sharedUnread, (count) => {
 });
 
 const fetchNotifications = async () => {
+    if (loading.value) {
+        return;
+    }
+
     loading.value = true;
     try {
         const response = await axios.get(route('notifications.index'));
@@ -196,14 +200,24 @@ const linkFor = (notification) => {
                     <h4 class="text-sm font-semibold text-gray-900">
                         Notifications
                     </h4>
-                    <button
-                        v-if="unreadCount > 0"
-                        type="button"
-                        class="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
-                        @click.stop="markAllAsRead"
-                    >
-                        Mark all read
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button
+                            type="button"
+                            class="text-xs font-semibold text-gray-500 hover:text-gray-700 disabled:text-gray-300"
+                            :disabled="loading"
+                            @click.stop="fetchNotifications"
+                        >
+                            {{ loading ? 'Refreshing...' : 'Refresh' }}
+                        </button>
+                        <button
+                            v-if="unreadCount > 0"
+                            type="button"
+                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                            @click.stop="markAllAsRead"
+                        >
+                            Mark all read
+                        </button>
+                    </div>
                 </div>
                 <div
                     v-if="loading && notifications.length === 0"
