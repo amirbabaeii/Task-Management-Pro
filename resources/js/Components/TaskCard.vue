@@ -6,7 +6,7 @@ import {
     formatPriority,
     priorityBadgeClass,
 } from '@/lib/format';
-import { hiddenTagCount, visibleTags } from '@/lib/task';
+import { commentCount, hiddenTagCount, visibleTags } from '@/lib/task';
 
 defineProps({
     task: {
@@ -64,6 +64,9 @@ const checklistPercent = (task) => {
 
     return Math.round((completedChecklistCount(task) / total) * 100);
 };
+
+const taskCommentCount = (task) =>
+    Array.isArray(task.comments) ? commentCount(task.comments) : 0;
 </script>
 
 <template>
@@ -169,6 +172,13 @@ const checklistPercent = (task) => {
                 :class="deadlineBadgeClass(task.deadline_at)"
             >
                 {{ formatDeadlineLabel(task.deadline_at) }}
+            </span>
+            <span
+                v-if="taskCommentCount(task)"
+                class="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500"
+            >
+                {{ taskCommentCount(task) }}
+                {{ taskCommentCount(task) === 1 ? 'Comment' : 'Comments' }}
             </span>
             <div class="ml-auto flex items-center gap-2">
                 <button
