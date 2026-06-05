@@ -73,8 +73,52 @@ const props = defineProps({
     },
 });
 
-const initialFilterPreferences = normalizeBoardFilterPreferences(
+const filterPreferencesFromQuery = (preferences = {}) => {
+    const normalized = normalizeBoardFilterPreferences(preferences);
+
+    if (typeof window === 'undefined') {
+        return normalized;
+    }
+
+    try {
+        const params = new URL(window.location.href).searchParams;
+        const queryPreferences = {};
+        const priorities = params
+            .getAll('priority')
+            .flatMap((value) => value.split(','))
+            .map((value) => value.trim())
+            .filter(Boolean);
+
+        if (params.has('deadline')) {
+            queryPreferences.deadline = params.get('deadline');
+        }
+
+        if (params.has('search')) {
+            queryPreferences.search = params.get('search') ?? '';
+        }
+
+        if (params.has('view')) {
+            queryPreferences.view = params.get('view');
+        }
+
+        if (priorities.length) {
+            queryPreferences.priorities = priorities;
+        }
+
+        return normalizeBoardFilterPreferences({
+            ...normalized,
+            ...queryPreferences,
+        });
+    } catch {
+        return normalized;
+    }
+};
+
+const savedInitialFilterPreferences = normalizeBoardFilterPreferences(
     props.filterPreferences,
+);
+const initialFilterPreferences = filterPreferencesFromQuery(
+    savedInitialFilterPreferences,
 );
 const tasks = ref(props.tasks.map(normalizeTask));
 const archivedTasks = ref(props.archivedTasks.map(normalizeTask));
@@ -91,7 +135,7 @@ const showingCreateModal = ref(false);
 const showingDetailsModal = ref(false);
 const showingEditModal = ref(false);
 const showingArchived = ref(initialFilterPreferences.view === 'archived');
-const savedFilterPreferences = ref(initialFilterPreferences);
+const savedFilterPreferences = ref(savedInitialFilterPreferences);
 const savingFilterPreferences = ref(false);
 const selectedTaskId = ref(null);
 const editingTaskId = ref(null);

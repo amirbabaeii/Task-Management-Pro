@@ -27,11 +27,21 @@ const summary = computed(() => props.dashboard.summary ?? {});
 const boards = computed(() => props.dashboard.boards ?? []);
 const upcomingTasks = computed(() => props.dashboard.upcoming_tasks ?? []);
 const recentActivity = computed(() => props.dashboard.recent_activity ?? []);
-const primaryBoardHref = computed(() =>
-    boards.value.length
-        ? route('tasks.board', { board: boards.value[0].id })
-        : route('tasks.board'),
-);
+const boardHref = (board, params = {}) => {
+    if (! board?.id) {
+        return route('tasks.board');
+    }
+
+    const href = route('tasks.board', { board: board.id });
+    const query = new URLSearchParams(
+        Object.entries(params).filter(([, value]) => value),
+    ).toString();
+
+    return query ? `${href}?${query}` : href;
+};
+const primaryBoardHref = computed(() => boardHref(boards.value[0]));
+const primaryBoardFilterHref = (params = {}) =>
+    boards.value.length ? boardHref(boards.value[0], params) : route('tasks.board');
 const taskHref = (task) => {
     if (! task?.board?.id) {
         return route('tasks.board');
@@ -59,6 +69,8 @@ const metrics = computed(() => [
         value: summary.value.active_tasks ?? 0,
         detail: `${summary.value.total_tasks ?? 0} assigned total`,
         class: 'border-gray-200 bg-white text-gray-900',
+        href: primaryBoardFilterHref({ view: 'active' }),
+        action: 'Open',
     },
     {
         label: 'Overdue',
@@ -68,6 +80,8 @@ const metrics = computed(() => [
             (summary.value.overdue_tasks ?? 0) > 0
                 ? 'border-rose-200 bg-rose-50 text-rose-900'
                 : 'border-gray-200 bg-white text-gray-900',
+        href: primaryBoardFilterHref({ deadline: 'overdue' }),
+        action: 'Review',
     },
     {
         label: 'Due today',
@@ -77,6 +91,8 @@ const metrics = computed(() => [
             (summary.value.due_today_tasks ?? 0) > 0
                 ? 'border-amber-200 bg-amber-50 text-amber-900'
                 : 'border-gray-200 bg-white text-gray-900',
+        href: primaryBoardFilterHref({ deadline: 'today' }),
+        action: 'Plan',
     },
     {
         label: 'Completed',
@@ -163,6 +179,13 @@ const activityDotClass = (kind) => {
                         <div class="mt-1 text-xs text-gray-500">
                             {{ metric.detail }}
                         </div>
+                        <Link
+                            v-if="metric.href && metric.value > 0"
+                            :href="metric.href"
+                            class="mt-3 inline-flex rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        >
+                            {{ metric.action }}
+                        </Link>
                     </div>
                 </section>
 
