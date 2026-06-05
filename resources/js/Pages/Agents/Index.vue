@@ -6,7 +6,7 @@ import UndoToast from '@/Components/UndoToast.vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head } from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 const props = defineProps({
     agents: {
@@ -25,7 +25,6 @@ const showingArchived = ref(false);
 const searchQuery = ref('');
 const boardFilter = ref(null);
 const workloadFilter = ref('all');
-const sortMode = ref('name');
 const showingFormModal = ref(false);
 const editingAgentId = ref(null);
 const saving = ref(false);
@@ -66,6 +65,34 @@ const sortOptions = [
     { value: 'overdue', label: 'Overdue' },
     { value: 'boards', label: 'Boards' },
 ];
+const sortOptionValues = sortOptions.map((option) => option.value);
+const sortStorageKey = 'task-management-pro.agent-sort';
+const readSavedSortMode = () => {
+    if (typeof window === 'undefined') {
+        return 'name';
+    }
+
+    try {
+        const saved = window.localStorage.getItem(sortStorageKey);
+
+        return sortOptionValues.includes(saved) ? saved : 'name';
+    } catch {
+        return 'name';
+    }
+};
+const sortMode = ref(readSavedSortMode());
+
+watch(sortMode, (mode) => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(sortStorageKey, mode);
+    } catch {
+        // Local storage is a convenience only.
+    }
+});
 const editingAgent = computed(
     () =>
         [...agents.value, ...archivedAgents.value].find(
