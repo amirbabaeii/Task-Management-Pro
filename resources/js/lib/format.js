@@ -175,13 +175,26 @@ export const formatDeadlineLabel = (value) => {
     }
 
     const state = deadlineState(value);
+    const daysUntil = daysUntilDate(value);
 
     if (state === 'overdue') {
-        return `Overdue ${formattedDate}`;
+        const daysOverdue = Math.abs(daysUntil);
+
+        return daysOverdue === 1
+            ? 'Overdue yesterday'
+            : `Overdue ${daysOverdue} days`;
     }
 
     if (state === 'today') {
         return 'Due today';
+    }
+
+    if (daysUntil === 1) {
+        return 'Due tomorrow';
+    }
+
+    if (state === 'soon') {
+        return `Due in ${daysUntil} days`;
     }
 
     return `Due ${formattedDate}`;
