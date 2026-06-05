@@ -548,9 +548,17 @@ const workingActionFor = (agent) => {
                             v-model="searchQuery"
                             type="search"
                             placeholder="Search agents, skills, or assignments..."
-                            class="block w-full rounded-md border-gray-300 py-1.5 pl-8 pr-3 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                            class="block w-full rounded-md border-gray-300 py-1.5 pl-8 pr-16 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
                             autocomplete="off"
                         />
+                        <button
+                            v-if="searchQuery"
+                            type="button"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            @click="searchQuery = ''"
+                        >
+                            Clear
+                        </button>
                     </div>
 
                     <label class="flex items-center gap-2 text-xs">
