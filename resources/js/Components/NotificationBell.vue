@@ -248,6 +248,14 @@ const linkFor = (notification) => {
                     <p class="mt-1 text-xs text-gray-500">
                         You're all caught up.
                     </p>
+                    <button
+                        type="button"
+                        class="mt-3 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600 transition hover:bg-gray-50 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:text-gray-300"
+                        :disabled="loading"
+                        @click.stop="fetchNotifications"
+                    >
+                        {{ loading ? 'Checking...' : 'Check again' }}
+                    </button>
                 </div>
                 <ul
                     v-else
