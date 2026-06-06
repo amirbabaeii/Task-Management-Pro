@@ -112,6 +112,24 @@ const completionPercent = (counts = {}) => {
     return Math.round(((counts.completed_tasks ?? 0) / total) * 100);
 };
 
+const boardQuickLinks = (board) => [
+    {
+        label: 'Active',
+        count: board.task_counts?.active_tasks ?? 0,
+        href: boardHref(board, { view: 'active' }),
+    },
+    {
+        label: 'Today',
+        count: board.task_counts?.due_today_tasks ?? 0,
+        href: boardHref(board, { deadline: 'today' }),
+    },
+    {
+        label: 'Overdue',
+        count: board.task_counts?.overdue_tasks ?? 0,
+        href: boardHref(board, { deadline: 'overdue' }),
+    },
+];
+
 const activityDotClass = (kind) => {
     switch (kind) {
         case 'created':
@@ -204,17 +222,19 @@ const activityDotClass = (kind) => {
                             v-if="boards.length"
                             class="grid gap-3 md:grid-cols-2"
                         >
-                            <Link
+                            <article
                                 v-for="board in boards"
                                 :key="board.id"
-                                :href="route('tasks.board', { board: board.id })"
-                                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-300 hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                             >
                                 <div class="flex items-start justify-between gap-3">
                                     <div class="min-w-0">
-                                        <div class="truncate text-sm font-semibold text-gray-900">
+                                        <Link
+                                            :href="boardHref(board)"
+                                            class="block truncate text-sm font-semibold text-gray-900 transition hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                        >
                                             {{ board.name }}
-                                        </div>
+                                        </Link>
                                         <div class="mt-1 text-xs text-gray-500">
                                             {{ board.is_owner ? 'Owner' : 'Collaborator' }}
                                         </div>
@@ -228,24 +248,19 @@ const activityDotClass = (kind) => {
                                 </div>
 
                                 <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
-                                    <div>
+                                    <Link
+                                        v-for="quickLink in boardQuickLinks(board)"
+                                        :key="quickLink.label"
+                                        :href="quickLink.href"
+                                        class="rounded-md border border-transparent px-2 py-1 transition hover:border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                    >
                                         <div class="font-semibold text-gray-900">
-                                            {{ board.task_counts.active_tasks }}
+                                            {{ quickLink.count }}
                                         </div>
-                                        <div class="text-gray-500">Active</div>
-                                    </div>
-                                    <div>
-                                        <div class="font-semibold text-gray-900">
-                                            {{ board.task_counts.due_today_tasks }}
+                                        <div class="text-gray-500">
+                                            {{ quickLink.label }}
                                         </div>
-                                        <div class="text-gray-500">Today</div>
-                                    </div>
-                                    <div>
-                                        <div class="font-semibold text-gray-900">
-                                            {{ board.task_counts.completed_tasks }}
-                                        </div>
-                                        <div class="text-gray-500">Done</div>
-                                    </div>
+                                    </Link>
                                 </div>
 
                                 <div class="mt-4 h-2 rounded-full bg-gray-100">
@@ -257,7 +272,7 @@ const activityDotClass = (kind) => {
                                 <div class="mt-1 text-[11px] text-gray-500">
                                     {{ completionPercent(board.task_counts) }}% complete
                                 </div>
-                            </Link>
+                            </article>
                         </div>
 
                         <div
