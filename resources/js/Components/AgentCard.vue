@@ -1,6 +1,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 import {
+    formatDate,
     formatPriority,
     formatStatus,
     priorityBadgeClass,
@@ -33,6 +34,9 @@ const hiddenBoardCount = computed(() =>
     Math.max(0, (props.agent.boards?.length ?? 0) - visibleBoards.value.length),
 );
 const nextTasks = computed(() => (props.agent.next_tasks ?? []).slice(0, 3));
+const archivedLabel = computed(() =>
+    props.agent.archived_at ? formatDate(props.agent.archived_at) : null,
+);
 const workloadCount = (key) => Number(props.agent.workload?.[key] ?? 0);
 const statusBadgeClass = (status) => {
     if (status === 'completed') {
@@ -100,6 +104,12 @@ const isOverdue = (value) => {
                 </h3>
                 <p class="mt-1 truncate text-xs text-gray-500">
                     {{ agent.title || 'AI agent' }} - {{ agent.email }}
+                </p>
+                <p
+                    v-if="archived && archivedLabel"
+                    class="mt-1 text-[11px] font-medium uppercase tracking-wide text-gray-400"
+                >
+                    Archived {{ archivedLabel }}
                 </p>
             </div>
             <span
