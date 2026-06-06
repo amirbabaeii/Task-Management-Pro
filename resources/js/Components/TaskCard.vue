@@ -149,7 +149,7 @@ const taskCommentCount = (task) =>
                 </span>
                 <span>
                     {{ completedChecklistCount(task) }}/{{ task.checklist_items.length }}
-                    done
+                    done · {{ checklistPercent(task) }}%
                 </span>
             </div>
             <div class="mt-1.5 h-1.5 rounded-full bg-gray-100">
