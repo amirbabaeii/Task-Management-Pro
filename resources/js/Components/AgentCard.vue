@@ -1,7 +1,9 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 import {
+    deadlineBadgeClass,
     formatDate,
+    formatDeadlineLabel,
     formatPriority,
     formatStatus,
     priorityBadgeClass,
@@ -65,31 +67,8 @@ const assignmentHref = (task) => {
 
     return `${route('tasks.board', { board: task.board_id })}?${query}`;
 };
-const formatDeadline = (value) => {
-    if (!value) {
-        return 'No date';
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return 'No date';
-    }
-
-    return new Intl.DateTimeFormat(undefined, {
-        month: 'short',
-        day: 'numeric',
-    }).format(date);
-};
-const isOverdue = (value) => {
-    if (!value) {
-        return false;
-    }
-
-    const date = new Date(value);
-
-    return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
-};
+const assignmentDeadlineLabel = (value) =>
+    formatDeadlineLabel(value) ?? 'No date';
 </script>
 
 <template>
@@ -240,10 +219,10 @@ const isOverdue = (value) => {
                                 {{ task.board_name || 'Board' }}
                             </span>
                             <span
-                                class="shrink-0 text-[11px] font-medium"
-                                :class="isOverdue(task.deadline_at) ? 'text-rose-600' : 'text-gray-500'"
+                                class="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                :class="deadlineBadgeClass(task.deadline_at)"
                             >
-                                {{ formatDeadline(task.deadline_at) }}
+                                {{ assignmentDeadlineLabel(task.deadline_at) }}
                             </span>
                         </div>
                     </Link>
@@ -268,10 +247,10 @@ const isOverdue = (value) => {
                                 {{ task.board_name || 'Board' }}
                             </span>
                             <span
-                                class="shrink-0 text-[11px] font-medium"
-                                :class="isOverdue(task.deadline_at) ? 'text-rose-600' : 'text-gray-500'"
+                                class="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                :class="deadlineBadgeClass(task.deadline_at)"
                             >
-                                {{ formatDeadline(task.deadline_at) }}
+                                {{ assignmentDeadlineLabel(task.deadline_at) }}
                             </span>
                         </div>
                     </div>
