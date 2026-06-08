@@ -12,6 +12,9 @@ const loading = ref(false);
 const loaded = ref(false);
 
 const sharedUnread = computed(() => page.props.unreadNotifications ?? 0);
+const unreadLabel = computed(() =>
+    unreadCount.value === 1 ? '1 unread' : `${unreadCount.value} unread`,
+);
 
 watch(sharedUnread, (count) => {
     unreadCount.value = count;
@@ -197,9 +200,17 @@ const linkFor = (notification) => {
                 <div
                     class="flex items-center justify-between border-b border-gray-100 px-4 py-3"
                 >
-                    <h4 class="text-sm font-semibold text-gray-900">
-                        Notifications
-                    </h4>
+                    <div class="flex items-center gap-2">
+                        <h4 class="text-sm font-semibold text-gray-900">
+                            Notifications
+                        </h4>
+                        <span
+                            v-if="unreadCount > 0"
+                            class="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700"
+                        >
+                            {{ unreadLabel }}
+                        </span>
+                    </div>
                     <div class="flex items-center gap-2">
                         <button
                             type="button"
