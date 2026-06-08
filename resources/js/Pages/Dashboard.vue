@@ -42,6 +42,9 @@ const boardHref = (board, params = {}) => {
 const primaryBoardHref = computed(() => boardHref(boards.value[0]));
 const primaryBoardFilterHref = (params = {}) =>
     boards.value.length ? boardHref(boards.value[0], params) : route('tasks.board');
+const dueSoonHref = computed(() =>
+    primaryBoardFilterHref({ deadline: 'upcoming' }),
+);
 const taskHref = (task) => {
     if (! task?.board?.id) {
         return route('tasks.board');
@@ -213,8 +216,15 @@ const activityDotClass = (kind) => {
                             <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">
                                 Boards
                             </h3>
-                            <span class="text-xs text-gray-500">
+                            <Link
+                                v-if="(summary.due_soon_tasks ?? 0) > 0"
+                                :href="dueSoonHref"
+                                class="rounded-md px-2 py-1 text-xs font-semibold text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                            >
                                 {{ summary.due_soon_tasks ?? 0 }} due in the next week
+                            </Link>
+                            <span v-else class="text-xs text-gray-500">
+                                0 due in the next week
                             </span>
                         </div>
 
