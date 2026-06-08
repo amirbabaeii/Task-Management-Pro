@@ -182,6 +182,13 @@ const taskCommentCount = (task) =>
             </span>
             <div class="ml-auto flex items-center gap-2">
                 <button
+                    type="button"
+                    class="rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600 transition hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    @click.stop="emit('open-details', task)"
+                >
+                    Open
+                </button>
+                <button
                     v-if="canEdit"
                     type="button"
                     class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
