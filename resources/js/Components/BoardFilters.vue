@@ -74,6 +74,11 @@ const deadlineOptions = [
     { value: 'upcoming', label: 'Next 7' },
     { value: 'none', label: 'No date' },
 ];
+const deadlineLabel = computed(
+    () =>
+        deadlineOptions.find((option) => option.value === deadlineFilter.value)
+            ?.label ?? null,
+);
 
 // "Me" appears first when the current user is on the board.
 const assigneeOptions = computed(() => {
@@ -85,6 +90,22 @@ const assigneeOptions = computed(() => {
         return a.name.localeCompare(b.name);
     });
     return sorted;
+});
+
+const assigneeLabel = computed(() => {
+    if (assigneeFilter.value === null) {
+        return null;
+    }
+
+    const assignee = assigneeOptions.value.find(
+        (member) => Number(member.id) === Number(assigneeFilter.value),
+    );
+
+    if (!assignee) {
+        return null;
+    }
+
+    return assignee.id === props.currentUserId ? 'Me' : assignee.name;
 });
 </script>
 
@@ -243,6 +264,49 @@ const assigneeOptions = computed(() => {
                 @click="emit('reset-saved-filters')"
             >
                 Reset
+            </button>
+        </div>
+
+        <div
+            v-if="hasActiveFilters"
+            class="flex basis-full flex-wrap items-center gap-1.5 border-t border-gray-100 pt-2 text-[11px]"
+        >
+            <span class="font-semibold uppercase tracking-wide text-gray-400">
+                Filters
+            </span>
+            <button
+                v-if="searchQuery"
+                type="button"
+                class="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 font-medium text-gray-600 transition hover:bg-white hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                @click="searchQuery = ''"
+            >
+                Search: {{ searchQuery }}
+            </button>
+            <button
+                v-for="priority in activePriorities"
+                :key="`chip-priority-${priority}`"
+                type="button"
+                class="rounded-full border px-2 py-0.5 font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                :class="priorityBadgeClass(priority)"
+                @click="emit('toggle-priority', priority)"
+            >
+                Priority: {{ formatPriority(priority) }}
+            </button>
+            <button
+                v-if="deadlineFilter !== 'all' && deadlineLabel"
+                type="button"
+                class="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 font-medium text-gray-600 transition hover:bg-white hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                @click="deadlineFilter = 'all'"
+            >
+                Due: {{ deadlineLabel }}
+            </button>
+            <button
+                v-if="assigneeLabel"
+                type="button"
+                class="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 font-medium text-gray-600 transition hover:bg-white hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                @click="assigneeFilter = null"
+            >
+                Assignee: {{ assigneeLabel }}
             </button>
         </div>
     </div>
