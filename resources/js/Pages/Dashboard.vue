@@ -127,6 +127,11 @@ const boardQuickLinks = (board) => [
         href: boardHref(board, { deadline: 'today' }),
     },
     {
+        label: 'Next 7',
+        count: board.task_counts?.due_soon_tasks ?? 0,
+        href: boardHref(board, { deadline: 'upcoming' }),
+    },
+    {
         label: 'Overdue',
         count: board.task_counts?.overdue_tasks ?? 0,
         href: boardHref(board, { deadline: 'overdue' }),
@@ -257,7 +262,7 @@ const activityDotClass = (kind) => {
                                     </span>
                                 </div>
 
-                                <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+                                <div class="mt-4 grid grid-cols-4 gap-2 text-xs">
                                     <Link
                                         v-for="quickLink in boardQuickLinks(board)"
                                         :key="quickLink.label"
