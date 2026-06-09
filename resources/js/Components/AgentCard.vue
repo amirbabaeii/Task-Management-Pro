@@ -40,6 +40,11 @@ const archivedLabel = computed(() =>
     props.agent.archived_at ? formatDate(props.agent.archived_at) : null,
 );
 const workloadCount = (key) => Number(props.agent.workload?.[key] ?? 0);
+const boardAccessLabel = computed(() => {
+    const count = workloadCount('boards');
+
+    return count === 1 ? '1 board' : `${count} boards`;
+});
 const statusBadgeClass = (status) => {
     if (status === 'completed') {
         return 'border-emerald-200 bg-emerald-50 text-emerald-700';
@@ -145,8 +150,9 @@ const assignmentDeadlineLabel = (value) =>
             v-if="visibleBoards.length"
             class="mt-3 space-y-2"
         >
-            <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                Board Access
+            <div class="flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-wide">
+                <span class="text-gray-500">Board Access</span>
+                <span class="text-gray-400">{{ boardAccessLabel }}</span>
             </div>
             <div class="flex flex-wrap gap-1.5">
                 <Link
