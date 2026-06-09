@@ -107,6 +107,12 @@ const assigneeLabel = computed(() => {
 
     return assignee.id === props.currentUserId ? 'Me' : assignee.name;
 });
+
+const resultSummary = computed(() => {
+    const totalLabel = props.totalCount === 1 ? 'task' : 'tasks';
+
+    return `Showing ${props.matchedCount} of ${props.totalCount} ${totalLabel}`;
+});
 </script>
 
 <template>
@@ -232,7 +238,7 @@ const assigneeLabel = computed(() => {
                 v-if="hasActiveFilters"
                 class="text-xs text-gray-500"
             >
-                {{ matchedCount }} of {{ totalCount }}
+                {{ resultSummary }}
             </span>
             <button
                 v-if="hasActiveFilters"
