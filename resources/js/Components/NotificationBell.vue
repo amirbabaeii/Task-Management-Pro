@@ -282,21 +282,32 @@ const linkFor = (notification) => {
                     >
                         <Link
                             :href="linkFor(notification)"
-                            class="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
+                            class="flex gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
                             @click="markAsRead(notification)"
                         >
                             <span
-                                class="mb-1.5 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                                :class="kindBadgeClass(notification)"
-                            >
-                                {{ kindLabel(notification) }}
+                                class="mt-2 h-2 w-2 shrink-0 rounded-full"
+                                :class="
+                                    notification.read_at
+                                        ? 'bg-transparent'
+                                        : 'bg-indigo-500'
+                                "
+                                aria-hidden="true"
+                            />
+                            <span class="min-w-0 flex-1">
+                                <span
+                                    class="mb-1.5 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                    :class="kindBadgeClass(notification)"
+                                >
+                                    {{ kindLabel(notification) }}
+                                </span>
+                                <span class="block leading-snug">
+                                    {{ summarize(notification) }}
+                                </span>
+                                <span class="mt-1 block text-[10px] text-gray-400">
+                                    {{ formatDateTime(notification.created_at) }}
+                                </span>
                             </span>
-                            <p class="leading-snug">
-                                {{ summarize(notification) }}
-                            </p>
-                            <p class="mt-1 text-[10px] text-gray-400">
-                                {{ formatDateTime(notification.created_at) }}
-                            </p>
                         </Link>
                     </li>
                 </ul>
