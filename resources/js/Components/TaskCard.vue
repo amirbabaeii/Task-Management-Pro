@@ -67,6 +67,9 @@ const checklistPercent = (task) => {
 
 const taskCommentCount = (task) =>
     Array.isArray(task.comments) ? commentCount(task.comments) : 0;
+
+const assigneeCount = (task) =>
+    Array.isArray(task.assignees) ? task.assignees.length : 0;
 </script>
 
 <template>
@@ -166,6 +169,13 @@ const taskCommentCount = (task) =>
                 :users="task.assignees"
                 :max="3"
             />
+            <span
+                v-if="assigneeCount(task)"
+                class="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500"
+            >
+                {{ assigneeCount(task) }}
+                {{ assigneeCount(task) === 1 ? 'Assignee' : 'Assignees' }}
+            </span>
             <span
                 v-if="formatDeadlineLabel(task.deadline_at)"
                 class="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
