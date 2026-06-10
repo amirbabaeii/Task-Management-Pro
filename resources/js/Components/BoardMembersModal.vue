@@ -51,6 +51,7 @@ const emit = defineEmits(['close', 'invite', 'add-agent', 'remove']);
 
 const inviteEmail = ref('');
 const memberSearch = ref('');
+const agentSearch = ref('');
 
 const sortedMembers = computed(() =>
     [...props.members].sort((a, b) => {
@@ -81,6 +82,20 @@ const filteredMembers = computed(() => {
 const sortedAvailableAgents = computed(() =>
     [...props.availableAgents].sort((a, b) => a.name.localeCompare(b.name)),
 );
+
+const filteredAvailableAgents = computed(() => {
+    const query = agentSearch.value.trim().toLowerCase();
+
+    if (!query) {
+        return sortedAvailableAgents.value;
+    }
+
+    return sortedAvailableAgents.value.filter((agent) =>
+        [agent.name, agent.email, agent.agent_title]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(query)),
+    );
+});
 
 const memberStats = computed(() => [
     {
@@ -151,6 +166,7 @@ watch(
         if (next) {
             inviteEmail.value = '';
             memberSearch.value = '';
+            agentSearch.value = '';
         }
     },
 );
@@ -229,12 +245,25 @@ watch(
                         Managed Agents
                     </div>
                     <div class="text-xs text-gray-500">
+                        {{ filteredAvailableAgents.length }} of
                         {{ sortedAvailableAgents.length }} available
                     </div>
                 </div>
-                <ul class="divide-y divide-gray-200">
+                <div class="border-b border-gray-200 px-3 py-2">
+                    <TextInput
+                        v-model="agentSearch"
+                        type="search"
+                        class="block w-full"
+                        placeholder="Search agents by name, email, or title..."
+                        autocomplete="off"
+                    />
+                </div>
+                <ul
+                    v-if="filteredAvailableAgents.length"
+                    class="divide-y divide-gray-200"
+                >
                     <li
-                        v-for="agent in sortedAvailableAgents"
+                        v-for="agent in filteredAvailableAgents"
                         :key="agent.id"
                         class="flex items-center gap-3 px-3 py-2"
                     >
@@ -261,6 +290,12 @@ watch(
                         </button>
                     </li>
                 </ul>
+                <div
+                    v-else
+                    class="px-4 py-5 text-center text-sm text-gray-500"
+                >
+                    No available agents match this search.
+                </div>
             </div>
 
             <div class="mt-6">
