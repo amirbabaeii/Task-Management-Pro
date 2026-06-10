@@ -5,7 +5,8 @@ import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import {
-    formatDate,
+    deadlineBadgeClass,
+    formatDeadlineLabel,
     formatDateTime,
     formatPriority,
     priorityBadgeClass,
@@ -245,7 +246,14 @@ const activityDotClass = (kind) => {
                             Due Date
                         </div>
                         <div class="mt-1 text-sm text-gray-700">
-                            {{ formatDate(task.deadline_at) || 'No deadline set' }}
+                            <span
+                                v-if="formatDeadlineLabel(task.deadline_at)"
+                                class="inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+                                :class="deadlineBadgeClass(task.deadline_at)"
+                            >
+                                {{ formatDeadlineLabel(task.deadline_at) }}
+                            </span>
+                            <span v-else>No deadline set</span>
                         </div>
                     </div>
                     <div class="rounded-lg bg-gray-50 px-4 py-3">
