@@ -50,6 +50,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'invite', 'add-agent', 'remove']);
 
 const inviteEmail = ref('');
+const memberSearch = ref('');
 
 const sortedMembers = computed(() =>
     [...props.members].sort((a, b) => {
@@ -62,6 +63,20 @@ const sortedMembers = computed(() =>
         return a.name.localeCompare(b.name);
     }),
 );
+
+const filteredMembers = computed(() => {
+    const query = memberSearch.value.trim().toLowerCase();
+
+    if (!query) {
+        return sortedMembers.value;
+    }
+
+    return sortedMembers.value.filter((member) =>
+        [member.name, member.email]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(query)),
+    );
+});
 
 const sortedAvailableAgents = computed(() =>
     [...props.availableAgents].sort((a, b) => a.name.localeCompare(b.name)),
@@ -135,6 +150,7 @@ watch(
     (next) => {
         if (next) {
             inviteEmail.value = '';
+            memberSearch.value = '';
         }
     },
 );
@@ -248,15 +264,31 @@ watch(
             </div>
 
             <div class="mt-6">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Board Members
+                    </h4>
+                    <span class="text-xs text-gray-500">
+                        {{ filteredMembers.length }} of {{ members.length }}
+                    </span>
+                </div>
+                <TextInput
+                    v-if="members.length"
+                    v-model="memberSearch"
+                    type="search"
+                    class="mb-3 block w-full"
+                    placeholder="Search members by name or email..."
+                    autocomplete="off"
+                />
                 <div
                     v-if="loading && members.length === 0"
                     class="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500"
                 >
                     Loading members...
                 </div>
-                <ul v-else class="divide-y divide-gray-100">
+                <ul v-else-if="filteredMembers.length" class="divide-y divide-gray-100">
                     <li
-                        v-for="member in sortedMembers"
+                        v-for="member in filteredMembers"
                         :key="member.id"
                         class="flex items-center gap-3 py-3"
                     >
@@ -296,6 +328,12 @@ watch(
                         </DangerButton>
                     </li>
                 </ul>
+                <div
+                    v-else
+                    class="rounded-md border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500"
+                >
+                    No members match this search.
+                </div>
             </div>
 
             <div class="mt-6 flex items-center justify-end">
