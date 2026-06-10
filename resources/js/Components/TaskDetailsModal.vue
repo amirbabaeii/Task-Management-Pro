@@ -11,7 +11,7 @@ import {
     priorityBadgeClass,
 } from '@/lib/format';
 import { commentCount } from '@/lib/task';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     show: {
@@ -77,6 +77,9 @@ const replyDraft = defineModel('replyDraft', {
 });
 
 const checklistItems = computed(() => props.task?.checklist_items ?? []);
+const copiedTaskLink = ref(false);
+let copiedTaskLinkTimer = null;
+
 const completedChecklistCount = computed(
     () => checklistItems.value.filter((item) => item.completed).length,
 );
@@ -92,6 +95,45 @@ const checklistPercent = computed(() => {
 
 const isArchivedAgent = (user) =>
     Boolean(user.is_archived_agent || (user.is_agent && user.agent_archived_at));
+
+const copyTaskLink = async () => {
+    if (typeof window === 'undefined' || !props.task?.id) {
+        return;
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('task', props.task.id);
+
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(url.toString());
+        } else {
+            const input = document.createElement('textarea');
+            input.value = url.toString();
+            input.style.position = 'fixed';
+            input.style.opacity = '0';
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            input.remove();
+        }
+
+        copiedTaskLink.value = true;
+        window.clearTimeout(copiedTaskLinkTimer);
+        copiedTaskLinkTimer = window.setTimeout(() => {
+            copiedTaskLink.value = false;
+        }, 2000);
+    } catch {
+        copiedTaskLink.value = false;
+    }
+};
+
+watch(
+    () => props.task?.id,
+    () => {
+        copiedTaskLink.value = false;
+    },
+);
 
 const activityDotClass = (kind) => {
     switch (kind) {
@@ -144,6 +186,18 @@ const activityDotClass = (kind) => {
                     </div>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
+                    <button
+                        type="button"
+                        class="rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-widest transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        :class="
+                            copiedTaskLink
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                        "
+                        @click="copyTaskLink"
+                    >
+                        {{ copiedTaskLink ? 'Copied' : 'Copy Link' }}
+                    </button>
                     <SecondaryButton
                         v-if="!task.archived_at"
                         @click="emit('open-edit')"
