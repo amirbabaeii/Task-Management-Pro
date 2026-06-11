@@ -9,7 +9,7 @@ import {
     priorityBadgeClass,
 } from '@/lib/format';
 import { Head, Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     dashboard: {
@@ -27,6 +27,14 @@ const summary = computed(() => props.dashboard.summary ?? {});
 const boards = computed(() => props.dashboard.boards ?? []);
 const upcomingTasks = computed(() => props.dashboard.upcoming_tasks ?? []);
 const recentActivity = computed(() => props.dashboard.recent_activity ?? []);
+const boardSort = ref('default');
+const boardSortOptions = [
+    { value: 'default', label: 'Default' },
+    { value: 'overdue', label: 'Most overdue' },
+    { value: 'active', label: 'Most active' },
+    { value: 'completion', label: 'Most complete' },
+    { value: 'name', label: 'Name' },
+];
 const boardHref = (board, params = {}) => {
     if (! board?.id) {
         return route('tasks.board');
@@ -114,6 +122,43 @@ const completionPercent = (counts = {}) => {
 
     return Math.round(((counts.completed_tasks ?? 0) / total) * 100);
 };
+
+const sortedBoards = computed(() => {
+    const items = [...boards.value];
+
+    if (boardSort.value === 'overdue') {
+        return items.sort(
+            (a, b) =>
+                (b.task_counts?.overdue_tasks ?? 0) -
+                    (a.task_counts?.overdue_tasks ?? 0) ||
+                a.name.localeCompare(b.name),
+        );
+    }
+
+    if (boardSort.value === 'active') {
+        return items.sort(
+            (a, b) =>
+                (b.task_counts?.active_tasks ?? 0) -
+                    (a.task_counts?.active_tasks ?? 0) ||
+                a.name.localeCompare(b.name),
+        );
+    }
+
+    if (boardSort.value === 'completion') {
+        return items.sort(
+            (a, b) =>
+                completionPercent(b.task_counts) -
+                    completionPercent(a.task_counts) ||
+                a.name.localeCompare(b.name),
+        );
+    }
+
+    if (boardSort.value === 'name') {
+        return items.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return items;
+});
 
 const boardQuickLinks = (board) => [
     {
@@ -217,20 +262,35 @@ const activityDotClass = (kind) => {
 
                 <section class="grid gap-8 lg:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.9fr)]">
                     <div>
-                        <div class="mb-3 flex items-center justify-between">
+                        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                             <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">
                                 Boards
                             </h3>
-                            <Link
-                                v-if="(summary.due_soon_tasks ?? 0) > 0"
-                                :href="dueSoonHref"
-                                class="rounded-md px-2 py-1 text-xs font-semibold text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                            >
-                                {{ summary.due_soon_tasks ?? 0 }} due in the next week
-                            </Link>
-                            <span v-else class="text-xs text-gray-500">
-                                0 due in the next week
-                            </span>
+                            <div class="flex items-center gap-2">
+                                <Link
+                                    v-if="(summary.due_soon_tasks ?? 0) > 0"
+                                    :href="dueSoonHref"
+                                    class="rounded-md px-2 py-1 text-xs font-semibold text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                >
+                                    {{ summary.due_soon_tasks ?? 0 }} due in the next week
+                                </Link>
+                                <span v-else class="text-xs text-gray-500">
+                                    0 due in the next week
+                                </span>
+                                <select
+                                    v-model="boardSort"
+                                    class="rounded-md border-gray-300 py-1 pl-2 pr-7 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                    aria-label="Sort boards"
+                                >
+                                    <option
+                                        v-for="option in boardSortOptions"
+                                        :key="option.value"
+                                        :value="option.value"
+                                    >
+                                        {{ option.label }}
+                                    </option>
+                                </select>
+                            </div>
                         </div>
 
                         <div
@@ -238,7 +298,7 @@ const activityDotClass = (kind) => {
                             class="grid gap-3 md:grid-cols-2"
                         >
                             <article
-                                v-for="board in boards"
+                                v-for="board in sortedBoards"
                                 :key="board.id"
                                 class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                             >
