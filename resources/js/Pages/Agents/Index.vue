@@ -24,6 +24,7 @@ const archivedAgents = ref([...props.archivedAgents]);
 const showingArchived = ref(false);
 const searchQuery = ref('');
 const boardFilter = ref(null);
+const skillFilter = ref('');
 const workloadFilter = ref('all');
 const showingFormModal = ref(false);
 const editingAgentId = ref(null);
@@ -104,6 +105,7 @@ const hasAgentFilters = computed(
     () =>
         searchQuery.value.trim() !== '' ||
         boardFilter.value !== null ||
+        skillFilter.value !== '' ||
         workloadFilter.value !== 'all',
 );
 const boardFilterOptions = computed(() => {
@@ -124,6 +126,16 @@ const boardFilterOptions = computed(() => {
         a.name.localeCompare(b.name),
     );
 });
+const skillFilterOptions = computed(() =>
+    [
+        ...new Set(
+            currentAgents.value
+                .flatMap((agent) => agent.skills ?? [])
+                .map((skill) => `${skill}`.trim())
+                .filter(Boolean),
+        ),
+    ].sort((a, b) => a.localeCompare(b)),
+);
 
 const searchableText = (agent) =>
     [
@@ -168,6 +180,13 @@ const matchesBoardFilter = (agent) =>
         (board) => Number(board.id) === Number(boardFilter.value),
     );
 
+const matchesSkillFilter = (agent) =>
+    skillFilter.value === '' ||
+    (agent.skills ?? []).some(
+        (skill) =>
+            `${skill}`.toLowerCase() === skillFilter.value.toLowerCase(),
+    );
+
 const visibleAgents = computed(() => {
     const query = searchQuery.value.trim().toLowerCase();
 
@@ -177,6 +196,7 @@ const visibleAgents = computed(() => {
         return (
             matchesSearch &&
             matchesBoardFilter(agent) &&
+            matchesSkillFilter(agent) &&
             matchesWorkloadFilter(agent)
         );
     });
@@ -217,6 +237,7 @@ const sortAgents = (items) =>
 const clearAgentFilters = () => {
     searchQuery.value = '';
     boardFilter.value = null;
+    skillFilter.value = '';
     workloadFilter.value = 'all';
 };
 
@@ -250,6 +271,10 @@ const emptyStateDetail = computed(() => {
 
     if (selectedBoardName.value) {
         parts.push(`board ${selectedBoardName.value}`);
+    }
+
+    if (skillFilter.value) {
+        parts.push(`skill ${skillFilter.value}`);
     }
 
     if (workloadFilter.value !== 'all') {
@@ -603,6 +628,28 @@ const workingActionFor = (agent) => {
                                 :value="board.id"
                             >
                                 {{ board.name }}
+                            </option>
+                        </select>
+                    </label>
+
+                    <label
+                        v-if="skillFilterOptions.length"
+                        class="flex items-center gap-2 text-xs"
+                    >
+                        <span class="font-semibold uppercase tracking-wide text-gray-500">
+                            Skill
+                        </span>
+                        <select
+                            v-model="skillFilter"
+                            class="rounded-md border-gray-300 py-1 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                        >
+                            <option value="">Any skill</option>
+                            <option
+                                v-for="skill in skillFilterOptions"
+                                :key="skill"
+                                :value="skill"
+                            >
+                                {{ skill }}
                             </option>
                         </select>
                     </label>
