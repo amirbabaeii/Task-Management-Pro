@@ -88,6 +88,7 @@ const replyDraft = defineModel('replyDraft', {
 
 const checklistItems = computed(() => props.task?.checklist_items ?? []);
 const copiedTaskLink = ref(false);
+const activityFilter = ref('all');
 let copiedTaskLinkTimer = null;
 
 const completedChecklistCount = computed(
@@ -105,6 +106,45 @@ const checklistPercent = computed(() => {
 
 const isArchivedAgent = (user) =>
     Boolean(user.is_archived_agent || (user.is_agent && user.agent_archived_at));
+
+const activityKindLabels = {
+    created: 'Created',
+    status_changed: 'Status',
+    assignees_changed: 'Assignees',
+    comment_added: 'Comments',
+    archived: 'Archived',
+    restored: 'Restored',
+    checklist_item_added: 'Checklist added',
+    checklist_item_completed: 'Checklist completed',
+    checklist_item_reopened: 'Checklist reopened',
+    checklist_item_renamed: 'Checklist renamed',
+    checklist_item_deleted: 'Checklist deleted',
+};
+
+const activityFilterOptions = computed(() => {
+    const kinds = [
+        ...new Set(
+            (props.task?.activities ?? [])
+                .map((activity) => activity.kind)
+                .filter(Boolean),
+        ),
+    ];
+
+    return kinds.map((kind) => ({
+        value: kind,
+        label: activityKindLabels[kind] ?? 'Other',
+    }));
+});
+
+const filteredActivities = computed(() => {
+    const activities = props.task?.activities ?? [];
+
+    return activityFilter.value === 'all'
+        ? activities
+        : activities.filter(
+              (activity) => activity.kind === activityFilter.value,
+          );
+});
 
 const copyTaskLink = async () => {
     if (typeof window === 'undefined' || !props.task?.id) {
@@ -142,6 +182,7 @@ watch(
     () => props.task?.id,
     () => {
         copiedTaskLink.value = false;
+        activityFilter.value = 'all';
     },
 );
 
@@ -469,13 +510,30 @@ const activityDotClass = (kind) => {
                         <h4 class="text-sm font-semibold text-gray-900">
                             Activity
                         </h4>
-                        <span class="text-xs text-gray-500">
-                            {{ task.activities.length }} entries
-                        </span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-500">
+                                {{ filteredActivities.length }} of
+                                {{ task.activities.length }}
+                            </span>
+                            <select
+                                v-if="activityFilterOptions.length > 1"
+                                v-model="activityFilter"
+                                class="rounded-md border-gray-300 py-1 pl-2 pr-7 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                            >
+                                <option value="all">All activity</option>
+                                <option
+                                    v-for="option in activityFilterOptions"
+                                    :key="option.value"
+                                    :value="option.value"
+                                >
+                                    {{ option.label }}
+                                </option>
+                            </select>
+                        </div>
                     </div>
                     <ol class="space-y-3 border-l-2 border-gray-100 pl-4">
                         <li
-                            v-for="activity in task.activities"
+                            v-for="activity in filteredActivities"
                             :key="activity.id"
                             class="relative text-sm text-gray-700"
                         >
