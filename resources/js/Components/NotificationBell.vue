@@ -11,6 +11,7 @@ const unreadCount = ref(page.props.unreadNotifications ?? 0);
 const loading = ref(false);
 const loaded = ref(false);
 const notificationFilter = ref('all');
+const notificationType = ref('all');
 
 const sharedUnread = computed(() => page.props.unreadNotifications ?? 0);
 const unreadLabel = computed(() =>
@@ -19,10 +20,46 @@ const unreadLabel = computed(() =>
 const loadedUnreadCount = computed(
     () => notifications.value.filter((notification) => !notification.read_at).length,
 );
+const notificationTypeOptions = computed(() => {
+    const kinds = [
+        ...new Set(
+            notifications.value
+                .map((notification) => notification.data?.kind)
+                .filter(Boolean),
+        ),
+    ];
+
+    return kinds.map((kind) => ({
+        value: kind,
+        label: kindLabel({ data: { kind } }),
+    }));
+});
 const visibleNotifications = computed(() =>
-    notificationFilter.value === 'unread'
-        ? notifications.value.filter((notification) => !notification.read_at)
-        : notifications.value,
+    notifications.value.filter((notification) => {
+        if (
+            notificationFilter.value === 'unread' &&
+            notification.read_at
+        ) {
+            return false;
+        }
+
+        return (
+            notificationType.value === 'all' ||
+            notification.data?.kind === notificationType.value
+        );
+    }),
+);
+const emptyFilterTitle = computed(() =>
+    notificationFilter.value === 'unread' &&
+    notificationType.value === 'all'
+        ? 'No unread notifications'
+        : 'No matching notifications',
+);
+const emptyFilterDetail = computed(() =>
+    notificationFilter.value === 'unread' &&
+    notificationType.value === 'all'
+        ? 'Everything in this list has been read.'
+        : 'Try another notification type or show the full list.',
 );
 
 watch(sharedUnread, (count) => {
@@ -267,6 +304,20 @@ const linkFor = (notification) => {
                     >
                         Unread {{ loadedUnreadCount }}
                     </button>
+                    <select
+                        v-if="notificationTypeOptions.length > 1"
+                        v-model="notificationType"
+                        class="ml-auto rounded-md border-gray-300 py-1 pl-2 pr-7 text-[11px] font-semibold uppercase tracking-wide text-gray-600 shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                    >
+                        <option value="all">All types</option>
+                        <option
+                            v-for="option in notificationTypeOptions"
+                            :key="option.value"
+                            :value="option.value"
+                        >
+                            {{ option.label }}
+                        </option>
+                    </select>
                 </div>
                 <div
                     v-if="loading && notifications.length === 0"
@@ -311,15 +362,18 @@ const linkFor = (notification) => {
                     class="px-4 py-8 text-center"
                 >
                     <p class="text-sm font-medium text-gray-700">
-                        No unread notifications
+                        {{ emptyFilterTitle }}
                     </p>
                     <p class="mt-1 text-xs text-gray-500">
-                        Everything in this list has been read.
+                        {{ emptyFilterDetail }}
                     </p>
                     <button
                         type="button"
                         class="mt-3 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600 transition hover:bg-gray-50 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                        @click.stop="notificationFilter = 'all'"
+                        @click.stop="
+                            notificationFilter = 'all';
+                            notificationType = 'all';
+                        "
                     >
                         Show all
                     </button>
