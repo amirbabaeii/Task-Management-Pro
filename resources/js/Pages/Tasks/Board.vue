@@ -1420,6 +1420,19 @@ const reorderTask = async (task, destinationStatus, beforeTaskId = null) => {
     }
 };
 
+const changeTaskStatusFromDetails = async (status) => {
+    if (
+        !activeTask.value ||
+        activeTask.value.archived_at ||
+        activeTask.value.status === status ||
+        !boardStatuses.value.includes(status)
+    ) {
+        return;
+    }
+
+    await reorderTask(activeTask.value, status);
+};
+
 const taskDragDrop = useTaskDragDrop({
     tasks,
     tasksByStatus,
@@ -2022,6 +2035,8 @@ const submitTaskUpdate = () => {
                     :show="showingDetailsModal"
                     :task="activeTask"
                     :format-status="formatStatus"
+                    :statuses="boardStatuses"
+                    :is-updating="updatingId === activeTask?.id"
                     v-model:comment-draft="commentDraft"
                     v-model:reply-draft="replyDraft"
                     :comment-errors="commentErrors"
@@ -2041,6 +2056,7 @@ const submitTaskUpdate = () => {
                     @cancel-reply="cancelReply"
                     @submit-reply="submitReply"
                     @toggle-checklist-item="toggleChecklistItem"
+                    @change-status="changeTaskStatusFromDetails"
                 />
 
                 <TaskFormModal

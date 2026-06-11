@@ -27,6 +27,14 @@ const props = defineProps({
         type: Function,
         required: true,
     },
+    statuses: {
+        type: Array,
+        default: () => [],
+    },
+    isUpdating: {
+        type: Boolean,
+        default: false,
+    },
     commentErrors: {
         type: Object,
         default: () => ({}),
@@ -65,6 +73,7 @@ const emit = defineEmits([
     'cancel-reply',
     'submit-reply',
     'toggle-checklist-item',
+    'change-status',
 ]);
 
 const commentDraft = defineModel('commentDraft', {
@@ -173,7 +182,23 @@ const activityDotClass = (kind) => {
                         {{ task.title }}
                     </h3>
                     <div class="flex flex-wrap gap-2 text-xs">
+                        <select
+                            v-if="!task.archived_at"
+                            :value="task.status"
+                            class="rounded-md border-gray-300 py-1 pl-2 pr-7 text-xs font-semibold uppercase tracking-wide text-gray-700 shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                            :disabled="isUpdating"
+                            @change="emit('change-status', $event.target.value)"
+                        >
+                            <option
+                                v-for="status in statuses"
+                                :key="status"
+                                :value="status"
+                            >
+                                {{ formatStatus(status) }}
+                            </option>
+                        </select>
                         <span
+                            v-else
                             class="rounded-full bg-gray-100 px-2.5 py-1 font-semibold uppercase tracking-wide text-gray-700"
                         >
                             {{ formatStatus(task.status) }}
