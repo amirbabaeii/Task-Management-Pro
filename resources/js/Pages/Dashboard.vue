@@ -9,7 +9,7 @@ import {
     priorityBadgeClass,
 } from '@/lib/format';
 import { Head, Link } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     dashboard: {
@@ -27,7 +27,6 @@ const summary = computed(() => props.dashboard.summary ?? {});
 const boards = computed(() => props.dashboard.boards ?? []);
 const upcomingTasks = computed(() => props.dashboard.upcoming_tasks ?? []);
 const recentActivity = computed(() => props.dashboard.recent_activity ?? []);
-const boardSort = ref('default');
 const boardSortOptions = [
     { value: 'default', label: 'Default' },
     { value: 'overdue', label: 'Most overdue' },
@@ -35,6 +34,34 @@ const boardSortOptions = [
     { value: 'completion', label: 'Most complete' },
     { value: 'name', label: 'Name' },
 ];
+const boardSortStorageKey = 'task-management-pro.dashboard-board-sort';
+const boardSortValues = boardSortOptions.map((option) => option.value);
+const readSavedBoardSort = () => {
+    if (typeof window === 'undefined') {
+        return 'default';
+    }
+
+    try {
+        const saved = window.localStorage.getItem(boardSortStorageKey);
+
+        return boardSortValues.includes(saved) ? saved : 'default';
+    } catch {
+        return 'default';
+    }
+};
+const boardSort = ref(readSavedBoardSort());
+
+watch(boardSort, (sort) => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(boardSortStorageKey, sort);
+    } catch {
+        // Remembering the sort is optional.
+    }
+});
 const boardHref = (board, params = {}) => {
     if (! board?.id) {
         return route('tasks.board');
