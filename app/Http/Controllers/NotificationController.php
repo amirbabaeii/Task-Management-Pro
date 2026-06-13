@@ -2,11 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Notifications\DeleteNotificationAction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
+    public function __construct(
+        private readonly DeleteNotificationAction $deleteNotification,
+    ) {}
+
     /**
      * Recent notifications + unread count for the authenticated user.
      */
@@ -48,5 +53,14 @@ class NotificationController extends Controller
         $request->user()->unreadNotifications->markAsRead();
 
         return response()->json(['unread_count' => 0]);
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $this->deleteNotification->execute($request->user(), $id);
+
+        return response()->json([
+            'unread_count' => $request->user()->unreadNotifications()->count(),
+        ]);
     }
 }

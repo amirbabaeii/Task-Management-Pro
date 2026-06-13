@@ -12,6 +12,7 @@ const loading = ref(false);
 const loaded = ref(false);
 const notificationFilter = ref('all');
 const notificationType = ref('all');
+const dismissingNotificationId = ref(null);
 
 const sharedUnread = computed(() => page.props.unreadNotifications ?? 0);
 const unreadLabel = computed(() =>
@@ -120,6 +121,27 @@ const markAllAsRead = async () => {
         unreadCount.value = 0;
     } catch {
         // ignore
+    }
+};
+
+const dismissNotification = async (notification) => {
+    if (dismissingNotificationId.value !== null) {
+        return;
+    }
+
+    dismissingNotificationId.value = notification.id;
+    try {
+        const response = await axios.delete(
+            route('notifications.destroy', { id: notification.id }),
+        );
+        notifications.value = notifications.value.filter(
+            (item) => item.id !== notification.id,
+        );
+        unreadCount.value = response.data.unread_count ?? unreadCount.value;
+    } catch {
+        // ignore
+    } finally {
+        dismissingNotificationId.value = null;
     }
 };
 
@@ -390,35 +412,60 @@ const linkFor = (notification) => {
                             notification.read_at ? 'bg-white' : 'bg-indigo-50/40'
                         "
                     >
-                        <Link
-                            :href="linkFor(notification)"
-                            class="flex gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
-                            @click="markAsRead(notification)"
-                        >
-                            <span
-                                class="mt-2 h-2 w-2 shrink-0 rounded-full"
-                                :class="
-                                    notification.read_at
-                                        ? 'bg-transparent'
-                                        : 'bg-indigo-500'
-                                "
-                                aria-hidden="true"
-                            />
-                            <span class="min-w-0 flex-1">
+                        <div class="flex items-start hover:bg-gray-50">
+                            <Link
+                                :href="linkFor(notification)"
+                                class="flex min-w-0 flex-1 gap-3 px-4 py-3 pr-2 text-sm text-gray-700"
+                                @click="markAsRead(notification)"
+                            >
                                 <span
-                                    class="mb-1.5 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                                    :class="kindBadgeClass(notification)"
+                                    class="mt-2 h-2 w-2 shrink-0 rounded-full"
+                                    :class="
+                                        notification.read_at
+                                            ? 'bg-transparent'
+                                            : 'bg-indigo-500'
+                                    "
+                                    aria-hidden="true"
+                                </span>
+                                <span class="min-w-0 flex-1">
+                                    <span
+                                        class="mb-1.5 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                        :class="kindBadgeClass(notification)"
+                                    >
+                                        {{ kindLabel(notification) }}
+                                    </span>
+                                    <span class="block leading-snug">
+                                        {{ summarize(notification) }}
+                                    </span>
+                                    <span class="mt-1 block text-[10px] text-gray-400">
+                                        {{ formatDateTime(notification.created_at) }}
+                                    </span>
+                                </span>
+                            </Link>
+                            <button
+                                type="button"
+                                class="mr-2 mt-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-white hover:text-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:opacity-40"
+                                :disabled="
+                                    dismissingNotificationId === notification.id
+                                "
+                                title="Dismiss notification"
+                                aria-label="Dismiss notification"
+                                @click.stop="dismissNotification(notification)"
+                            >
+                                <svg
+                                    class="h-4 w-4"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    aria-hidden="true"
                                 >
-                                    {{ kindLabel(notification) }}
-                                </span>
-                                <span class="block leading-snug">
-                                    {{ summarize(notification) }}
-                                </span>
-                                <span class="mt-1 block text-[10px] text-gray-400">
-                                    {{ formatDateTime(notification.created_at) }}
-                                </span>
-                            </span>
-                        </Link>
+                                    <path
+                                        fill-rule="evenodd"
+                                        d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                        clip-rule="evenodd"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
                     </li>
                 </ul>
             </div>

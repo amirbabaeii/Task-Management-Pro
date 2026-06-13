@@ -99,6 +99,8 @@ Route::middleware('auth')->group(function () {
         ->name('notifications.read');
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])
         ->name('notifications.read-all');
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])
+        ->name('notifications.destroy');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
