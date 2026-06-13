@@ -413,7 +413,7 @@ const activityDotClass = (kind) => {
                             v-else
                             class="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-sm text-gray-500"
                         >
-                            No dated active tasks.
+                            No upcoming deadlines. Your dated work is clear.
                         </div>
                     </div>
                 </section>
