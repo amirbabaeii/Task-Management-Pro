@@ -531,7 +531,10 @@ const activityDotClass = (kind) => {
                             </select>
                         </div>
                     </div>
-                    <ol class="space-y-3 border-l-2 border-gray-100 pl-4">
+                    <ol
+                        v-if="filteredActivities.length"
+                        class="space-y-3 border-l-2 border-gray-100 pl-4"
+                    >
                         <li
                             v-for="activity in filteredActivities"
                             :key="activity.id"
@@ -548,6 +551,21 @@ const activityDotClass = (kind) => {
                             </p>
                         </li>
                     </ol>
+                    <div
+                        v-else
+                        class="flex items-center justify-between gap-3 rounded-md border border-dashed border-gray-300 px-3 py-2"
+                    >
+                        <p class="text-sm text-gray-500">
+                            No activity matches this filter.
+                        </p>
+                        <button
+                            type="button"
+                            class="shrink-0 text-xs font-semibold text-indigo-600 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                            @click="activityFilter = 'all'"
+                        >
+                            Clear filter
+                        </button>
+                    </div>
                 </section>
 
                 <section class="space-y-4">
