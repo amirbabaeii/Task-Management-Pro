@@ -27,6 +27,7 @@ const summary = computed(() => props.dashboard.summary ?? {});
 const boards = computed(() => props.dashboard.boards ?? []);
 const upcomingTasks = computed(() => props.dashboard.upcoming_tasks ?? []);
 const recentActivity = computed(() => props.dashboard.recent_activity ?? []);
+const upcomingBoardFilter = ref(null);
 const boardSortOptions = [
     { value: 'default', label: 'Default' },
     { value: 'overdue', label: 'Most overdue' },
@@ -62,6 +63,32 @@ watch(boardSort, (sort) => {
         // Remembering the sort is optional.
     }
 });
+
+const upcomingBoardOptions = computed(() => {
+    const boardsById = new Map();
+
+    upcomingTasks.value.forEach((task) => {
+        if (task.board?.id && !boardsById.has(Number(task.board.id))) {
+            boardsById.set(Number(task.board.id), {
+                id: Number(task.board.id),
+                name: task.board.name,
+            });
+        }
+    });
+
+    return [...boardsById.values()].sort((a, b) =>
+        a.name.localeCompare(b.name),
+    );
+});
+const filteredUpcomingTasks = computed(() =>
+    upcomingBoardFilter.value === null
+        ? upcomingTasks.value
+        : upcomingTasks.value.filter(
+              (task) =>
+                  Number(task.board?.id) ===
+                  Number(upcomingBoardFilter.value),
+          ),
+);
 const boardHref = (board, params = {}) => {
     if (! board?.id) {
         return route('tasks.board');
@@ -386,21 +413,39 @@ const activityDotClass = (kind) => {
                     </div>
 
                     <div>
-                        <div class="mb-3 flex items-center justify-between">
+                        <div class="mb-3 flex items-center justify-between gap-2">
                             <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">
                                 Due Next
                             </h3>
-                            <span class="text-xs text-gray-500">
-                                {{ upcomingTasks.length }} tasks
-                            </span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500">
+                                    {{ filteredUpcomingTasks.length }} of
+                                    {{ upcomingTasks.length }}
+                                </span>
+                                <select
+                                    v-if="upcomingBoardOptions.length > 1"
+                                    v-model="upcomingBoardFilter"
+                                    class="rounded-md border-gray-300 py-1 pl-2 pr-7 text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                                    aria-label="Filter upcoming tasks by board"
+                                >
+                                    <option :value="null">All boards</option>
+                                    <option
+                                        v-for="board in upcomingBoardOptions"
+                                        :key="board.id"
+                                        :value="board.id"
+                                    >
+                                        {{ board.name }}
+                                    </option>
+                                </select>
+                            </div>
                         </div>
 
                         <div
-                            v-if="upcomingTasks.length"
+                            v-if="filteredUpcomingTasks.length"
                             class="space-y-3"
                         >
                             <Link
-                                v-for="task in upcomingTasks"
+                                v-for="task in filteredUpcomingTasks"
                                 :key="task.id"
                                 :href="taskHref(task)"
                                 class="block rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-300 hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
@@ -440,7 +485,11 @@ const activityDotClass = (kind) => {
                             v-else
                             class="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-sm text-gray-500"
                         >
-                            No upcoming deadlines. Your dated work is clear.
+                            {{
+                                upcomingTasks.length
+                                    ? 'No upcoming deadlines on this board.'
+                                    : 'No upcoming deadlines. Your dated work is clear.'
+                            }}
                         </div>
                     </div>
                 </section>
