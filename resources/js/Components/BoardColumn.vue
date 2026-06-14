@@ -1,8 +1,9 @@
 <script setup>
+import { nextTick, ref, watch } from 'vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import TaskCard from '@/Components/TaskCard.vue';
 
-defineProps({
+const props = defineProps({
     status: {
         type: String,
         required: true,
@@ -88,12 +89,20 @@ const labelDraft = defineModel('labelDraft', {
     default: '',
 });
 
-const setInputRef = (element) => {
-    if (element) {
-        element.focus();
-        element.select();
-    }
-};
+const labelInput = ref(null);
+
+watch(
+    () => props.isEditingLabel,
+    async (isEditing) => {
+        if (!isEditing) {
+            return;
+        }
+
+        await nextTick();
+        labelInput.value?.focus();
+        labelInput.value?.select();
+    },
+);
 </script>
 
 <template>
@@ -139,7 +148,7 @@ const setInputRef = (element) => {
                 <div class="min-w-0 flex-1">
                     <input
                         v-if="isEditingLabel"
-                        :ref="setInputRef"
+                        ref="labelInput"
                         v-model="labelDraft"
                         type="text"
                         maxlength="40"
