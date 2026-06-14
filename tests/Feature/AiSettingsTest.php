@@ -5,11 +5,25 @@ namespace Tests\Feature;
 use App\Enums\AiProvider;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class AiSettingsTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_manager_can_view_ai_settings(): void
+    {
+        $manager = User::factory()->create();
+
+        $this->actingAs($manager)
+            ->get(route('ai-settings.edit'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Settings/Ai')
+                ->where('connection.configured', false)
+                ->where('connection.default_model', 'gpt-5.5'));
+    }
 
     public function test_manager_can_save_and_rotate_openai_connection(): void
     {
@@ -94,6 +108,9 @@ class AiSettingsTest extends TestCase
             'agent_manager_id' => $manager->id,
         ]);
 
+        $this->actingAs($agent)
+            ->get(route('ai-settings.edit'))
+            ->assertNotFound();
         $this->actingAs($agent)
             ->putJson(route('ai-settings.openai.update'), [
                 'api_key' => 'sk-agent-secret',

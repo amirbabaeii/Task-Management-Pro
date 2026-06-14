@@ -52,6 +52,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/agents/{agent}', [AgentController::class, 'destroy'])
         ->name('agents.destroy');
 
+    Route::get('/settings/ai', [AiSettingsController::class, 'edit'])
+        ->name('ai-settings.edit');
     Route::put('/settings/ai/openai', [AiSettingsController::class, 'update'])
         ->name('ai-settings.openai.update');
     Route::delete('/settings/ai/openai', [AiSettingsController::class, 'destroy'])
