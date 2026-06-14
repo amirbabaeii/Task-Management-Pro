@@ -56,6 +56,8 @@ Route::middleware('auth')->group(function () {
         ->name('ai-settings.edit');
     Route::put('/settings/ai/openai', [AiSettingsController::class, 'update'])
         ->name('ai-settings.openai.update');
+    Route::post('/settings/ai/openai/verify', [AiSettingsController::class, 'verify'])
+        ->name('ai-settings.openai.verify');
     Route::delete('/settings/ai/openai', [AiSettingsController::class, 'destroy'])
         ->name('ai-settings.openai.destroy');
 

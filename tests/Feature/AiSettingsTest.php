@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\AiProvider;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -98,6 +99,55 @@ class AiSettingsTest extends TestCase
             ->assertJsonPath('connection.configured', false);
 
         $this->assertDatabaseCount('ai_provider_connections', 0);
+    }
+
+    public function test_manager_can_verify_openai_connection(): void
+    {
+        Http::fake([
+            'https://api.openai.com/v1/models/gpt-5.5' => Http::response([
+                'id' => 'gpt-5.5',
+            ]),
+        ]);
+
+        $manager = User::factory()->create();
+        $connection = $manager->aiProviderConnections()->create([
+            'provider' => AiProvider::OpenAI,
+            'api_key' => 'sk-test-secret',
+            'default_model' => 'gpt-5.5',
+        ]);
+
+        $this->actingAs($manager)
+            ->postJson(route('ai-settings.openai.verify'))
+            ->assertOk()
+            ->assertJsonPath('connection.configured', true);
+
+        $this->assertNotNull($connection->fresh()->verified_at);
+    }
+
+    public function test_verification_failure_is_sanitized(): void
+    {
+        Http::fake([
+            'https://api.openai.com/v1/models/*' => Http::response([
+                'error' => [
+                    'message' => 'Sensitive upstream detail',
+                ],
+            ], 401),
+        ]);
+
+        $manager = User::factory()->create();
+        $connection = $manager->aiProviderConnections()->create([
+            'provider' => AiProvider::OpenAI,
+            'api_key' => 'sk-invalid-secret',
+            'default_model' => 'gpt-5.5',
+        ]);
+
+        $this->actingAs($manager)
+            ->postJson(route('ai-settings.openai.verify'))
+            ->assertUnprocessable()
+            ->assertJsonPath('error_code', 'invalid_credentials')
+            ->assertJsonMissing(['message' => 'Sensitive upstream detail']);
+
+        $this->assertNull($connection->fresh()->verified_at);
     }
 
     public function test_managed_agent_cannot_access_ai_settings(): void

@@ -25,6 +25,7 @@ const errors = ref({});
 const message = ref('');
 const saving = ref(false);
 const deleting = ref(false);
+const verifying = ref(false);
 
 const save = async () => {
     if (saving.value) {
@@ -86,6 +87,31 @@ const remove = async () => {
             'Unable to delete the OpenAI connection.';
     } finally {
         deleting.value = false;
+    }
+};
+
+const verify = async () => {
+    if (verifying.value || !connection.value.configured) {
+        return;
+    }
+
+    verifying.value = true;
+    errors.value = {};
+    message.value = '';
+
+    try {
+        const response = await axios.post(
+            route('ai-settings.openai.verify'),
+        );
+
+        connection.value = response.data.connection;
+        message.value = 'OpenAI connection verified.';
+    } catch (error) {
+        message.value =
+            error?.response?.data?.message ||
+            'Unable to verify the OpenAI connection.';
+    } finally {
+        verifying.value = false;
     }
 };
 </script>
@@ -184,16 +210,25 @@ const remove = async () => {
                         </div>
 
                         <div class="flex flex-wrap items-center justify-between gap-3">
-                            <SecondaryButton
-                                v-if="connection.configured"
-                                type="button"
-                                class="text-rose-700"
-                                :disabled="deleting"
-                                @click="remove"
-                            >
-                                {{ deleting ? 'Deleting...' : 'Delete Connection' }}
-                            </SecondaryButton>
-                            <span v-else />
+                            <div class="flex flex-wrap items-center gap-2">
+                                <SecondaryButton
+                                    v-if="connection.configured"
+                                    type="button"
+                                    :disabled="verifying"
+                                    @click="verify"
+                                >
+                                    {{ verifying ? 'Verifying...' : 'Verify Connection' }}
+                                </SecondaryButton>
+                                <SecondaryButton
+                                    v-if="connection.configured"
+                                    type="button"
+                                    class="text-rose-700"
+                                    :disabled="deleting"
+                                    @click="remove"
+                                >
+                                    {{ deleting ? 'Deleting...' : 'Delete Connection' }}
+                                </SecondaryButton>
+                            </div>
 
                             <PrimaryButton
                                 :disabled="saving"
