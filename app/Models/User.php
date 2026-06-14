@@ -87,6 +87,16 @@ class User extends Authenticatable
             ->where('is_agent', true);
     }
 
+    public function managedAgentRuns(): HasMany
+    {
+        return $this->hasMany(AgentRun::class, 'manager_id');
+    }
+
+    public function agentRuns(): HasMany
+    {
+        return $this->hasMany(AgentRun::class, 'agent_id');
+    }
+
     public function aiProviderConnections(): HasMany
     {
         return $this->hasMany(AiProviderConnection::class);

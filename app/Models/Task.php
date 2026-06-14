@@ -101,6 +101,13 @@ class Task extends Model
             ->orderByDesc('id');
     }
 
+    public function agentRuns(): HasMany
+    {
+        return $this->hasMany(AgentRun::class)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+    }
+
     /**
      * Normalize tag input from request payloads or persisted data.
      *
