@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\AgentAutonomy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,6 +31,9 @@ class User extends Authenticatable
         'password',
         'is_agent',
         'agent_manager_id',
+        'agent_provider_connection_id',
+        'agent_model',
+        'agent_autonomy',
         'agent_title',
         'agent_profile',
         'agent_personality',
@@ -58,6 +62,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_agent' => 'boolean',
+            'agent_autonomy' => AgentAutonomy::class,
             'agent_skills' => 'array',
             'agent_archived_at' => 'datetime',
         ];
@@ -66,6 +71,14 @@ class User extends Authenticatable
     public function agentManager(): BelongsTo
     {
         return $this->belongsTo(User::class, 'agent_manager_id');
+    }
+
+    public function agentProviderConnection(): BelongsTo
+    {
+        return $this->belongsTo(
+            AiProviderConnection::class,
+            'agent_provider_connection_id',
+        );
     }
 
     public function managedAgents(): HasMany
@@ -122,6 +135,7 @@ class User extends Authenticatable
                     ->orderByRaw('tasks.deadline_at is null')
                     ->orderBy('tasks.deadline_at')
                     ->orderBy('tasks.id'),
+                'agentProviderConnection:id,provider,default_model',
             ])
             ->withCount([
                 'accessibleBoards as boards_count',

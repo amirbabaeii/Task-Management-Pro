@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
+use App\Enums\AgentAutonomy;
+use App\Enums\AiProvider;
 use App\Enums\BoardRole;
+use App\Models\AiProviderConnection;
 use App\Models\Board;
 use App\Models\Task;
 use App\Models\User;
@@ -117,6 +120,87 @@ class AgentManagementTest extends TestCase
                 'agent_skills' => [],
             ])
             ->assertNotFound();
+    }
+
+    public function test_manager_can_configure_agent_execution_policy(): void
+    {
+        $manager = User::factory()->create();
+        $connection = $manager->aiProviderConnections()->create([
+            'provider' => AiProvider::OpenAI,
+            'api_key' => 'sk-manager-secret',
+            'default_model' => AiProviderConnection::DEFAULT_MODEL,
+        ]);
+
+        $response = $this->actingAs($manager)
+            ->postJson(route('agents.store'), [
+                'name' => 'Planner Agent',
+                'email' => 'planner.agent@example.com',
+                'agent_provider_connection_id' => $connection->id,
+                'agent_model' => 'gpt-5.5-planner',
+                'agent_autonomy' => AgentAutonomy::Automatic->value,
+                'agent_skills' => ['planning'],
+            ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath(
+                'agent.execution.provider_connection_id',
+                $connection->id,
+            )
+            ->assertJsonPath(
+                'agent.execution.autonomy',
+                AgentAutonomy::Automatic->value,
+            )
+            ->assertJsonPath(
+                'agent.execution.effective_model',
+                'gpt-5.5-planner',
+            );
+
+        $agent = User::query()
+            ->where('email', 'planner.agent@example.com')
+            ->firstOrFail();
+
+        $this->assertSame($connection->id, $agent->agent_provider_connection_id);
+        $this->assertSame(AgentAutonomy::Automatic, $agent->agent_autonomy);
+    }
+
+    public function test_new_agent_defaults_to_approval_policy(): void
+    {
+        $manager = User::factory()->create();
+
+        $this->actingAs($manager)
+            ->postJson(route('agents.store'), [
+                'name' => 'Default Agent',
+                'email' => 'default.agent@example.com',
+                'agent_skills' => [],
+            ])
+            ->assertCreated()
+            ->assertJsonPath(
+                'agent.execution.autonomy',
+                AgentAutonomy::Approval->value,
+            );
+    }
+
+    public function test_manager_cannot_assign_another_managers_connection(): void
+    {
+        $manager = User::factory()->create();
+        $otherManager = User::factory()->create();
+        $connection = $otherManager->aiProviderConnections()->create([
+            'provider' => AiProvider::OpenAI,
+            'api_key' => 'sk-other-secret',
+            'default_model' => AiProviderConnection::DEFAULT_MODEL,
+        ]);
+
+        $this->actingAs($manager)
+            ->postJson(route('agents.store'), [
+                'name' => 'Invalid Agent',
+                'email' => 'invalid.agent@example.com',
+                'agent_provider_connection_id' => $connection->id,
+                'agent_autonomy' => AgentAutonomy::Approval->value,
+                'agent_skills' => [],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['agent_provider_connection_id']);
     }
 
     public function test_agent_index_includes_workload_counts(): void

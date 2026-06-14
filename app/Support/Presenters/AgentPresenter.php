@@ -24,6 +24,14 @@ class AgentPresenter
             'profile' => $agent->agent_profile,
             'personality' => $agent->agent_personality,
             'skills' => $agent->agent_skills ?? [],
+            'execution' => [
+                'provider_connection_id' => $agent->agent_provider_connection_id,
+                'provider' => $agent->agentProviderConnection?->provider?->value,
+                'model' => $agent->agent_model,
+                'effective_model' => $agent->agent_model
+                    ?? $agent->agentProviderConnection?->default_model,
+                'autonomy' => $agent->agent_autonomy->value,
+            ],
             'archived_at' => $agent->agent_archived_at,
             'workload' => [
                 'boards' => self::countOr($agent, 'boards_count', fn (): int => $agent->accessibleBoards()->count()),
