@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AgentController;
+use App\Http\Controllers\AiSettingsController;
 use App\Http\Controllers\BoardColumnController;
 use App\Http\Controllers\BoardController;
 use App\Http\Controllers\BoardFilterController;
@@ -50,6 +51,11 @@ Route::middleware('auth')->group(function () {
         ->name('agents.restore');
     Route::delete('/agents/{agent}', [AgentController::class, 'destroy'])
         ->name('agents.destroy');
+
+    Route::put('/settings/ai/openai', [AiSettingsController::class, 'update'])
+        ->name('ai-settings.openai.update');
+    Route::delete('/settings/ai/openai', [AiSettingsController::class, 'destroy'])
+        ->name('ai-settings.openai.destroy');
 
     Route::get('/boards/{board}/members', [BoardMemberController::class, 'index'])
         ->name('boards.members.index');
