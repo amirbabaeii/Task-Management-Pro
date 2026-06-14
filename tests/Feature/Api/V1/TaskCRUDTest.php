@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Api\V1;
 
-use App\Enums\TaskPriority;
+use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
+use App\Enums\BoardRole;
+use App\Models\Board;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -12,371 +14,239 @@ class TaskCRUDTest extends TestCase
 {
     use RefreshDatabase;
 
-    private $user;
+    private User $user;
 
-    private $token;
+    private Board $board;
+
+    private string $token;
 
     protected function setUp(): void
     {
         parent::setUp();
-        // Create a user and token for all tests
+
         $this->user = User::factory()->create();
-        $this->token = $this->user->createToken('TestToken')->plainTextToken;
+        $this->board = app(EnsureUserHasDefaultBoardAction::class)
+            ->execute($this->user);
+        $this->token = $this->user
+            ->createToken('TestToken')
+            ->plainTextToken;
     }
 
-    public function test_can_list_tasks_as_authenticated_user()
+    public function test_member_can_list_only_tasks_on_the_requested_board(): void
     {
-        // Arrange
-        Task::factory()->count(15)->create();
+        $included = $this->taskOnBoard($this->board, [
+            'title' => 'Included task',
+        ]);
+        $otherBoard = Board::factory()->create();
+        $excluded = $this->taskOnBoard($otherBoard, [
+            'title' => 'Excluded task',
+        ]);
 
-        // Act
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->token,
-        ])->getJson(route('api.v1.tasks.index'));
+        $response = $this->api()
+            ->getJson(route('api.v1.boards.tasks.index', $this->board));
 
-        // Assert
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'data' => [
-                    'data' => [
-                        '*' => [
-                            'id',
-                            'title',
-                            'description',
-                            'priority',
-                            'created_at',
-                            'updated_at',
-                        ],
-                    ],
-                    'current_page',
-                    'total',
-                    'per_page',
-                ],
-                'message',
-                'type',
-            ])
-            ->assertJsonPath('data.per_page', 10)
-            ->assertJsonPath('message', 'List of tasks successfully received')
-            ->assertJsonPath('type', 'success');
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.total', 1)
+            ->assertJsonPath('data.data.0.id', $included->id)
+            ->assertJsonMissing(['id' => $excluded->id]);
     }
 
-    public function test_can_create_task_as_authenticated_user()
+    public function test_member_can_create_a_board_task(): void
     {
-        // Arrange
-        $taskData = [
-            'title' => 'New Test Task',
-            'description' => 'Test Task Description',
-            'priority' => 'high',
-        ];
+        $response = $this->api()->postJson(
+            route('api.v1.boards.tasks.store', $this->board),
+            [
+                'title' => 'New board task',
+                'description' => 'Created through the board-scoped API.',
+                'status' => 'pending',
+                'priority' => 'high',
+                'tags' => ['api', 'board'],
+            ],
+        );
 
-        // Act
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->token,
-        ])->postJson(route('api.v1.tasks.store'), $taskData);
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.title', 'New board task')
+            ->assertJsonPath('data.priority', 'high')
+            ->assertJsonPath('data.assignees.0.id', $this->user->id);
 
-        // Assert
-        $response->assertStatus(201)
-            ->assertJsonStructure([
-                'data' => [
-                    'id',
-                    'title',
-                    'description',
-                    'priority',
-                    'created_at',
-                    'updated_at',
-                ],
-                'message',
-                'type',
-            ])
-            ->assertJsonPath('message', 'Task successfully created')
-            ->assertJsonPath('type', 'success')
-            ->assertJsonPath('data.priority', 'high');
+        $taskId = $response->json('data.id');
 
-        $this->assertDatabaseHas('tasks', [
-            'title' => 'New Test Task',
-            'description' => 'Test Task Description',
-            'priority' => 'high',
+        $this->assertDatabaseHas('task_user', [
+            'task_id' => $taskId,
+            'user_id' => $this->user->id,
+            'board_id' => $this->board->id,
+            'role' => 'assignee',
         ]);
     }
 
-    public function test_cannot_create_task_with_invalid_data()
+    public function test_creation_validates_board_columns_and_members(): void
     {
-        $invalidData = [
-            'title' => '', // Empty title
-            'status' => 'invalid_status', // Invalid status
-            'priority' => 'urgent',
-        ];
+        $stranger = User::factory()->create();
 
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->token,
-        ])->postJson(route('api.v1.tasks.store'), $invalidData);
-
-        $response->assertStatus(422)
+        $this->api()->postJson(
+            route('api.v1.boards.tasks.store', $this->board),
+            [
+                'title' => '',
+                'status' => 'blocked',
+                'priority' => 'urgent',
+                'assignee_ids' => [$stranger->id],
+            ],
+        )
+            ->assertUnprocessable()
             ->assertJsonStructure([
-                'data',
-                'message',
                 'data' => [
                     'errors' => [
                         'title',
                         'status',
                         'priority',
+                        'assignee_ids.0',
                     ],
                 ],
-                'type',
-            ])
-            ->assertJson([
-                'type' => 'error',
             ]);
 
+        $this->assertDatabaseCount('tasks', 0);
     }
 
-    public function test_can_create_task_with_all_valid_fields()
+    public function test_collaborator_can_create_a_task_for_a_board_member(): void
     {
-        $taskData = [
-            'title' => 'New Test Task',
-            'description' => 'Test Task Description',
-            'status' => 'pending',
-            'priority' => 'medium',
-        ];
-
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->token,
-        ])->postJson(route('api.v1.tasks.store'), $taskData);
-
-        $response->assertStatus(201)
-            ->assertJsonStructure([
-                'data' => [
-                    'id',
-                    'title',
-                    'description',
-                    'status',
-                    'priority',
-                    'created_at',
-                    'updated_at',
-                ],
-                'message',
-                'type',
-            ])
-            ->assertJsonPath('data.priority', 'medium');
-
-        $this->assertDatabaseHas('tasks', [
-            'title' => 'New Test Task',
-            'description' => 'Test Task Description',
-            'status' => 'pending',
-            'priority' => 'medium',
+        $collaborator = User::factory()->create();
+        $this->board->members()->attach($collaborator->id, [
+            'role' => BoardRole::Collaborator->value,
+            'joined_at' => now(),
         ]);
+        $token = $collaborator
+            ->createToken('CollaboratorToken')
+            ->plainTextToken;
+
+        $response = $this->withToken($token)->postJson(
+            route('api.v1.boards.tasks.store', $this->board),
+            [
+                'title' => 'Collaborative task',
+                'status' => 'pending',
+                'priority' => 'medium',
+                'assignee_ids' => [$this->user->id],
+            ],
+        );
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.assignees.0.id', $this->user->id);
     }
 
-    public function test_cannot_access_tasks_without_authentication()
+    public function test_member_can_partially_update_a_board_task(): void
     {
-        // Act
-        $response = $this->getJson(route('api.v1.tasks.index'));
-
-        // Assert
-        $response->assertStatus(401);
-    }
-
-    public function test_cannot_create_task_without_authentication()
-    {
-        // Arrange
-        $taskData = [
-            'title' => 'New Test Task',
-            'description' => 'Test Task Description',
-        ];
-
-        // Act
-        $response = $this->postJson(route('api.v1.tasks.store'), $taskData);
-
-        // Assert
-        $response->assertStatus(401);
-    }
-
-    public function test_can_update_task_as_authenticated_user()
-    {
-        // Arrange
-        $task = Task::factory()->create([
-            'title' => 'Original Title',
-            'description' => 'Original Description',
+        $task = $this->taskOnBoard($this->board, [
+            'title' => 'Original title',
             'status' => 'pending',
-            'progress' => 0,
             'priority' => 'low',
         ]);
 
-        $task->users()->attach($this->user, ['role' => 'assignee']);
+        $response = $this->api()->patchJson(
+            route('api.v1.boards.tasks.update', [$this->board, $task]),
+            [
+                'title' => 'Updated title',
+                'status' => 'in-progress',
+                'progress' => 50,
+            ],
+        );
 
-        $updateData = [
-            'title' => 'Updated Task Title',
-            'description' => 'Updated Task Description',
-            'status' => 'in-progress',
-            'progress' => 50,
-            'priority' => 'high',
-        ];
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Updated title')
+            ->assertJsonPath('data.status', 'in-progress')
+            ->assertJsonPath('data.progress', 50);
 
-        // Act
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->token,
-        ])->putJson(route('api.v1.tasks.update', $task->id), $updateData);
-
-        // Assert
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'data' => [
-                    'id',
-                    'title',
-                    'description',
-                    'status',
-                    'progress',
-                    'priority',
-                    'created_at',
-                    'updated_at',
-                ],
-                'message',
-                'type',
-            ])
-            ->assertJsonPath('message', 'Task successfully updated')
-            ->assertJsonPath('type', 'success');
-
-        // Add more specific assertions
         $this->assertDatabaseHas('tasks', [
             'id' => $task->id,
-            'title' => 'Updated Task Title',
-            'description' => 'Updated Task Description',
+            'title' => 'Updated title',
             'status' => 'in-progress',
-            'progress' => 50,
-            'priority' => 'high',
-        ]);
-
-        // Add assertion to verify exact record
-        $updatedTask = Task::find($task->id);
-        $this->assertEquals(50, $updatedTask->progress);
-        $this->assertSame(TaskPriority::High, $updatedTask->priority);
-    }
-
-    public function test_cannot_update_task_with_invalid_data()
-    {
-        // Arrange
-        $task = Task::factory()->create();
-        $task->users()->attach($this->user, ['role' => 'assignee']);
-
-        $invalidData = [
-            'status' => 'invalid-status',
-            'progress' => 150, // Invalid progress value
-            'priority' => 'critical',
-        ];
-
-        // Act
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->token,
-        ])->putJson(route('api.v1.tasks.update', $task->id), $invalidData);
-
-        // Assert
-        $response->assertStatus(422)
-            ->assertJsonStructure([
-                'data' => [
-                    'errors' => [
-                        'status',
-                        'progress',
-                        'priority',
-                    ],
-                ],
-                'message',
-                'type',
-            ])
-            ->assertJson([
-                'type' => 'error',
-            ]);
-    }
-
-    public function test_cannot_update_task_without_authentication()
-    {
-        // Arrange
-        $task = Task::factory()->create();
-
-        $updateData = [
-            'title' => 'Updated Task Title',
-        ];
-
-        // Act
-        $response = $this->putJson(route('api.v1.tasks.update', $task->id), $updateData);
-
-        // Assert
-        $response->assertStatus(401);
-    }
-
-    public function test_cannot_update_task_if_not_assigned()
-    {
-        // Arrange
-        $task = Task::factory()->create();
-        // Not attaching the user to the task
-
-        $updateData = [
-            'title' => 'Updated Task Title',
-        ];
-
-        // Act
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->token,
-        ])->putJson(route('api.v1.tasks.update', $task->id), $updateData);
-
-        // Assert
-        $response->assertStatus(403);
-    }
-
-    public function test_can_partially_update_task()
-    {
-        // Arrange
-        $task = Task::factory()->create([
-            'title' => 'Original Title',
-            'description' => 'Original Description',
-            'status' => 'pending',
             'priority' => 'low',
-        ]);
-        $task->users()->attach($this->user, ['role' => 'assignee']);
-
-        $partialUpdate = [
-            'status' => 'in-progress',
-        ];
-
-        // Act
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->token,
-        ])->putJson(route('api.v1.tasks.update', $task->id), $partialUpdate);
-
-        // Assert
-        $response->assertStatus(200);
-
-        $this->assertDatabaseHas('tasks', [
-            'id' => $task->id,
-            'title' => 'Original Title', // Should remain unchanged
-            'description' => 'Original Description', // Should remain unchanged
-            'status' => 'in-progress', // Should be updated
-            'priority' => 'low', // Should remain unchanged
+            'progress' => 50,
         ]);
     }
 
-    public function test_can_filter_tasks_by_priority()
+    public function test_task_from_another_board_cannot_be_updated(): void
     {
-        Task::factory()->count(3)->create(['priority' => 'low']);
-        Task::factory()->count(2)->create(['priority' => 'high']);
+        $otherBoard = Board::factory()->create();
+        $task = $this->taskOnBoard($otherBoard);
 
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->token,
-        ])->getJson(route('api.v1.tasks.index', ['priority' => 'high']));
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'data' => [
-                    'data' => [
-                        '*' => [
-                            'priority',
-                        ],
-                    ],
-                    'total',
-                ],
-                'message',
-                'type',
+        $this->api()->patchJson(
+            route('api.v1.boards.tasks.update', [$this->board, $task]),
+            ['title' => 'Leaked update'],
+        )->assertNotFound();
+
+        $this->assertNotSame('Leaked update', $task->fresh()->title);
+    }
+
+    public function test_non_member_cannot_access_board_tasks(): void
+    {
+        $stranger = User::factory()->create();
+        $token = $stranger->createToken('StrangerToken')->plainTextToken;
+
+        $this->withToken($token)
+            ->getJson(route('api.v1.boards.tasks.index', $this->board))
+            ->assertNotFound();
+
+        $this->withToken($token)
+            ->postJson(route('api.v1.boards.tasks.store', $this->board), [
+                'title' => 'Unauthorized task',
+                'status' => 'pending',
+                'priority' => 'medium',
             ])
-            ->assertJsonPath('data.data.*.priority', array_fill(0, 2, 'high'))
-            ->assertJsonPath('data.total', 2)
-            ->assertJsonPath('message', 'List of tasks successfully received');
+            ->assertNotFound();
+    }
+
+    public function test_unauthenticated_requests_are_rejected(): void
+    {
+        $task = $this->taskOnBoard($this->board);
+
+        $this->getJson(route('api.v1.boards.tasks.index', $this->board))
+            ->assertUnauthorized();
+        $this->postJson(route('api.v1.boards.tasks.store', $this->board), [])
+            ->assertUnauthorized();
+        $this->patchJson(
+            route('api.v1.boards.tasks.update', [$this->board, $task]),
+            [],
+        )->assertUnauthorized();
+    }
+
+    public function test_priority_filter_is_scoped_to_the_board(): void
+    {
+        $this->taskOnBoard($this->board, ['priority' => 'high']);
+        $this->taskOnBoard($this->board, ['priority' => 'low']);
+        $otherBoard = Board::factory()->create();
+        $this->taskOnBoard($otherBoard, ['priority' => 'high']);
+
+        $response = $this->api()->getJson(route(
+            'api.v1.boards.tasks.index',
+            ['board' => $this->board, 'priority' => 'high'],
+        ));
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.total', 1)
+            ->assertJsonPath('data.data.0.priority', 'high');
+    }
+
+    private function api(): static
+    {
+        return $this->withToken($this->token);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function taskOnBoard(Board $board, array $attributes = []): Task
+    {
+        $task = Task::factory()->create($attributes);
+        $task->users()->attach($board->user_id, [
+            'board_id' => $board->id,
+            'role' => 'assignee',
+            'sort_order' => 1,
+        ]);
+
+        return $task;
     }
 }

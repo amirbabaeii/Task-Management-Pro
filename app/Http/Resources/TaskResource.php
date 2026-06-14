@@ -25,6 +25,17 @@ class TaskResource extends JsonResource
             'progress' => $this->progress,
             'tags' => $this->tags ?? [],
             'deadline_at' => $this->deadline_at,
+            'assignees' => $this->whenLoaded(
+                'assignees',
+                fn () => $this->assignees
+                    ->map(fn ($assignee): array => [
+                        'id' => $assignee->id,
+                        'name' => $assignee->name,
+                        'email' => $assignee->email,
+                    ])
+                    ->values()
+                    ->all(),
+            ),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

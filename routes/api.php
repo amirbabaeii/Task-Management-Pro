@@ -26,8 +26,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             return $request->user();
         })->name('user.profile');
 
-        // Tasks resource
-        Route::apiResource('tasks', App\Http\Controllers\Api\V1\TaskController::class)
+        Route::apiResource('boards.tasks', App\Http\Controllers\Api\V1\TaskController::class)
             ->only(['index', 'store', 'update']);
     });
 });
