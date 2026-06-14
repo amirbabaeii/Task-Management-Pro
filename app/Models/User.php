@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -71,6 +72,17 @@ class User extends Authenticatable
     {
         return $this->hasMany(User::class, 'agent_manager_id')
             ->where('is_agent', true);
+    }
+
+    public function aiProviderConnections(): HasMany
+    {
+        return $this->hasMany(AiProviderConnection::class);
+    }
+
+    public function openAiConnection(): HasOne
+    {
+        return $this->hasOne(AiProviderConnection::class)
+            ->where('provider', 'openai');
     }
 
     public function scopeAgentsManagedBy(Builder $query, User $manager, ?bool $archived = null): Builder
