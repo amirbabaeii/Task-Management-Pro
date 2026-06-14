@@ -112,6 +112,24 @@ const assignmentDeadlineLabel = (value) =>
             {{ agent.profile || 'No profile yet.' }}
         </p>
 
+        <div class="mt-3 flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase tracking-wide">
+            <span class="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-violet-700">
+                {{ agent.execution?.autonomy ?? 'approval' }}
+            </span>
+            <span
+                v-if="agent.execution?.effective_model"
+                class="max-w-full truncate rounded-full border border-gray-200 bg-white px-2 py-0.5 text-gray-600"
+            >
+                {{ agent.execution.effective_model }}
+            </span>
+            <span
+                v-else
+                class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700"
+            >
+                No provider
+            </span>
+        </div>
+
         <div class="mt-3 grid grid-cols-3 divide-x divide-gray-200 border-y border-gray-200 py-2 text-center">
             <div>
                 <div class="text-sm font-semibold text-gray-900">

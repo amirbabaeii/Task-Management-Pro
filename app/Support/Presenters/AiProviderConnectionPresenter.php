@@ -12,8 +12,10 @@ class AiProviderConnectionPresenter
     public static function toArray(?AiProviderConnection $connection): array
     {
         return [
+            'id' => $connection?->id,
             'configured' => $connection !== null,
             'provider' => $connection?->provider?->value ?? 'openai',
+            'provider_label' => $connection?->provider?->label() ?? 'OpenAI',
             'default_model' => $connection?->default_model
                 ?? AiProviderConnection::DEFAULT_MODEL,
             'verified_at' => $connection?->verified_at,

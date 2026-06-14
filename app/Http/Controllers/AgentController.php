@@ -12,6 +12,7 @@ use App\Http\Requests\Agents\UpdateAgentRequest;
 use App\Models\Board;
 use App\Models\User;
 use App\Support\Presenters\AgentPresenter;
+use App\Support\Presenters\AiProviderConnectionPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,6 +36,13 @@ class AgentController extends Controller
                 ->agentsManagedBy($request->user(), false)),
             'archivedAgents' => $this->agentPayloads(User::query()
                 ->agentsManagedBy($request->user(), true)),
+            'providerConnections' => $request->user()
+                ->aiProviderConnections()
+                ->orderBy('provider')
+                ->get()
+                ->map(fn ($connection): array => AiProviderConnectionPresenter::toArray($connection))
+                ->values()
+                ->all(),
         ]);
     }
 

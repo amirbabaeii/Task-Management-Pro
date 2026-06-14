@@ -17,6 +17,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    providerConnections: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const agents = ref([...props.agents]);
@@ -39,6 +43,9 @@ let pendingAgentDeletionTimer = null;
 const blankForm = () => ({
     name: '',
     email: '',
+    agent_provider_connection_id: props.providerConnections[0]?.id ?? null,
+    agent_model: '',
+    agent_autonomy: 'approval',
     agent_title: '',
     agent_profile: '',
     agent_personality: '',
@@ -324,6 +331,10 @@ const editAgent = (agent) => {
     Object.assign(form, {
         name: agent.name ?? '',
         email: agent.email ?? '',
+        agent_provider_connection_id:
+            agent.execution?.provider_connection_id ?? null,
+        agent_model: agent.execution?.model ?? '',
+        agent_autonomy: agent.execution?.autonomy ?? 'approval',
         agent_title: agent.title ?? '',
         agent_profile: agent.profile ?? '',
         agent_personality: agent.personality ?? '',
@@ -355,6 +366,10 @@ const submit = async () => {
         const payload = {
             name: form.name,
             email: form.email,
+            agent_provider_connection_id:
+                form.agent_provider_connection_id,
+            agent_model: form.agent_model,
+            agent_autonomy: form.agent_autonomy,
             agent_title: form.agent_title,
             agent_profile: form.agent_profile,
             agent_personality: form.agent_personality,
@@ -764,11 +779,15 @@ const workingActionFor = (agent) => {
         <AgentFormModal
             v-model:name="form.name"
             v-model:email="form.email"
+            v-model:provider-connection-id="form.agent_provider_connection_id"
+            v-model:model="form.agent_model"
+            v-model:autonomy="form.agent_autonomy"
             v-model:title="form.agent_title"
             v-model:profile="form.agent_profile"
             v-model:personality="form.agent_personality"
             v-model:skills="form.agent_skills"
             :show="showingFormModal"
+            :provider-connections="providerConnections"
             :is-editing="isEditing"
             :saving="saving"
             :errors="errors"

@@ -28,12 +28,25 @@ defineProps({
         type: String,
         default: '',
     },
+    providerConnections: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const emit = defineEmits(['close', 'submit']);
 
 const name = defineModel('name', { type: String, default: '' });
 const email = defineModel('email', { type: String, default: '' });
+const providerConnectionId = defineModel('providerConnectionId', {
+    type: Number,
+    default: null,
+});
+const model = defineModel('model', { type: String, default: '' });
+const autonomy = defineModel('autonomy', {
+    type: String,
+    default: 'approval',
+});
 const title = defineModel('title', { type: String, default: '' });
 const profile = defineModel('profile', { type: String, default: '' });
 const personality = defineModel('personality', { type: String, default: '' });
@@ -95,6 +108,91 @@ const skills = defineModel('skills', { type: Array, default: () => [] });
                         placeholder="QA analyst, planner, researcher"
                     />
                     <InputError class="mt-2" :message="errors.agent_title?.[0]" />
+                </div>
+
+                <div class="sm:col-span-2 rounded-md border border-gray-200 bg-gray-50 p-4">
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-900">
+                            Execution Policy
+                        </h4>
+                        <p class="mt-1 text-xs text-gray-500">
+                            The manager may make an individual run more restrictive, but never more autonomous.
+                        </p>
+                    </div>
+
+                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <InputLabel
+                                for="agent-provider-connection"
+                                value="Provider Connection"
+                            />
+                            <select
+                                id="agent-provider-connection"
+                                v-model="providerConnectionId"
+                                class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                            >
+                                <option :value="null">
+                                    No provider connection
+                                </option>
+                                <option
+                                    v-for="connection in providerConnections"
+                                    :key="connection.id"
+                                    :value="connection.id"
+                                >
+                                    {{ connection.provider_label }} - {{ connection.default_model }}
+                                </option>
+                            </select>
+                            <InputError
+                                class="mt-2"
+                                :message="errors.agent_provider_connection_id?.[0]"
+                            />
+                        </div>
+
+                        <div>
+                            <InputLabel
+                                for="agent-model"
+                                value="Model Override"
+                            />
+                            <TextInput
+                                id="agent-model"
+                                v-model="model"
+                                type="text"
+                                class="mt-1 block w-full"
+                                maxlength="120"
+                                placeholder="Use provider default"
+                            />
+                            <InputError
+                                class="mt-2"
+                                :message="errors.agent_model?.[0]"
+                            />
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <InputLabel
+                                for="agent-autonomy"
+                                value="Maximum Autonomy"
+                            />
+                            <select
+                                id="agent-autonomy"
+                                v-model="autonomy"
+                                class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-500 focus:ring-gray-500"
+                            >
+                                <option value="advisory">
+                                    Advisory only - recommendations, no executable actions
+                                </option>
+                                <option value="approval">
+                                    Approval required - manager approves every action
+                                </option>
+                                <option value="automatic">
+                                    Scoped automatic - comments, checklist, progress, and status
+                                </option>
+                            </select>
+                            <InputError
+                                class="mt-2"
+                                :message="errors.agent_autonomy?.[0]"
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 <div>

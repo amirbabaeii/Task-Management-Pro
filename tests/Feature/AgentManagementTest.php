@@ -29,7 +29,8 @@ class AgentManagementTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Agents/Index')
                 ->has('agents', 0)
-                ->has('archivedAgents', 0));
+                ->has('archivedAgents', 0)
+                ->has('providerConnections', 0));
 
         $createResponse = $this->actingAs($manager)->postJson(route('agents.store'), [
             'name' => 'Noah Analyst',
@@ -162,6 +163,16 @@ class AgentManagementTest extends TestCase
 
         $this->assertSame($connection->id, $agent->agent_provider_connection_id);
         $this->assertSame(AgentAutonomy::Automatic, $agent->agent_autonomy);
+
+        $this->actingAs($manager)
+            ->get(route('agents.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('providerConnections.0.id', $connection->id)
+                ->where(
+                    'providerConnections.0.default_model',
+                    AiProviderConnection::DEFAULT_MODEL,
+                ));
     }
 
     public function test_new_agent_defaults_to_approval_policy(): void
