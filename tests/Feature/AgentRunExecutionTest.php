@@ -18,11 +18,14 @@ use App\Models\AiProviderConnection;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\User;
+use App\Notifications\AgentRunApprovalRequiredNotification;
+use App\Notifications\AgentRunFailedNotification;
 use App\Services\Ai\AgentProviderManager;
 use App\Services\Ai\Contracts\AgentProvider;
 use App\Services\Ai\Data\AgentRunPrompt;
 use App\Services\Ai\Data\AgentRunResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -32,6 +35,8 @@ class AgentRunExecutionTest extends TestCase
 
     public function test_approval_run_persists_provider_result_for_review(): void
     {
+        Notification::fake();
+
         $run = $this->runFixture(AgentAutonomy::Approval);
         $capturedPrompt = null;
 
@@ -72,6 +77,11 @@ class AgentRunExecutionTest extends TestCase
         $this->assertSame(AgentRunActionType::AddChecklistItem, $action->type);
         $this->assertSame(AgentRunActionStatus::Proposed, $action->status);
         $this->assertSame('Write regression tests', $action->payload['title']);
+
+        Notification::assertSentTo(
+            $run->manager,
+            AgentRunApprovalRequiredNotification::class,
+        );
     }
 
     public function test_advisory_run_persists_suggestions_without_approval_state(): void
@@ -110,6 +120,8 @@ class AgentRunExecutionTest extends TestCase
 
     public function test_provider_error_marks_run_failed_with_sanitized_error(): void
     {
+        Notification::fake();
+
         $run = $this->runFixture(AgentAutonomy::Approval);
 
         $this->fakeProviderThrowing(new AgentProviderException(
@@ -131,6 +143,8 @@ class AgentRunExecutionTest extends TestCase
             $run->error_message,
         );
         $this->assertNotNull($run->failed_at);
+
+        Notification::assertSentTo($run->manager, AgentRunFailedNotification::class);
     }
 
     public function test_automatic_run_applies_safe_actions_and_holds_field_changes(): void

@@ -165,6 +165,12 @@ const summarize = (notification) => {
             ? `“${title}” is overdue on ${board}`
             : `“${title}” is due today on ${board}`;
     }
+    if (data.kind === 'agent_run_approval_required') {
+        return `${data.agent?.name ?? 'An AI teammate'} needs approval on “${data.task?.title ?? 'a task'}”`;
+    }
+    if (data.kind === 'agent_run_failed') {
+        return `${data.agent?.name ?? 'An AI teammate'} could not complete “${data.task?.title ?? 'a task'}”`;
+    }
     return 'You have a new notification';
 };
 
@@ -187,6 +193,14 @@ const kindLabel = (notification) => {
         return data.deadline_state === 'overdue' ? 'Overdue' : 'Due today';
     }
 
+    if (data.kind === 'agent_run_approval_required') {
+        return 'Agent approval';
+    }
+
+    if (data.kind === 'agent_run_failed') {
+        return 'Agent failed';
+    }
+
     return 'Update';
 };
 
@@ -201,6 +215,14 @@ const kindBadgeClass = (notification) => {
 
     if (data.kind === 'task_assigned') {
         return 'border-indigo-200 bg-indigo-50 text-indigo-700';
+    }
+
+    if (data.kind === 'agent_run_approval_required') {
+        return 'border-indigo-200 bg-indigo-50 text-indigo-700';
+    }
+
+    if (data.kind === 'agent_run_failed') {
+        return 'border-rose-200 bg-rose-50 text-rose-700';
     }
 
     if (data.kind === 'comment_reply') {

@@ -10,6 +10,8 @@ use App\Enums\AgentRunActionType;
 use App\Enums\AgentRunStatus;
 use App\Exceptions\Agents\AgentProviderException;
 use App\Models\AgentRun;
+use App\Notifications\AgentRunApprovalRequiredNotification;
+use App\Notifications\AgentRunFailedNotification;
 use App\Services\Ai\AgentProviderManager;
 use App\Services\Ai\Data\AgentRunPrompt;
 use App\Services\Ai\Data\AgentRunResult;
@@ -228,6 +230,11 @@ class ExecuteAgentRunJob implements ShouldQueue
                 : AgentRunStatus::Completed,
             'completed_at' => now(),
         ])->save();
+
+        if ($run->status === AgentRunStatus::AwaitingApproval) {
+            $run->loadMissing('manager');
+            $run->manager?->notify(new AgentRunApprovalRequiredNotification($run));
+        }
     }
 
     private function markFailed(AgentRun $run, string $code, string $message): void
@@ -238,5 +245,8 @@ class ExecuteAgentRunJob implements ShouldQueue
             'error_message' => $message,
             'failed_at' => now(),
         ])->save();
+
+        $run->loadMissing('manager');
+        $run->manager?->notify(new AgentRunFailedNotification($run));
     }
 }
