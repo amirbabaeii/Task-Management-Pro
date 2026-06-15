@@ -26,6 +26,12 @@ class CreateAgentRunAction
         User $agent,
         ?AgentAutonomy $requestedAutonomy = null,
     ): AgentRun {
+        if (! config('ai.execution.enabled')) {
+            throw ValidationException::withMessages([
+                'agent_id' => 'Agent execution is currently disabled.',
+            ]);
+        }
+
         $this->validateAgent($manager, $board, $task, $agent);
 
         $autonomy = $requestedAutonomy ?? $agent->agent_autonomy;

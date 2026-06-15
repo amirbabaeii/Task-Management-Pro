@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote')->hourly();
 
 Schedule::command('tasks:send-due-reminders')->dailyAt('08:00');
+Schedule::command('agents:prune-run-payloads')->dailyAt('02:30');

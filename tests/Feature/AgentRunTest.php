@@ -176,6 +176,23 @@ class AgentRunTest extends TestCase
             ->assertJsonPath('agent_runs.0.agent.id', $agent->id);
     }
 
+    public function test_execution_feature_flag_can_disable_run_start(): void
+    {
+        Queue::fake();
+        config(['ai.execution.enabled' => false]);
+
+        [$manager, $board, $task, $agent] = $this->fixture();
+
+        $this->actingAs($manager)
+            ->postJson(route('tasks.agent-runs.store', [$board, $task]), [
+                'agent_id' => $agent->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['agent_id']);
+
+        Queue::assertNothingPushed();
+    }
+
     /**
      * @param  array<string, mixed>  $agentAttributes
      * @return array{0: User, 1: Board, 2: Task, 3: User}

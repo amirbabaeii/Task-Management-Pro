@@ -32,7 +32,8 @@ class ExecuteAgentRunJob implements ShouldQueue
     public function __construct(
         public AgentRun $run,
     ) {
-        $this->onQueue('agents');
+        $this->timeout = (int) config('ai.execution.queue_timeout');
+        $this->onQueue((string) config('ai.execution.queue'));
     }
 
     /**
@@ -40,7 +41,10 @@ class ExecuteAgentRunJob implements ShouldQueue
      */
     public function backoff(): array
     {
-        return [30, 120, 300];
+        return array_map(
+            fn ($seconds): int => (int) $seconds,
+            (array) config('ai.execution.retry_backoff', [30, 120, 300]),
+        );
     }
 
     public function handle(AgentProviderManager $providers, ApplyAgentRunAction $applyAction): void
