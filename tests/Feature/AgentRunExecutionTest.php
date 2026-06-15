@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\AgentRuns\ApplyAgentRunAction;
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Enums\AgentAutonomy;
 use App\Enums\AgentProviderErrorCode;
@@ -15,6 +16,7 @@ use App\Jobs\Agents\ExecuteAgentRunJob;
 use App\Models\AgentRun;
 use App\Models\AiProviderConnection;
 use App\Models\Task;
+use App\Models\TaskActivity;
 use App\Models\User;
 use App\Services\Ai\AgentProviderManager;
 use App\Services\Ai\Contracts\AgentProvider;
@@ -50,7 +52,10 @@ class AgentRunExecutionTest extends TestCase
             providerResponseId: 'resp_123',
         ), $capturedPrompt);
 
-        (new ExecuteAgentRunJob($run))->handle(app(AgentProviderManager::class));
+        (new ExecuteAgentRunJob($run))->handle(
+            app(AgentProviderManager::class),
+            app(ApplyAgentRunAction::class),
+        );
 
         $run->refresh();
 
@@ -89,7 +94,10 @@ class AgentRunExecutionTest extends TestCase
             ],
         ));
 
-        (new ExecuteAgentRunJob($run))->handle(app(AgentProviderManager::class));
+        (new ExecuteAgentRunJob($run))->handle(
+            app(AgentProviderManager::class),
+            app(ApplyAgentRunAction::class),
+        );
 
         $run->refresh();
 
@@ -109,7 +117,10 @@ class AgentRunExecutionTest extends TestCase
             'OpenAI rejected the configured API key or model access.',
         ));
 
-        (new ExecuteAgentRunJob($run))->handle(app(AgentProviderManager::class));
+        (new ExecuteAgentRunJob($run))->handle(
+            app(AgentProviderManager::class),
+            app(ApplyAgentRunAction::class),
+        );
 
         $run->refresh();
 
@@ -120,6 +131,99 @@ class AgentRunExecutionTest extends TestCase
             $run->error_message,
         );
         $this->assertNotNull($run->failed_at);
+    }
+
+    public function test_automatic_run_applies_safe_actions_and_holds_field_changes(): void
+    {
+        $run = $this->runFixture(AgentAutonomy::Automatic);
+        $task = $run->task;
+        $agent = $run->agent;
+        $item = $task->checklistItems()->create([
+            'title' => 'Draft notes',
+            'position' => 1,
+        ]);
+
+        $this->fakeProviderReturning(new AgentRunResult(
+            summary: 'Safe updates were ready to apply.',
+            rationale: 'The actions only touch comments, checklist, progress, and status.',
+            actions: [
+                [
+                    'type' => AgentRunActionType::AddComment->value,
+                    'comment' => 'I added the implementation checklist.',
+                ],
+                [
+                    'type' => AgentRunActionType::AddChecklistItem->value,
+                    'title' => 'Run regression suite',
+                ],
+                [
+                    'type' => AgentRunActionType::ToggleChecklistItem->value,
+                    'checklist_item_id' => $item->id,
+                    'completed' => true,
+                ],
+                [
+                    'type' => AgentRunActionType::UpdateProgress->value,
+                    'progress' => 55,
+                ],
+                [
+                    'type' => AgentRunActionType::ChangeStatus->value,
+                    'status' => 'in-progress',
+                ],
+                [
+                    'type' => AgentRunActionType::UpdateTaskFields->value,
+                    'fields' => [
+                        'title' => 'Needs manager approval',
+                    ],
+                ],
+            ],
+            usage: [
+                'input_tokens' => 80,
+                'output_tokens' => 30,
+                'total_tokens' => 110,
+            ],
+        ));
+
+        (new ExecuteAgentRunJob($run))->handle(
+            app(AgentProviderManager::class),
+            app(ApplyAgentRunAction::class),
+        );
+
+        $run->refresh();
+        $task->refresh();
+
+        $this->assertSame(AgentRunStatus::AwaitingApproval, $run->status);
+        $this->assertSame('in-progress', $task->status);
+        $this->assertSame(55, $task->progress);
+        $this->assertSame('Write release checklist', $task->title);
+        $this->assertTrue($item->fresh()->completed_at !== null);
+        $this->assertDatabaseHas('task_comments', [
+            'task_id' => $task->id,
+            'user_id' => $agent->id,
+            'content' => 'I added the implementation checklist.',
+        ]);
+        $this->assertDatabaseHas('task_checklist_items', [
+            'task_id' => $task->id,
+            'title' => 'Run regression suite',
+        ]);
+
+        $statuses = $run->actions()
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($action): string => $action->status->value)
+            ->all();
+
+        $this->assertSame([
+            AgentRunActionStatus::Applied->value,
+            AgentRunActionStatus::Applied->value,
+            AgentRunActionStatus::Applied->value,
+            AgentRunActionStatus::Applied->value,
+            AgentRunActionStatus::Applied->value,
+            AgentRunActionStatus::Proposed->value,
+        ], $statuses);
+
+        $this->assertTrue(TaskActivity::query()
+            ->where('task_id', $task->id)
+            ->where('user_id', $agent->id)
+            ->exists());
     }
 
     private function fakeProviderReturning(

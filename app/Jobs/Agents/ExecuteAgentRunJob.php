@@ -2,6 +2,8 @@
 
 namespace App\Jobs\Agents;
 
+use App\Actions\AgentRuns\ApplyAgentRunAction;
+use App\Enums\AgentAutonomy;
 use App\Enums\AgentProviderErrorCode;
 use App\Enums\AgentRunActionStatus;
 use App\Enums\AgentRunActionType;
@@ -39,7 +41,7 @@ class ExecuteAgentRunJob implements ShouldQueue
         return [30, 120, 300];
     }
 
-    public function handle(AgentProviderManager $providers): void
+    public function handle(AgentProviderManager $providers, ApplyAgentRunAction $applyAction): void
     {
         $run = AgentRun::query()
             ->with('providerConnection')
@@ -66,7 +68,7 @@ class ExecuteAgentRunJob implements ShouldQueue
                 ->for($run->provider)
                 ->execute($run->providerConnection, $this->promptFor($run));
 
-            $this->persistResult($run, $result);
+            $this->persistResult($run, $result, $applyAction);
         } catch (AgentProviderException $exception) {
             if ($exception->retryable && $this->attempts() < $this->tries) {
                 throw $exception;
@@ -144,24 +146,25 @@ class ExecuteAgentRunJob implements ShouldQueue
         ]);
     }
 
-    private function persistResult(AgentRun $run, AgentRunResult $result): void
-    {
-        DB::transaction(function () use ($run, $result): void {
-            $actionStatus = $this->storedActionStatus($run);
-
+    private function persistResult(
+        AgentRun $run,
+        AgentRunResult $result,
+        ApplyAgentRunAction $applyAction,
+    ): void {
+        $automaticActionIds = DB::transaction(function () use ($run, $result): array {
             $run->forceFill([
-                'status' => $this->completedStatus($run, count($result->actions)),
                 'summary' => $result->summary,
                 'rationale' => $result->rationale,
                 'provider_response_id' => $result->providerResponseId,
                 'input_tokens' => $result->usage['input_tokens'],
                 'output_tokens' => $result->usage['output_tokens'],
                 'total_tokens' => $result->usage['total_tokens'],
-                'completed_at' => now(),
                 'failed_at' => null,
                 'error_code' => null,
                 'error_message' => null,
             ])->save();
+
+            $automaticActionIds = [];
 
             foreach ($result->actions as $action) {
                 $type = AgentRunActionType::tryFrom((string) ($action['type'] ?? ''));
@@ -173,29 +176,58 @@ class ExecuteAgentRunJob implements ShouldQueue
                     );
                 }
 
-                $run->actions()->create([
+                $created = $run->actions()->create([
                     'type' => $type,
-                    'status' => $actionStatus,
+                    'status' => $this->storedActionStatus($run),
                     'payload' => Arr::except($action, ['type']),
                 ]);
+
+                if ($this->shouldApplyAutomatically($run, $type)) {
+                    $automaticActionIds[] = $created->id;
+                }
             }
+
+            return $automaticActionIds;
         });
+
+        foreach ($automaticActionIds as $actionId) {
+            $action = $run->actions()->find($actionId);
+
+            if ($action) {
+                $applyAction->execute($action);
+            }
+        }
+
+        $this->finishRun($run);
     }
 
     private function storedActionStatus(AgentRun $run): AgentRunActionStatus
     {
-        return $run->autonomy->value === 'advisory'
+        return $run->autonomy === AgentAutonomy::Advisory
             ? AgentRunActionStatus::Suggested
             : AgentRunActionStatus::Proposed;
     }
 
-    private function completedStatus(AgentRun $run, int $actionCount): AgentRunStatus
+    private function shouldApplyAutomatically(AgentRun $run, AgentRunActionType $type): bool
     {
-        if ($run->autonomy->value === 'advisory' || $actionCount === 0) {
-            return AgentRunStatus::Completed;
-        }
+        return $run->autonomy === AgentAutonomy::Automatic
+            && $type->canApplyAutomatically();
+    }
 
-        return AgentRunStatus::AwaitingApproval;
+    private function finishRun(AgentRun $run): void
+    {
+        $run->refresh();
+
+        $hasPendingApproval = $run->actions()
+            ->where('status', AgentRunActionStatus::Proposed->value)
+            ->exists();
+
+        $run->forceFill([
+            'status' => $hasPendingApproval
+                ? AgentRunStatus::AwaitingApproval
+                : AgentRunStatus::Completed,
+            'completed_at' => now(),
+        ])->save();
     }
 
     private function markFailed(AgentRun $run, string $code, string $message): void

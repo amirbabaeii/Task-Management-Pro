@@ -6,6 +6,7 @@ use App\Actions\Tasks\RecordTaskActivityAction;
 use App\Enums\TaskActivityKind;
 use App\Models\Task;
 use App\Models\TaskChecklistItem;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class CreateTaskChecklistItemAction
@@ -17,9 +18,9 @@ class CreateTaskChecklistItemAction
     /**
      * @param  array{title: string}  $data
      */
-    public function execute(Task $task, array $data): TaskChecklistItem
+    public function execute(Task $task, array $data, ?User $actor = null): TaskChecklistItem
     {
-        return DB::transaction(function () use ($task, $data): TaskChecklistItem {
+        return DB::transaction(function () use ($task, $data, $actor): TaskChecklistItem {
             $position = ((int) $task->checklistItems()->max('position')) + 1;
 
             $item = $task->checklistItems()->create([
@@ -31,6 +32,7 @@ class CreateTaskChecklistItemAction
                 $task,
                 TaskActivityKind::ChecklistItemAdded,
                 ['title' => $item->title],
+                $actor,
             );
 
             return $item;

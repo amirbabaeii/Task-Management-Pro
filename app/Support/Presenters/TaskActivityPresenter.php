@@ -39,6 +39,12 @@ class TaskActivityPresenter
                 $payload['from'] ?? 'unknown',
                 $payload['to'] ?? 'unknown',
             ),
+            TaskActivityKind::ProgressChanged => sprintf(
+                '%s updated progress from %s%% to %s%%',
+                $actorName,
+                $payload['from'] ?? 0,
+                $payload['to'] ?? 0,
+            ),
             TaskActivityKind::AssigneesChanged => self::describeAssigneeChange($actorName, $payload),
             TaskActivityKind::CommentAdded => "{$actorName} commented",
             TaskActivityKind::Archived => "{$actorName} archived this task",

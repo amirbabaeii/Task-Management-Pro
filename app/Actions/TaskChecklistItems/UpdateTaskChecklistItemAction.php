@@ -5,6 +5,7 @@ namespace App\Actions\TaskChecklistItems;
 use App\Actions\Tasks\RecordTaskActivityAction;
 use App\Enums\TaskActivityKind;
 use App\Models\TaskChecklistItem;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class UpdateTaskChecklistItemAction
@@ -16,9 +17,9 @@ class UpdateTaskChecklistItemAction
     /**
      * @param  array{title?: string, completed?: bool}  $data
      */
-    public function execute(TaskChecklistItem $item, array $data): TaskChecklistItem
+    public function execute(TaskChecklistItem $item, array $data, ?User $actor = null): TaskChecklistItem
     {
-        return DB::transaction(function () use ($item, $data): TaskChecklistItem {
+        return DB::transaction(function () use ($item, $data, $actor): TaskChecklistItem {
             $task = $item->task()->firstOrFail();
             $originalTitle = $item->title;
             $wasCompleted = $item->completed_at !== null;
@@ -41,6 +42,7 @@ class UpdateTaskChecklistItemAction
                         'from' => $originalTitle,
                         'to' => $item->title,
                     ],
+                    $actor,
                 );
             }
 
@@ -53,6 +55,7 @@ class UpdateTaskChecklistItemAction
                         ? TaskActivityKind::ChecklistItemCompleted
                         : TaskActivityKind::ChecklistItemReopened,
                     ['title' => $item->title],
+                    $actor,
                 );
             }
 

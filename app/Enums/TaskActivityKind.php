@@ -6,6 +6,7 @@ enum TaskActivityKind: string
 {
     case Created = 'created';
     case StatusChanged = 'status_changed';
+    case ProgressChanged = 'progress_changed';
     case AssigneesChanged = 'assignees_changed';
     case CommentAdded = 'comment_added';
     case Archived = 'archived';
