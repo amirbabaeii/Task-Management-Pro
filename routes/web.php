@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AgentController;
 use App\Http\Controllers\AgentRunController;
+use App\Http\Controllers\AgentRunReviewController;
 use App\Http\Controllers\AiSettingsController;
 use App\Http\Controllers\BoardColumnController;
 use App\Http\Controllers\BoardController;
@@ -75,6 +76,14 @@ Route::middleware('auth')->group(function () {
         ->name('tasks.agent-runs.index');
     Route::post('/tasks/board/{board}/tasks/{task}/agent-runs', [AgentRunController::class, 'store'])
         ->name('tasks.agent-runs.store');
+    Route::post('/agent-runs/{agentRun}/actions/{action}/approve', [AgentRunReviewController::class, 'approve'])
+        ->name('agent-runs.actions.approve');
+    Route::post('/agent-runs/{agentRun}/actions/{action}/reject', [AgentRunReviewController::class, 'reject'])
+        ->name('agent-runs.actions.reject');
+    Route::post('/agent-runs/{agentRun}/approve-all', [AgentRunReviewController::class, 'approveAll'])
+        ->name('agent-runs.approve-all');
+    Route::post('/agent-runs/{agentRun}/retry', [AgentRunReviewController::class, 'retry'])
+        ->name('agent-runs.retry');
 
     Route::post('/tasks/board/{board}/columns', [BoardColumnController::class, 'store'])
         ->name('tasks.columns.store');
