@@ -7,12 +7,14 @@ use App\Enums\AgentAutonomy;
 use App\Enums\AgentRunStatus;
 use App\Enums\AiProvider;
 use App\Enums\BoardRole;
+use App\Jobs\Agents\ExecuteAgentRunJob;
 use App\Models\AgentRun;
 use App\Models\AiProviderConnection;
 use App\Models\Board;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class AgentRunTest extends TestCase
@@ -21,6 +23,8 @@ class AgentRunTest extends TestCase
 
     public function test_manager_can_start_queued_run_for_assigned_agent(): void
     {
+        Queue::fake();
+
         [$manager, $board, $task, $agent] = $this->fixture();
 
         $this->actingAs($manager)
@@ -47,10 +51,18 @@ class AgentRunTest extends TestCase
 
         $this->assertSame($task->title, $run->context_snapshot['task']['title']);
         $this->assertSame($agent->name, $run->context_snapshot['agent']['name']);
+
+        Queue::assertPushed(
+            ExecuteAgentRunJob::class,
+            fn (ExecuteAgentRunJob $job): bool => $job->run->is($run)
+                && $job->queue === 'agents',
+        );
     }
 
     public function test_requested_autonomy_cannot_exceed_agent_default(): void
     {
+        Queue::fake();
+
         [$manager, $board, $task, $agent] = $this->fixture([
             'agent_autonomy' => AgentAutonomy::Approval,
         ]);
@@ -66,6 +78,8 @@ class AgentRunTest extends TestCase
 
     public function test_only_agent_manager_can_start_run(): void
     {
+        Queue::fake();
+
         [$manager, $board, $task, $agent] = $this->fixture();
         $otherManager = User::factory()->create();
 
@@ -83,6 +97,8 @@ class AgentRunTest extends TestCase
 
     public function test_agent_must_be_assigned_to_task(): void
     {
+        Queue::fake();
+
         [$manager, $board, $task, $agent] = $this->fixture(assignAgentToTask: false);
 
         $this->actingAs($manager)
@@ -95,6 +111,8 @@ class AgentRunTest extends TestCase
 
     public function test_agent_requires_verified_provider_connection(): void
     {
+        Queue::fake();
+
         [$manager, $board, $task, $agent] = $this->fixture(verifiedConnection: false);
 
         $this->actingAs($manager)
@@ -107,6 +125,8 @@ class AgentRunTest extends TestCase
 
     public function test_only_one_active_run_is_allowed_per_task(): void
     {
+        Queue::fake();
+
         [$manager, $board, $task, $agent] = $this->fixture();
 
         AgentRun::query()->create([

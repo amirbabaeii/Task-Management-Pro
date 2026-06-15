@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\AgentRuns\CreateAgentRunAction;
 use App\Http\Requests\AgentRuns\StoreAgentRunRequest;
+use App\Jobs\Agents\ExecuteAgentRunJob;
 use App\Models\Board;
 use App\Models\Task;
 use App\Models\User;
@@ -52,6 +53,8 @@ class AgentRunController extends Controller
             $agent,
             $request->autonomy(),
         );
+
+        ExecuteAgentRunJob::dispatch($run);
 
         $run->load(['agent:id,name', 'manager:id,name', 'actions']);
 
