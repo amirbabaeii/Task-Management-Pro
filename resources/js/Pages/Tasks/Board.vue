@@ -1142,6 +1142,14 @@ const closeTaskDetails = () => {
     clearTaskQueryFromUrl();
 };
 
+const refreshBoardTasks = () => {
+    router.reload({
+        only: ['tasks', 'archivedTasks'],
+        preserveScroll: true,
+        preserveState: true,
+    });
+};
+
 watch(
     () => page.url,
     (url) => openTaskFromQuery(url),
@@ -2033,6 +2041,7 @@ const submitTaskUpdate = () => {
 
                 <TaskDetailsModal
                     :show="showingDetailsModal"
+                    :board-id="currentBoardId"
                     :task="activeTask"
                     :format-status="formatStatus"
                     :statuses="boardStatuses"
@@ -2057,6 +2066,7 @@ const submitTaskUpdate = () => {
                     @submit-reply="submitReply"
                     @toggle-checklist-item="toggleChecklistItem"
                     @change-status="changeTaskStatusFromDetails"
+                    @task-refresh-needed="refreshBoardTasks"
                 />
 
                 <TaskFormModal

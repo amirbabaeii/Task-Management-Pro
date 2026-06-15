@@ -1,4 +1,5 @@
 <script setup>
+import AgentRunsPanel from '@/Components/AgentRunsPanel.vue';
 import CommentThread from '@/Components/CommentThread.vue';
 import InputError from '@/Components/InputError.vue';
 import Modal from '@/Components/Modal.vue';
@@ -21,6 +22,10 @@ const props = defineProps({
     },
     task: {
         type: Object,
+        default: null,
+    },
+    boardId: {
+        type: Number,
         default: null,
     },
     formatStatus: {
@@ -74,6 +79,7 @@ const emit = defineEmits([
     'submit-reply',
     'toggle-checklist-item',
     'change-status',
+    'task-refresh-needed',
 ]);
 
 const commentDraft = defineModel('commentDraft', {
@@ -110,6 +116,7 @@ const isArchivedAgent = (user) =>
 const activityKindLabels = {
     created: 'Created',
     status_changed: 'Status',
+    progress_changed: 'Progress',
     assignees_changed: 'Assignees',
     comment_added: 'Comments',
     archived: 'Archived',
@@ -191,6 +198,7 @@ const activityDotClass = (kind) => {
         case 'created':
             return 'bg-emerald-400';
         case 'status_changed':
+        case 'progress_changed':
             return 'bg-indigo-400';
         case 'assignees_changed':
             return 'bg-amber-400';
@@ -567,6 +575,13 @@ const activityDotClass = (kind) => {
                         </button>
                     </div>
                 </section>
+
+                <AgentRunsPanel
+                    v-if="!task.archived_at"
+                    :board-id="boardId"
+                    :task="task"
+                    @task-refresh-needed="emit('task-refresh-needed')"
+                />
 
                 <section class="space-y-4">
                     <div class="flex items-center justify-between">
