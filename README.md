@@ -16,11 +16,16 @@ activity, comments, checklists, deadlines, and notifications.
 - In-app assignment, collaboration, reply, and deadline notifications.
 - Scheduled daily deadline reminders.
 - Sanctum authentication and board-scoped task API endpoints.
+- Encrypted manager-owned OpenAI connections with verification and rotation.
+- Agent autonomy policies: advisory, approval, and scoped automatic execution.
+- Queued agent runs with task context snapshots, structured actions, approval
+  controls, retry, notifications, and raw-payload pruning.
 - Responsive Inertia and Vue interface with server-side rendering.
 
-Managed agents currently provide identity, skills, workload, board membership,
-and assignment. AI provider connections and controlled task execution are the
-next product milestone; they are not active in this version.
+Managed agents can be assigned to board tasks and run manually from task
+details. Automatic mode is intentionally scoped to comments, checklist
+changes, progress, and status changes; title, description, tags, priority, and
+deadline edits still require manager approval.
 
 ## Requirements
 
@@ -56,10 +61,11 @@ vendor/bin/sail npm run dev
 Run the queue worker used by notifications and future agent jobs:
 
 ```bash
-vendor/bin/sail artisan queue:work
+vendor/bin/sail artisan queue:work --queue=agents,default
 ```
 
-Run the scheduler locally so daily deadline reminders are dispatched:
+Run the scheduler locally so daily deadline reminders and agent payload pruning
+are dispatched:
 
 ```bash
 vendor/bin/sail artisan schedule:work
@@ -72,13 +78,47 @@ Production deployments should run persistent queue workers and invoke
 
 ```bash
 vendor/bin/sail artisan test
-vendor/bin/sail root-shell -c 'npm test'
-vendor/bin/sail root-shell -c 'npm run build'
+npm test
+npm run build
 vendor/bin/sail bin pint
 ```
 
-The root shell is only needed when Docker-owned frontend cache or build files
-prevent the normal Sail user from writing.
+If Docker-owned frontend cache or build files block local commands, fix the
+generated directories (`node_modules/.vite`, `public/build`, `bootstrap/ssr`)
+or run through a container user that can write them.
+
+## AI Operations
+
+Managers add or rotate their OpenAI key from **AI Settings**. Keys are stored
+encrypted and are never serialized through API responses. New agents default to
+the `approval` autonomy level; managers can downgrade a run at start time but
+cannot elevate it above the agent default.
+
+Relevant environment settings:
+
+```env
+AI_AGENT_EXECUTION_ENABLED=true
+AI_AGENT_QUEUE=agents
+AI_AGENT_QUEUE_TIMEOUT=120
+AI_MAX_OUTPUT_TOKENS=4000
+AI_CONTEXT_COMMENT_LIMIT=20
+AI_CONTEXT_ACTIVITY_LIMIT=30
+AI_RUN_RAW_PAYLOAD_RETENTION_DAYS=30
+AI_RUN_RETENTION_DAYS=180
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_TIMEOUT=60
+OPENAI_REASONING_EFFORT=low
+```
+
+The scheduler runs `agents:prune-run-payloads` daily, clearing old
+`context_snapshot` payloads while retaining run rows, action rows, token usage,
+statuses, and audit metadata. Run `php artisan agents:prune-run-payloads
+--days=30` manually after changing retention.
+
+For deployment, back up the database and `.env`/`APP_KEY` together; encrypted
+provider keys cannot be recovered without the application key. Keep queue
+workers, scheduler, database backups, and key-rotation procedures in the same
+release checklist.
 
 ## API
 
@@ -95,11 +135,10 @@ updates use the same board validation and domain actions as the web interface.
 
 ## Roadmap
 
-- Encrypted manager-owned OpenAI connections.
-- Manager-defined agent autonomy policies.
-- Queued agent runs with structured actions and approval controls.
-- Agent run history, notifications, retention, and operational limits.
 - Additional AI providers after the OpenAI integration is stable.
+- Scheduled autonomous scans and realtime streaming.
+- External tools, web search, per-board autonomy, and multi-tenant
+  organizations.
 
 ## License
 
