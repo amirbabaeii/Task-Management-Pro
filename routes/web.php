@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AgentController;
+use App\Http\Controllers\AgentRunController;
 use App\Http\Controllers\AiSettingsController;
 use App\Http\Controllers\BoardColumnController;
 use App\Http\Controllers\BoardController;
@@ -70,6 +71,10 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'store'])
         ->name('tasks.comments.store');
+    Route::get('/tasks/board/{board}/tasks/{task}/agent-runs', [AgentRunController::class, 'index'])
+        ->name('tasks.agent-runs.index');
+    Route::post('/tasks/board/{board}/tasks/{task}/agent-runs', [AgentRunController::class, 'store'])
+        ->name('tasks.agent-runs.store');
 
     Route::post('/tasks/board/{board}/columns', [BoardColumnController::class, 'store'])
         ->name('tasks.columns.store');
