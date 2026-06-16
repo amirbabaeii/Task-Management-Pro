@@ -57,6 +57,11 @@ class CreateAgentRunAction
         }
 
         return DB::transaction(function () use ($manager, $board, $task, $agent, $connection, $autonomy): AgentRun {
+            Task::query()
+                ->whereKey($task->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             $activeRunExists = AgentRun::query()
                 ->where('task_id', $task->id)
                 ->whereIn('status', AgentRunStatus::activeValues())
