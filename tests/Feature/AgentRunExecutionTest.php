@@ -24,6 +24,7 @@ use App\Services\Ai\AgentProviderManager;
 use App\Services\Ai\Contracts\AgentProvider;
 use App\Services\Ai\Data\AgentRunPrompt;
 use App\Services\Ai\Data\AgentRunResult;
+use Illuminate\Contracts\Queue\Job as QueueJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Mockery\MockInterface;
@@ -145,6 +146,90 @@ class AgentRunExecutionTest extends TestCase
         $this->assertNotNull($run->failed_at);
 
         Notification::assertSentTo($run->manager, AgentRunFailedNotification::class);
+    }
+
+    public function test_retryable_provider_error_does_not_strand_running_run(): void
+    {
+        Notification::fake();
+
+        $run = $this->runFixture(AgentAutonomy::Approval);
+        $provider = new class implements AgentProvider
+        {
+            public int $calls = 0;
+
+            public function provider(): AiProvider
+            {
+                return AiProvider::OpenAI;
+            }
+
+            public function verify(AiProviderConnection $connection): void {}
+
+            public function execute(
+                AiProviderConnection $connection,
+                AgentRunPrompt $prompt,
+            ): AgentRunResult {
+                $this->calls++;
+
+                if ($this->calls === 1) {
+                    throw new AgentProviderException(
+                        AgentProviderErrorCode::RateLimited,
+                        'OpenAI rate limited the request. Try again later.',
+                        true,
+                    );
+                }
+
+                return new AgentRunResult(
+                    summary: 'Recovered after retry.',
+                    rationale: 'The provider accepted the second attempt.',
+                    actions: [],
+                    usage: [
+                        'input_tokens' => 10,
+                        'output_tokens' => 5,
+                        'total_tokens' => 15,
+                    ],
+                    providerResponseId: 'resp_retry',
+                );
+            }
+        };
+
+        $this->mock(
+            AgentProviderManager::class,
+            fn (MockInterface $mock) => $mock
+                ->shouldReceive('for')
+                ->twice()
+                ->with(AiProvider::OpenAI)
+                ->andReturn($provider),
+        );
+
+        $firstAttempt = new ExecuteAgentRunJob($run);
+        $firstAttempt->setJob($this->queueJobAttempt(1));
+
+        try {
+            $firstAttempt->handle(
+                app(AgentProviderManager::class),
+                app(ApplyAgentRunAction::class),
+            );
+            $this->fail('Expected retryable provider exception.');
+        } catch (AgentProviderException $exception) {
+            $this->assertSame(AgentProviderErrorCode::RateLimited, $exception->errorCode);
+        }
+
+        $this->assertSame(AgentRunStatus::Running, $run->fresh()->status);
+
+        $secondAttempt = new ExecuteAgentRunJob($run);
+        $secondAttempt->setJob($this->queueJobAttempt(2));
+
+        $secondAttempt->handle(
+            app(AgentProviderManager::class),
+            app(ApplyAgentRunAction::class),
+        );
+
+        $run->refresh();
+
+        $this->assertSame(AgentRunStatus::Completed, $run->status);
+        $this->assertSame('Recovered after retry.', $run->summary);
+        $this->assertSame('resp_retry', $run->provider_response_id);
+        Notification::assertNothingSent();
     }
 
     public function test_automatic_run_applies_safe_actions_and_holds_field_changes(): void
@@ -295,6 +380,14 @@ class AgentRunExecutionTest extends TestCase
         };
 
         $this->mockProviderManager($provider);
+    }
+
+    private function queueJobAttempt(int $attempt): QueueJob
+    {
+        $job = \Mockery::mock(QueueJob::class);
+        $job->shouldReceive('attempts')->andReturn($attempt);
+
+        return $job;
     }
 
     private function mockProviderManager(AgentProvider $provider): void

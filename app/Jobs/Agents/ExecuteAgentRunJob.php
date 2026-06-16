@@ -53,7 +53,13 @@ class ExecuteAgentRunJob implements ShouldQueue
             ->with('providerConnection')
             ->find($this->run->id);
 
-        if (! $run || $run->status !== AgentRunStatus::Queued) {
+        if (
+            ! $run
+            || ! in_array($run->status, [
+                AgentRunStatus::Queued,
+                AgentRunStatus::Running,
+            ], true)
+        ) {
             return;
         }
 
