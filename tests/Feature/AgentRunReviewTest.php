@@ -173,6 +173,9 @@ class AgentRunReviewTest extends TestCase
             'error_message' => 'Provider failed.',
             'failed_at' => now(),
         ])->save();
+        $staleAction = $this->actionFor($run, AgentRunActionType::AddComment, [
+            'comment' => 'Stale suggestion from a failed attempt.',
+        ]);
 
         $this->actingAs($manager)
             ->postJson(route('agent-runs.retry', $run))
@@ -183,6 +186,9 @@ class AgentRunReviewTest extends TestCase
         $run->refresh();
 
         $this->assertNull($run->failed_at);
+        $this->assertDatabaseMissing('agent_run_actions', [
+            'id' => $staleAction->id,
+        ]);
         Queue::assertPushed(
             ExecuteAgentRunJob::class,
             fn (ExecuteAgentRunJob $job): bool => $job->run->is($run)

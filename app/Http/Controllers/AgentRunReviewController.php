@@ -11,6 +11,7 @@ use App\Models\AgentRunAction;
 use App\Support\Presenters\AgentRunPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AgentRunReviewController extends Controller
@@ -121,20 +122,24 @@ class AgentRunReviewController extends Controller
             ]);
         }
 
-        $agentRun->forceFill([
-            'status' => AgentRunStatus::Queued,
-            'error_code' => null,
-            'error_message' => null,
-            'summary' => null,
-            'rationale' => null,
-            'provider_response_id' => null,
-            'input_tokens' => 0,
-            'output_tokens' => 0,
-            'total_tokens' => 0,
-            'started_at' => null,
-            'completed_at' => null,
-            'failed_at' => null,
-        ])->save();
+        DB::transaction(function () use ($agentRun): void {
+            $agentRun->actions()->delete();
+
+            $agentRun->forceFill([
+                'status' => AgentRunStatus::Queued,
+                'error_code' => null,
+                'error_message' => null,
+                'summary' => null,
+                'rationale' => null,
+                'provider_response_id' => null,
+                'input_tokens' => 0,
+                'output_tokens' => 0,
+                'total_tokens' => 0,
+                'started_at' => null,
+                'completed_at' => null,
+                'failed_at' => null,
+            ])->save();
+        });
 
         ExecuteAgentRunJob::dispatch($agentRun);
 
