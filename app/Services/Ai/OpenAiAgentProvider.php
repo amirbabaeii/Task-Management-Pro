@@ -192,6 +192,8 @@ class OpenAiAgentProvider implements AgentProvider
             throw $this->malformedOutput();
         }
 
+        $this->validateActionPayloads($decoded['actions']);
+
         return new AgentRunResult(
             summary: $decoded['summary'],
             rationale: $decoded['rationale'],
@@ -287,6 +289,51 @@ class OpenAiAgentProvider implements AgentProvider
                 ],
             ],
         ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $actions
+     */
+    private function validateActionPayloads(array $actions): void
+    {
+        foreach ($actions as $action) {
+            $fields = $action['fields'] ?? [];
+            $valid = match ($action['type'] ?? null) {
+                'add_comment' => $this->filledString($action['comment'] ?? null),
+                'add_checklist_item' => $this->filledString($action['title'] ?? null),
+                'toggle_checklist_item' => is_int($action['checklist_item_id'] ?? null)
+                    && ($action['checklist_item_id'] ?? 0) > 0
+                    && is_bool($action['completed'] ?? null),
+                'update_progress' => is_int($action['progress'] ?? null),
+                'change_status' => $this->filledString($action['status'] ?? null),
+                'update_task_fields' => is_array($fields)
+                    && $this->containsTaskFieldUpdate($fields),
+                default => false,
+            };
+
+            if (! $valid) {
+                throw $this->malformedOutput();
+            }
+        }
+    }
+
+    private function filledString(mixed $value): bool
+    {
+        return is_string($value) && trim($value) !== '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $fields
+     */
+    private function containsTaskFieldUpdate(array $fields): bool
+    {
+        foreach (['title', 'description', 'tags', 'priority', 'deadline_at'] as $field) {
+            if (array_key_exists($field, $fields) && $fields[$field] !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function malformedOutput(): AgentProviderException

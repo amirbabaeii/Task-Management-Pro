@@ -238,6 +238,59 @@ class OpenAiAgentProviderTest extends TestCase
         }
     }
 
+    public function test_task_field_actions_must_include_at_least_one_update(): void
+    {
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output' => [
+                    [
+                        'type' => 'message',
+                        'content' => [
+                            [
+                                'type' => 'output_text',
+                                'text' => json_encode([
+                                    'summary' => 'No useful change.',
+                                    'rationale' => 'The action only contains schema placeholders.',
+                                    'actions' => [
+                                        [
+                                            'type' => 'update_task_fields',
+                                            'comment' => null,
+                                            'title' => null,
+                                            'checklist_item_id' => null,
+                                            'completed' => null,
+                                            'progress' => null,
+                                            'status' => null,
+                                            'fields' => [
+                                                'title' => null,
+                                                'description' => null,
+                                                'tags' => null,
+                                                'priority' => null,
+                                                'deadline_at' => null,
+                                            ],
+                                        ],
+                                    ],
+                                ], JSON_THROW_ON_ERROR),
+                            ],
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        try {
+            app(OpenAiAgentProvider::class)->execute(
+                $this->connection(),
+                new AgentRunPrompt('gpt-5.5', 'Analyze.', []),
+            );
+            $this->fail('Expected provider exception.');
+        } catch (AgentProviderException $exception) {
+            $this->assertSame(
+                AgentProviderErrorCode::MalformedOutput,
+                $exception->errorCode,
+            );
+        }
+    }
+
     private function connection(): AiProviderConnection
     {
         $user = User::factory()->create();
