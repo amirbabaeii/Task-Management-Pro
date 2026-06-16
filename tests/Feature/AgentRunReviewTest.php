@@ -48,6 +48,30 @@ class AgentRunReviewTest extends TestCase
         $this->assertNotNull($action->applied_at);
     }
 
+    public function test_field_update_approval_ignores_null_placeholders(): void
+    {
+        [$manager, $run, $task] = $this->runFixture();
+        $action = $this->actionFor($run, AgentRunActionType::UpdateTaskFields, [
+            'fields' => [
+                'title' => null,
+                'description' => null,
+                'tags' => ['backend', '', 'Backend'],
+                'priority' => null,
+                'deadline_at' => null,
+            ],
+        ]);
+
+        $this->actingAs($manager)
+            ->postJson(route('agent-runs.actions.approve', [$run, $action]))
+            ->assertOk()
+            ->assertJsonPath('agent_run.actions.0.status', AgentRunActionStatus::Applied->value);
+
+        $task->refresh();
+
+        $this->assertSame('Write release checklist', $task->title);
+        $this->assertSame(['backend'], $task->tags);
+    }
+
     public function test_manager_can_reject_proposed_action(): void
     {
         [$manager, $run, $task] = $this->runFixture();

@@ -177,16 +177,16 @@ class ApplyAgentRunAction
         $data = [];
 
         foreach (['title', 'description', 'deadline_at'] as $field) {
-            if (array_key_exists($field, $fields)) {
+            if (array_key_exists($field, $fields) && $fields[$field] !== null) {
                 $data[$field] = $fields[$field];
             }
         }
 
-        if (array_key_exists('tags', $fields)) {
+        if (array_key_exists('tags', $fields) && $fields['tags'] !== null) {
             $data['tags'] = Task::normalizeTags($fields['tags']);
         }
 
-        if (array_key_exists('priority', $fields)) {
+        if (array_key_exists('priority', $fields) && $fields['priority'] !== null) {
             $priority = TaskPriority::tryFrom((string) $fields['priority']);
 
             if ($priority === null) {
