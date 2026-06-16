@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Ai\Data\AgentRunPrompt;
 use App\Services\Ai\OpenAiAgentProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -127,6 +128,81 @@ class OpenAiAgentProviderTest extends TestCase
                 $exception->getMessage(),
             );
             $this->assertFalse($exception->retryable);
+        }
+    }
+
+    public function test_rate_limits_are_retryable(): void
+    {
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'error' => [
+                    'message' => 'Sensitive rate limit detail',
+                ],
+            ], 429),
+        ]);
+
+        try {
+            app(OpenAiAgentProvider::class)->execute(
+                $this->connection(),
+                new AgentRunPrompt('gpt-5.5', 'Analyze.', []),
+            );
+            $this->fail('Expected provider exception.');
+        } catch (AgentProviderException $exception) {
+            $this->assertSame(
+                AgentProviderErrorCode::RateLimited,
+                $exception->errorCode,
+            );
+            $this->assertTrue($exception->retryable);
+            $this->assertStringNotContainsString(
+                'Sensitive rate limit detail',
+                $exception->getMessage(),
+            );
+        }
+    }
+
+    public function test_provider_unavailable_errors_are_retryable(): void
+    {
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([], 503),
+        ]);
+
+        try {
+            app(OpenAiAgentProvider::class)->execute(
+                $this->connection(),
+                new AgentRunPrompt('gpt-5.5', 'Analyze.', []),
+            );
+            $this->fail('Expected provider exception.');
+        } catch (AgentProviderException $exception) {
+            $this->assertSame(
+                AgentProviderErrorCode::ProviderUnavailable,
+                $exception->errorCode,
+            );
+            $this->assertTrue($exception->retryable);
+        }
+    }
+
+    public function test_connection_timeouts_are_retryable_and_sanitized(): void
+    {
+        Http::fake([
+            'https://api.openai.com/v1/responses' => fn () => throw new ConnectionException('Sensitive timeout detail'),
+        ]);
+
+        try {
+            app(OpenAiAgentProvider::class)->execute(
+                $this->connection(),
+                new AgentRunPrompt('gpt-5.5', 'Analyze.', []),
+            );
+            $this->fail('Expected provider exception.');
+        } catch (AgentProviderException $exception) {
+            $this->assertSame(
+                AgentProviderErrorCode::TimedOut,
+                $exception->errorCode,
+            );
+            $this->assertTrue($exception->retryable);
+            $this->assertStringNotContainsString(
+                'Sensitive timeout detail',
+                $exception->getMessage(),
+            );
         }
     }
 
