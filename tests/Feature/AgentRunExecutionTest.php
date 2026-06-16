@@ -232,6 +232,31 @@ class AgentRunExecutionTest extends TestCase
         Notification::assertNothingSent();
     }
 
+    public function test_retry_exhaustion_marks_run_failed_and_notifies_manager(): void
+    {
+        Notification::fake();
+
+        $run = $this->runFixture(AgentAutonomy::Approval);
+        $exception = new AgentProviderException(
+            AgentProviderErrorCode::TimedOut,
+            'OpenAI did not respond before the run timed out.',
+            true,
+        );
+
+        (new ExecuteAgentRunJob($run))->failed($exception);
+
+        $run->refresh();
+
+        $this->assertSame(AgentRunStatus::Failed, $run->status);
+        $this->assertSame(AgentProviderErrorCode::TimedOut->value, $run->error_code);
+        $this->assertSame(
+            'OpenAI did not respond before the run timed out.',
+            $run->error_message,
+        );
+        $this->assertNotNull($run->failed_at);
+        Notification::assertSentTo($run->manager, AgentRunFailedNotification::class);
+    }
+
     public function test_automatic_run_applies_safe_actions_and_holds_field_changes(): void
     {
         $run = $this->runFixture(AgentAutonomy::Automatic);
