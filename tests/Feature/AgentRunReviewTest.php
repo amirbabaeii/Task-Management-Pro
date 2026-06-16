@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\AgentRuns\ApplyAgentRunAction;
 use App\Actions\Boards\EnsureUserHasDefaultBoardAction;
 use App\Enums\AgentAutonomy;
 use App\Enums\AgentRunActionStatus;
@@ -94,6 +95,28 @@ class AgentRunReviewTest extends TestCase
         $this->assertSame(AgentRunActionStatus::Rejected, $action->status);
         $this->assertSame($manager->id, $action->approved_by);
         $this->assertNotNull($action->rejected_at);
+    }
+
+    public function test_applier_leaves_non_proposed_actions_unchanged(): void
+    {
+        [$manager, $run, $task] = $this->runFixture(status: AgentRunStatus::Completed);
+        $action = $this->actionFor($run, AgentRunActionType::UpdateTaskFields, [
+            'fields' => [
+                'title' => 'Should not apply',
+            ],
+        ]);
+        $action->forceFill([
+            'status' => AgentRunActionStatus::Suggested,
+        ])->save();
+
+        app(ApplyAgentRunAction::class)->execute($action, $manager);
+
+        $action->refresh();
+        $task->refresh();
+
+        $this->assertSame(AgentRunActionStatus::Suggested, $action->status);
+        $this->assertNull($action->applied_at);
+        $this->assertSame('Write release checklist', $task->title);
     }
 
     public function test_manager_can_approve_all_proposed_actions(): void

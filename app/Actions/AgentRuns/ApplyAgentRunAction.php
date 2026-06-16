@@ -38,7 +38,7 @@ class ApplyAgentRunAction
         }
 
         if ($action->status !== AgentRunActionStatus::Proposed) {
-            return $this->markFailed($action, 'Only proposed actions can be applied.');
+            return $action;
         }
 
         try {
