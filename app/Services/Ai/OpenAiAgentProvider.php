@@ -4,6 +4,7 @@ namespace App\Services\Ai;
 
 use App\Enums\AgentProviderErrorCode;
 use App\Enums\AiProvider;
+use App\Enums\TaskPriority;
 use App\Exceptions\Agents\AgentProviderException;
 use App\Models\AiProviderConnection;
 use App\Services\Ai\Contracts\AgentProvider;
@@ -184,7 +185,7 @@ class OpenAiAgentProvider implements AgentProvider
             'actions.*.fields.description' => ['nullable', 'string', 'max:1000'],
             'actions.*.fields.tags' => ['nullable', 'array', 'max:10'],
             'actions.*.fields.tags.*' => ['string', 'max:30'],
-            'actions.*.fields.priority' => ['nullable', 'string'],
+            'actions.*.fields.priority' => ['nullable', 'string', Rule::in(TaskPriority::values())],
             'actions.*.fields.deadline_at' => ['nullable', 'date'],
         ]);
 
