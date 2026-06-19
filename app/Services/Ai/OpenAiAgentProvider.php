@@ -200,9 +200,9 @@ class OpenAiAgentProvider implements AgentProvider
             rationale: $decoded['rationale'],
             actions: $decoded['actions'],
             usage: [
-                'input_tokens' => (int) data_get($body, 'usage.input_tokens', 0),
-                'output_tokens' => (int) data_get($body, 'usage.output_tokens', 0),
-                'total_tokens' => (int) data_get($body, 'usage.total_tokens', 0),
+                'input_tokens' => max(0, (int) data_get($body, 'usage.input_tokens', 0)),
+                'output_tokens' => max(0, (int) data_get($body, 'usage.output_tokens', 0)),
+                'total_tokens' => max(0, (int) data_get($body, 'usage.total_tokens', 0)),
             ],
             providerResponseId: is_string($body['id'] ?? null)
                 ? $body['id']
