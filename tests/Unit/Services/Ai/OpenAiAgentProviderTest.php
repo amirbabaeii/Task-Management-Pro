@@ -101,7 +101,11 @@ class OpenAiAgentProviderTest extends TestCase
                 && $payload['model'] === 'gpt-5.5'
                 && $payload['store'] === false
                 && $payload['text']['format']['type'] === 'json_schema'
-                && $payload['text']['format']['strict'] === true;
+                && $payload['text']['format']['strict'] === true
+                && data_get(
+                    $payload,
+                    'text.format.schema.properties.actions.items.properties.fields.properties.priority.enum',
+                ) === ['low', 'medium', 'high', null];
         });
     }
 

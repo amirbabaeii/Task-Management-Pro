@@ -281,7 +281,13 @@ class OpenAiAgentProvider implements AgentProvider
                                         'type' => ['array', 'null'],
                                         'items' => ['type' => 'string'],
                                     ],
-                                    'priority' => ['type' => $nullableString],
+                                    'priority' => [
+                                        'type' => $nullableString,
+                                        'enum' => [
+                                            ...TaskPriority::values(),
+                                            null,
+                                        ],
+                                    ],
                                     'deadline_at' => ['type' => $nullableString],
                                 ],
                             ],
