@@ -105,6 +105,40 @@ class OpenAiAgentProviderTest extends TestCase
         });
     }
 
+    public function test_negative_token_usage_is_clamped_to_zero(): void
+    {
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output' => [[
+                    'content' => [[
+                        'type' => 'output_text',
+                        'text' => json_encode([
+                            'summary' => 'No changes needed.',
+                            'rationale' => 'The task is already clear.',
+                            'actions' => [],
+                        ], JSON_THROW_ON_ERROR),
+                    ]],
+                ]],
+                'usage' => [
+                    'input_tokens' => -10,
+                    'output_tokens' => -5,
+                    'total_tokens' => -15,
+                ],
+            ]),
+        ]);
+
+        $result = app(OpenAiAgentProvider::class)->execute(
+            $this->connection(),
+            new AgentRunPrompt('gpt-5.5', 'Analyze.', []),
+        );
+
+        $this->assertSame([
+            'input_tokens' => 0,
+            'output_tokens' => 0,
+            'total_tokens' => 0,
+        ], $result->usage);
+    }
+
     public function test_provider_errors_are_sanitized(): void
     {
         Http::fake([
