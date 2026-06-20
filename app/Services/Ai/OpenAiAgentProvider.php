@@ -162,7 +162,7 @@ class OpenAiAgentProvider implements AgentProvider
         $validator = Validator::make($decoded, [
             'summary' => ['required', 'string', 'max:2000'],
             'rationale' => ['required', 'string', 'max:5000'],
-            'actions' => ['required', 'array', 'max:20'],
+            'actions' => ['present', 'array', 'max:20'],
             'actions.*.type' => [
                 'required',
                 Rule::in([
