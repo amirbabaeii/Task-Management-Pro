@@ -196,6 +196,33 @@ class AgentRunReviewTest extends TestCase
         );
     }
 
+    public function test_retry_requires_no_other_active_task_run(): void
+    {
+        Queue::fake();
+
+        [$manager, $run] = $this->runFixture(status: AgentRunStatus::Failed);
+        AgentRun::query()->create([
+            'board_id' => $run->board_id,
+            'task_id' => $run->task_id,
+            'agent_id' => $run->agent_id,
+            'manager_id' => $run->manager_id,
+            'provider_connection_id' => $run->provider_connection_id,
+            'provider' => $run->provider,
+            'model' => $run->model,
+            'autonomy' => $run->autonomy,
+            'status' => AgentRunStatus::Queued,
+            'context_snapshot' => [],
+        ]);
+
+        $this->actingAs($manager)
+            ->postJson(route('agent-runs.retry', $run))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['task']);
+
+        $this->assertSame(AgentRunStatus::Failed, $run->fresh()->status);
+        Queue::assertNothingPushed();
+    }
+
     public function test_retry_requires_failed_run(): void
     {
         Queue::fake();
