@@ -166,4 +166,53 @@ describe('AgentRunsPanel', () => {
         );
         expect(wrapper.emitted('task-refresh-needed')).toBeTruthy();
     });
+
+    it('hides approve all when no proposed actions remain', async () => {
+        axios.get.mockResolvedValue({
+            data: {
+                agent_runs: [
+                    {
+                        id: 10,
+                        status: 'awaiting_approval',
+                        autonomy: 'approval',
+                        summary: 'History only.',
+                        agent: { id: 7, name: 'Noah Agent' },
+                        error: {},
+                        actions: [
+                            {
+                                id: 16,
+                                type: 'add_comment',
+                                status: 'rejected',
+                                payload: {
+                                    comment: 'Skip this recommendation.',
+                                },
+                            },
+                        ],
+                    },
+                ],
+            },
+        });
+
+        const wrapper = mount(AgentRunsPanel, {
+            props: {
+                boardId: 3,
+                task,
+            },
+            global: {
+                stubs: {
+                    PrimaryButton: {
+                        template: '<button v-bind="$attrs"><slot /></button>',
+                    },
+                    SecondaryButton: {
+                        template: '<button v-bind="$attrs"><slot /></button>',
+                    },
+                },
+            },
+        });
+
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Rejected');
+        expect(wrapper.text()).not.toContain('Approve All');
+    });
 });

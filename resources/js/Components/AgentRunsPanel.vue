@@ -260,6 +260,9 @@ const retryRun = (run) =>
             ),
     );
 
+const hasProposedActions = (run) =>
+    (run.actions ?? []).some((action) => action.status === 'proposed');
+
 const actionSummary = (action) => {
     const payload = action.payload ?? {};
 
@@ -405,7 +408,7 @@ onBeforeUnmount(clearPolling);
                     </div>
                     <div class="flex shrink-0 gap-2">
                         <SecondaryButton
-                            v-if="run.status === 'awaiting_approval'"
+                            v-if="run.status === 'awaiting_approval' && hasProposedActions(run)"
                             :disabled="busyActionKey === `approve-all-${run.id}`"
                             @click="approveAll(run)"
                         >
