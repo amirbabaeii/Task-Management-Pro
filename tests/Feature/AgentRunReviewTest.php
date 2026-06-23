@@ -257,6 +257,40 @@ class AgentRunReviewTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_retry_requires_agent_to_remain_active(): void
+    {
+        Queue::fake();
+
+        [$manager, $run] = $this->runFixture(status: AgentRunStatus::Failed);
+        $run->agent->forceFill([
+            'agent_archived_at' => now(),
+        ])->save();
+
+        $this->actingAs($manager)
+            ->postJson(route('agent-runs.retry', $run))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['agent']);
+
+        $this->assertSame(AgentRunStatus::Failed, $run->fresh()->status);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_retry_requires_agent_to_remain_board_member(): void
+    {
+        Queue::fake();
+
+        [$manager, $run] = $this->runFixture(status: AgentRunStatus::Failed);
+        $run->board->members()->detach($run->agent_id);
+
+        $this->actingAs($manager)
+            ->postJson(route('agent-runs.retry', $run))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['agent']);
+
+        $this->assertSame(AgentRunStatus::Failed, $run->fresh()->status);
+        Queue::assertNothingPushed();
+    }
+
     public function test_retry_requires_failed_run(): void
     {
         Queue::fake();
