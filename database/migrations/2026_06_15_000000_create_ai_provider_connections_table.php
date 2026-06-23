@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('provider', 40);
             $table->text('api_key');
-            $table->string('default_model', 120)->default('gpt-5.5');
+            $table->string('default_model', 120)->default('gpt-5.4-mini');
             $table->timestamp('verified_at')->nullable();
             $table->timestamps();
 

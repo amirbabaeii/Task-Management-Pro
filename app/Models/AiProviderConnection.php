@@ -12,7 +12,7 @@ class AiProviderConnection extends Model
 {
     use HasFactory;
 
-    public const DEFAULT_MODEL = 'gpt-5.5';
+    public const DEFAULT_MODEL = 'gpt-5.4-mini';
 
     protected $fillable = [
         'user_id',

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\AiProvider;
+use App\Models\AiProviderConnection;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -23,7 +24,7 @@ class AiSettingsTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Settings/Ai')
                 ->where('connection.configured', false)
-                ->where('connection.default_model', 'gpt-5.5'));
+                ->where('connection.default_model', AiProviderConnection::DEFAULT_MODEL));
     }
 
     public function test_manager_can_save_and_rotate_openai_connection(): void
