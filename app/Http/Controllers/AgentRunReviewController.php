@@ -8,6 +8,7 @@ use App\Enums\AgentRunStatus;
 use App\Jobs\Agents\ExecuteAgentRunJob;
 use App\Models\AgentRun;
 use App\Models\AgentRunAction;
+use App\Models\Task;
 use App\Support\Presenters\AgentRunPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -104,25 +105,36 @@ class AgentRunReviewController extends Controller
     {
         $this->authorizeManager($request, $agentRun);
 
-        if ($agentRun->status !== AgentRunStatus::Failed) {
-            throw ValidationException::withMessages([
-                'run' => 'Only failed runs can be retried.',
-            ]);
-        }
+        $agentRun = DB::transaction(function () use ($agentRun): AgentRun {
+            $agentRun = AgentRun::query()
+                ->whereKey($agentRun->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $activeRunExists = AgentRun::query()
-            ->where('task_id', $agentRun->task_id)
-            ->where('id', '!=', $agentRun->id)
-            ->whereIn('status', AgentRunStatus::activeValues())
-            ->exists();
+            if ($agentRun->status !== AgentRunStatus::Failed) {
+                throw ValidationException::withMessages([
+                    'run' => 'Only failed runs can be retried.',
+                ]);
+            }
 
-        if ($activeRunExists) {
-            throw ValidationException::withMessages([
-                'task' => 'This task already has an active agent run.',
-            ]);
-        }
+            Task::query()
+                ->whereKey($agentRun->task_id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        DB::transaction(function () use ($agentRun): void {
+            $activeRunExists = AgentRun::query()
+                ->where('task_id', $agentRun->task_id)
+                ->where('id', '!=', $agentRun->id)
+                ->whereIn('status', AgentRunStatus::activeValues())
+                ->lockForUpdate()
+                ->exists();
+
+            if ($activeRunExists) {
+                throw ValidationException::withMessages([
+                    'task' => 'This task already has an active agent run.',
+                ]);
+            }
+
             $agentRun->actions()->delete();
 
             $agentRun->forceFill([
@@ -139,6 +151,8 @@ class AgentRunReviewController extends Controller
                 'completed_at' => null,
                 'failed_at' => null,
             ])->save();
+
+            return $agentRun;
         });
 
         ExecuteAgentRunJob::dispatch($agentRun);
