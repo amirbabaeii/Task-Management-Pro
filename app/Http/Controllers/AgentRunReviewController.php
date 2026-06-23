@@ -9,6 +9,7 @@ use App\Jobs\Agents\ExecuteAgentRunJob;
 use App\Models\AgentRun;
 use App\Models\AgentRunAction;
 use App\Models\Task;
+use App\Support\BoardTaskAssignments;
 use App\Support\Presenters\AgentRunPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -117,6 +118,8 @@ class AgentRunReviewController extends Controller
                 ]);
             }
 
+            $this->validateRetryContext($agentRun);
+
             Task::query()
                 ->whereKey($agentRun->task_id)
                 ->lockForUpdate()
@@ -158,6 +161,45 @@ class AgentRunReviewController extends Controller
         ExecuteAgentRunJob::dispatch($agentRun);
 
         return $this->runResponse($agentRun);
+    }
+
+    private function validateRetryContext(AgentRun $agentRun): void
+    {
+        $agentRun->loadMissing('agent', 'board', 'providerConnection');
+
+        if (
+            ! $agentRun->agent
+            || ! $agentRun->board
+            || ! $agentRun->agent->is_agent
+            || (int) $agentRun->agent->agent_manager_id !== (int) $agentRun->manager_id
+            || $agentRun->agent->agent_archived_at !== null
+        ) {
+            throw ValidationException::withMessages([
+                'agent' => 'Choose an active agent managed by this user.',
+            ]);
+        }
+
+        if (! $agentRun->board->hasMember($agentRun->agent)) {
+            throw ValidationException::withMessages([
+                'agent' => 'The agent must be a board member.',
+            ]);
+        }
+
+        if (! BoardTaskAssignments::userHasTaskOnBoard(
+            $agentRun->agent_id,
+            $agentRun->board_id,
+            $agentRun->task_id,
+        )) {
+            throw ValidationException::withMessages([
+                'agent' => 'The agent must be assigned to this task.',
+            ]);
+        }
+
+        if ($agentRun->providerConnection?->verified_at === null) {
+            throw ValidationException::withMessages([
+                'agent' => 'Verify this agent provider connection before retrying.',
+            ]);
+        }
     }
 
     private function authorizeManager(Request $request, AgentRun $agentRun): void
