@@ -61,7 +61,7 @@ class AiSettingsTest extends TestCase
         $this->assertSame('gpt-5.5-custom', $connection->default_model);
     }
 
-    public function test_existing_key_is_preserved_when_only_model_changes(): void
+    public function test_existing_key_is_preserved_and_reverification_required_when_model_changes(): void
     {
         $manager = User::factory()->create();
         $connection = $manager->aiProviderConnections()->create([
@@ -81,7 +81,7 @@ class AiSettingsTest extends TestCase
         $connection->refresh();
 
         $this->assertSame('sk-existing-secret', $connection->api_key);
-        $this->assertNotNull($connection->verified_at);
+        $this->assertNull($connection->verified_at);
         $this->assertSame('gpt-5.5-new', $connection->default_model);
     }
 
