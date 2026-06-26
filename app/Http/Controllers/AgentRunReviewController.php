@@ -165,7 +165,10 @@ class AgentRunReviewController extends Controller
 
     private function validateRetryContext(AgentRun $agentRun): void
     {
-        $agentRun->loadMissing('agent', 'board', 'providerConnection');
+        $agentRun->loadMissing('agent', 'board');
+        $providerConnection = $agentRun->providerConnection()
+            ->lockForUpdate()
+            ->first();
 
         if (
             ! $agentRun->agent
@@ -196,15 +199,15 @@ class AgentRunReviewController extends Controller
         }
 
         if (
-            ! $agentRun->providerConnection
-            || (int) $agentRun->providerConnection->user_id !== (int) $agentRun->manager_id
+            ! $providerConnection
+            || (int) $providerConnection->user_id !== (int) $agentRun->manager_id
         ) {
             throw ValidationException::withMessages([
                 'agent' => 'Choose an agent with a provider connection owned by this manager.',
             ]);
         }
 
-        if ($agentRun->providerConnection->verified_at === null) {
+        if ($providerConnection->verified_at === null) {
             throw ValidationException::withMessages([
                 'agent' => 'Verify this agent provider connection before retrying.',
             ]);
