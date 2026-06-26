@@ -42,27 +42,29 @@ class CreateAgentRunAction
             ]);
         }
 
-        $connection = $agent->agentProviderConnection;
+        return DB::transaction(function () use ($manager, $board, $task, $agent, $autonomy): AgentRun {
+            $connection = $agent->agentProviderConnection()
+                ->lockForUpdate()
+                ->first();
 
-        if ($connection === null) {
-            throw ValidationException::withMessages([
-                'agent_id' => 'Choose an agent with a provider connection.',
-            ]);
-        }
+            if ($connection === null) {
+                throw ValidationException::withMessages([
+                    'agent_id' => 'Choose an agent with a provider connection.',
+                ]);
+            }
 
-        if ((int) $connection->user_id !== (int) $manager->id) {
-            throw ValidationException::withMessages([
-                'agent_id' => 'Choose an agent with a provider connection owned by this manager.',
-            ]);
-        }
+            if ((int) $connection->user_id !== (int) $manager->id) {
+                throw ValidationException::withMessages([
+                    'agent_id' => 'Choose an agent with a provider connection owned by this manager.',
+                ]);
+            }
 
-        if ($connection->verified_at === null) {
-            throw ValidationException::withMessages([
-                'agent_id' => 'Verify this agent provider connection before starting a run.',
-            ]);
-        }
+            if ($connection->verified_at === null) {
+                throw ValidationException::withMessages([
+                    'agent_id' => 'Verify this agent provider connection before starting a run.',
+                ]);
+            }
 
-        return DB::transaction(function () use ($manager, $board, $task, $agent, $connection, $autonomy): AgentRun {
             Task::query()
                 ->whereKey($task->id)
                 ->lockForUpdate()
