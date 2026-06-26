@@ -241,6 +241,25 @@ class AgentRunReviewTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_retry_requires_manager_owned_provider_connection(): void
+    {
+        Queue::fake();
+
+        [$manager, $run] = $this->runFixture(status: AgentRunStatus::Failed);
+        $otherManager = User::factory()->create();
+        $run->providerConnection->forceFill([
+            'user_id' => $otherManager->id,
+        ])->save();
+
+        $this->actingAs($manager)
+            ->postJson(route('agent-runs.retry', $run))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['agent']);
+
+        $this->assertSame(AgentRunStatus::Failed, $run->fresh()->status);
+        Queue::assertNothingPushed();
+    }
+
     public function test_retry_requires_agent_to_remain_assigned_to_task(): void
     {
         Queue::fake();

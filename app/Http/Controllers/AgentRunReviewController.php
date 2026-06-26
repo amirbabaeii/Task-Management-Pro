@@ -195,7 +195,16 @@ class AgentRunReviewController extends Controller
             ]);
         }
 
-        if ($agentRun->providerConnection?->verified_at === null) {
+        if (
+            ! $agentRun->providerConnection
+            || (int) $agentRun->providerConnection->user_id !== (int) $agentRun->manager_id
+        ) {
+            throw ValidationException::withMessages([
+                'agent' => 'Choose an agent with a provider connection owned by this manager.',
+            ]);
+        }
+
+        if ($agentRun->providerConnection->verified_at === null) {
             throw ValidationException::withMessages([
                 'agent' => 'Verify this agent provider connection before retrying.',
             ]);

@@ -123,6 +123,26 @@ class AgentRunTest extends TestCase
             ->assertJsonValidationErrors(['agent_id']);
     }
 
+    public function test_agent_provider_connection_must_belong_to_manager(): void
+    {
+        Queue::fake();
+
+        [$manager, $board, $task, $agent] = $this->fixture();
+        $otherManager = User::factory()->create();
+        $agent->agentProviderConnection->forceFill([
+            'user_id' => $otherManager->id,
+        ])->save();
+
+        $this->actingAs($manager)
+            ->postJson(route('tasks.agent-runs.store', [$board, $task]), [
+                'agent_id' => $agent->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['agent_id']);
+
+        Queue::assertNothingPushed();
+    }
+
     public function test_only_one_active_run_is_allowed_per_task(): void
     {
         Queue::fake();

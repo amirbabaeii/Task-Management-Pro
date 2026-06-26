@@ -50,6 +50,12 @@ class CreateAgentRunAction
             ]);
         }
 
+        if ((int) $connection->user_id !== (int) $manager->id) {
+            throw ValidationException::withMessages([
+                'agent_id' => 'Choose an agent with a provider connection owned by this manager.',
+            ]);
+        }
+
         if ($connection->verified_at === null) {
             throw ValidationException::withMessages([
                 'agent_id' => 'Verify this agent provider connection before starting a run.',
