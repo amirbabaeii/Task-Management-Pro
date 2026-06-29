@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\AgentRunStatus;
 use App\Models\AgentRun;
 use Illuminate\Console\Command;
 
@@ -25,6 +26,10 @@ class PruneAgentRunPayloadsCommand extends Command
 
         $count = AgentRun::query()
             ->whereNotNull('context_snapshot')
+            ->whereIn('status', [
+                AgentRunStatus::Completed->value,
+                AgentRunStatus::Failed->value,
+            ])
             ->where('updated_at', '<', $cutoff)
             ->update([
                 'context_snapshot' => null,

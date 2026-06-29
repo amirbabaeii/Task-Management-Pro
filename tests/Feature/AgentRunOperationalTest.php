@@ -25,6 +25,7 @@ class AgentRunOperationalTest extends TestCase
         $refreshedOldRun->forceFill([
             'updated_at' => now()->subDays(2),
         ])->save();
+        $oldQueuedRun = $this->runWithContext(now()->subDays(45), AgentRunStatus::Queued);
 
         $this->artisan('agents:prune-run-payloads', ['--days' => 30])
             ->expectsOutput('Pruned 1 agent run context snapshot(s).')
@@ -39,14 +40,20 @@ class AgentRunOperationalTest extends TestCase
             'Fresh task',
             $refreshedOldRun->fresh()->context_snapshot['task']['title'],
         );
+        $this->assertSame(
+            'Fresh task',
+            $oldQueuedRun->fresh()->context_snapshot['task']['title'],
+        );
         $this->assertDatabaseHas('agent_runs', [
             'id' => $oldRun->id,
             'summary' => 'Retain audit summary',
         ]);
     }
 
-    private function runWithContext($createdAt): AgentRun
-    {
+    private function runWithContext(
+        $createdAt,
+        AgentRunStatus $status = AgentRunStatus::Completed,
+    ): AgentRun {
         $manager = User::factory()->create();
         $agent = User::factory()->create([
             'is_agent' => true,
@@ -74,7 +81,7 @@ class AgentRunOperationalTest extends TestCase
             'provider' => AiProvider::OpenAI,
             'model' => AiProviderConnection::DEFAULT_MODEL,
             'autonomy' => AgentAutonomy::Approval,
-            'status' => AgentRunStatus::Completed,
+            'status' => $status,
             'summary' => 'Retain audit summary',
             'context_snapshot' => [
                 'task' => [
