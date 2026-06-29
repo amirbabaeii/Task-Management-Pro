@@ -21,6 +21,10 @@ class AgentRunOperationalTest extends TestCase
     {
         $oldRun = $this->runWithContext(now()->subDays(45));
         $freshRun = $this->runWithContext(now()->subDays(5));
+        $refreshedOldRun = $this->runWithContext(now()->subDays(45));
+        $refreshedOldRun->forceFill([
+            'updated_at' => now()->subDays(2),
+        ])->save();
 
         $this->artisan('agents:prune-run-payloads', ['--days' => 30])
             ->expectsOutput('Pruned 1 agent run context snapshot(s).')
@@ -30,6 +34,10 @@ class AgentRunOperationalTest extends TestCase
         $this->assertSame(
             'Fresh task',
             $freshRun->fresh()->context_snapshot['task']['title'],
+        );
+        $this->assertSame(
+            'Fresh task',
+            $refreshedOldRun->fresh()->context_snapshot['task']['title'],
         );
         $this->assertDatabaseHas('agent_runs', [
             'id' => $oldRun->id,

@@ -25,7 +25,7 @@ class PruneAgentRunPayloadsCommand extends Command
 
         $count = AgentRun::query()
             ->whereNotNull('context_snapshot')
-            ->where('created_at', '<', $cutoff)
+            ->where('updated_at', '<', $cutoff)
             ->update([
                 'context_snapshot' => null,
             ]);
