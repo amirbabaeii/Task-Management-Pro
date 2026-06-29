@@ -167,12 +167,20 @@ class AgentRunReviewTest extends TestCase
     {
         Queue::fake();
 
-        [$manager, $run] = $this->runFixture(status: AgentRunStatus::Failed);
+        [$manager, $run, $task] = $this->runFixture(status: AgentRunStatus::Failed);
         $run->forceFill([
+            'context_snapshot' => [
+                'task' => [
+                    'title' => 'Stale failed-run title',
+                ],
+            ],
             'error_code' => 'provider_error',
             'error_message' => 'Provider failed.',
             'failed_at' => now(),
         ])->save();
+        $task->update([
+            'title' => 'Fresh retry title',
+        ]);
         $staleAction = $this->actionFor($run, AgentRunActionType::AddComment, [
             'comment' => 'Stale suggestion from a failed attempt.',
         ]);
@@ -186,6 +194,10 @@ class AgentRunReviewTest extends TestCase
         $run->refresh();
 
         $this->assertNull($run->failed_at);
+        $this->assertSame(
+            'Fresh retry title',
+            $run->context_snapshot['task']['title'],
+        );
         $this->assertDatabaseMissing('agent_run_actions', [
             'id' => $staleAction->id,
         ]);

@@ -9,6 +9,7 @@ use App\Jobs\Agents\ExecuteAgentRunJob;
 use App\Models\AgentRun;
 use App\Models\AgentRunAction;
 use App\Models\Task;
+use App\Services\Ai\AgentTaskContextBuilder;
 use App\Support\BoardTaskAssignments;
 use App\Support\Presenters\AgentRunPresenter;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ class AgentRunReviewController extends Controller
 {
     public function __construct(
         private readonly ApplyAgentRunAction $applyAgentRunAction,
+        private readonly AgentTaskContextBuilder $contextBuilder,
     ) {}
 
     public function approve(
@@ -120,7 +122,7 @@ class AgentRunReviewController extends Controller
 
             $this->validateRetryContext($agentRun);
 
-            Task::query()
+            $task = Task::query()
                 ->whereKey($agentRun->task_id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -150,6 +152,11 @@ class AgentRunReviewController extends Controller
                 'input_tokens' => 0,
                 'output_tokens' => 0,
                 'total_tokens' => 0,
+                'context_snapshot' => $this->contextBuilder->build(
+                    $agentRun->board,
+                    $task,
+                    $agentRun->agent,
+                ),
                 'started_at' => null,
                 'completed_at' => null,
                 'failed_at' => null,
