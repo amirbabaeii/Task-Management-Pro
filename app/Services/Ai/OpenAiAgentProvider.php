@@ -305,7 +305,7 @@ class OpenAiAgentProvider implements AgentProvider
     {
         foreach ($actions as $action) {
             if (
-                ! $this->hasOnlyKeys($action, [
+                ! $this->hasExactKeys($action, [
                     'type',
                     'comment',
                     'title',
@@ -323,7 +323,7 @@ class OpenAiAgentProvider implements AgentProvider
 
             if (
                 is_array($fields)
-                && ! $this->hasOnlyKeys($fields, [
+                && ! $this->hasExactKeys($fields, [
                     'title',
                     'description',
                     'tags',
@@ -357,9 +357,13 @@ class OpenAiAgentProvider implements AgentProvider
      * @param  array<string, mixed>  $payload
      * @param  list<string>  $allowedKeys
      */
-    private function hasOnlyKeys(array $payload, array $allowedKeys): bool
+    private function hasExactKeys(array $payload, array $allowedKeys): bool
     {
-        return array_diff(array_keys($payload), $allowedKeys) === [];
+        $keys = array_keys($payload);
+        sort($keys);
+        sort($allowedKeys);
+
+        return $keys === $allowedKeys;
     }
 
     private function filledString(mixed $value): bool
