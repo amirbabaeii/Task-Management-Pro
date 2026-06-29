@@ -375,6 +375,100 @@ class OpenAiAgentProviderTest extends TestCase
         }
     }
 
+    public function test_actions_reject_unsupported_top_level_keys(): void
+    {
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output' => [[
+                    'content' => [[
+                        'type' => 'output_text',
+                        'text' => json_encode([
+                            'summary' => 'Assign the task.',
+                            'rationale' => 'This operation is not allowed.',
+                            'actions' => [[
+                                'type' => 'add_comment',
+                                'comment' => 'This task needs a human owner.',
+                                'title' => null,
+                                'checklist_item_id' => null,
+                                'completed' => null,
+                                'progress' => null,
+                                'status' => null,
+                                'fields' => [
+                                    'title' => null,
+                                    'description' => null,
+                                    'tags' => null,
+                                    'priority' => null,
+                                    'deadline_at' => null,
+                                ],
+                                'assignee_ids' => [1],
+                            ]],
+                        ], JSON_THROW_ON_ERROR),
+                    ]],
+                ]],
+            ]),
+        ]);
+
+        try {
+            app(OpenAiAgentProvider::class)->execute(
+                $this->connection(),
+                new AgentRunPrompt('gpt-5.5', 'Analyze.', []),
+            );
+            $this->fail('Expected provider exception.');
+        } catch (AgentProviderException $exception) {
+            $this->assertSame(
+                AgentProviderErrorCode::MalformedOutput,
+                $exception->errorCode,
+            );
+        }
+    }
+
+    public function test_actions_reject_unsupported_task_field_keys(): void
+    {
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output' => [[
+                    'content' => [[
+                        'type' => 'output_text',
+                        'text' => json_encode([
+                            'summary' => 'Archive the task.',
+                            'rationale' => 'This operation is not allowed.',
+                            'actions' => [[
+                                'type' => 'update_task_fields',
+                                'comment' => null,
+                                'title' => null,
+                                'checklist_item_id' => null,
+                                'completed' => null,
+                                'progress' => null,
+                                'status' => null,
+                                'fields' => [
+                                    'title' => null,
+                                    'description' => null,
+                                    'tags' => null,
+                                    'priority' => null,
+                                    'deadline_at' => null,
+                                    'archived_at' => now()->toISOString(),
+                                ],
+                            ]],
+                        ], JSON_THROW_ON_ERROR),
+                    ]],
+                ]],
+            ]),
+        ]);
+
+        try {
+            app(OpenAiAgentProvider::class)->execute(
+                $this->connection(),
+                new AgentRunPrompt('gpt-5.5', 'Analyze.', []),
+            );
+            $this->fail('Expected provider exception.');
+        } catch (AgentProviderException $exception) {
+            $this->assertSame(
+                AgentProviderErrorCode::MalformedOutput,
+                $exception->errorCode,
+            );
+        }
+    }
+
     private function connection(): AiProviderConnection
     {
         $user = User::factory()->create();

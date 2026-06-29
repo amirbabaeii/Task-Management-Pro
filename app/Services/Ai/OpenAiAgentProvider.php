@@ -304,7 +304,36 @@ class OpenAiAgentProvider implements AgentProvider
     private function validateActionPayloads(array $actions): void
     {
         foreach ($actions as $action) {
+            if (
+                ! $this->hasOnlyKeys($action, [
+                    'type',
+                    'comment',
+                    'title',
+                    'checklist_item_id',
+                    'completed',
+                    'progress',
+                    'status',
+                    'fields',
+                ])
+            ) {
+                throw $this->malformedOutput();
+            }
+
             $fields = $action['fields'] ?? [];
+
+            if (
+                is_array($fields)
+                && ! $this->hasOnlyKeys($fields, [
+                    'title',
+                    'description',
+                    'tags',
+                    'priority',
+                    'deadline_at',
+                ])
+            ) {
+                throw $this->malformedOutput();
+            }
+
             $valid = match ($action['type'] ?? null) {
                 'add_comment' => $this->filledString($action['comment'] ?? null),
                 'add_checklist_item' => $this->filledString($action['title'] ?? null),
@@ -322,6 +351,15 @@ class OpenAiAgentProvider implements AgentProvider
                 throw $this->malformedOutput();
             }
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  list<string>  $allowedKeys
+     */
+    private function hasOnlyKeys(array $payload, array $allowedKeys): bool
+    {
+        return array_diff(array_keys($payload), $allowedKeys) === [];
     }
 
     private function filledString(mixed $value): bool
