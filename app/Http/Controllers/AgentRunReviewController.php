@@ -48,6 +48,8 @@ class AgentRunReviewController extends Controller
             ]);
         }
 
+        $this->ensureRunIsAwaitingApproval($agentRun);
+
         $this->applyAgentRunAction->execute($action, $request->user());
         $this->finishRunIfReviewed($agentRun);
 
@@ -78,6 +80,8 @@ class AgentRunReviewController extends Controller
             ]);
         }
 
+        $this->ensureRunIsAwaitingApproval($agentRun);
+
         $action->forceFill([
             'status' => AgentRunActionStatus::Rejected,
             'approved_by' => $request->user()->id,
@@ -94,10 +98,17 @@ class AgentRunReviewController extends Controller
     {
         $this->authorizeManager($request, $agentRun);
 
-        $agentRun->actions()
+        $actions = $agentRun->actions()
             ->where('status', AgentRunActionStatus::Proposed->value)
-            ->get()
-            ->each(fn (AgentRunAction $action) => $this->applyAgentRunAction->execute($action, $request->user()));
+            ->get();
+
+        if ($actions->isEmpty()) {
+            return $this->runResponse($agentRun);
+        }
+
+        $this->ensureRunIsAwaitingApproval($agentRun);
+
+        $actions->each(fn (AgentRunAction $action) => $this->applyAgentRunAction->execute($action, $request->user()));
 
         $this->finishRunIfReviewed($agentRun);
 
@@ -229,6 +240,17 @@ class AgentRunReviewController extends Controller
     private function ensureActionBelongsToRun(AgentRun $agentRun, AgentRunAction $action): void
     {
         abort_unless((int) $action->agent_run_id === (int) $agentRun->id, 404);
+    }
+
+    private function ensureRunIsAwaitingApproval(AgentRun $agentRun): void
+    {
+        if ($agentRun->status === AgentRunStatus::AwaitingApproval) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'run' => 'Only runs awaiting approval can be reviewed.',
+        ]);
     }
 
     private function finishRunIfReviewed(AgentRun $agentRun): void

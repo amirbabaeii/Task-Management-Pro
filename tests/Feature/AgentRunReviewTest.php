@@ -97,6 +97,29 @@ class AgentRunReviewTest extends TestCase
         $this->assertNotNull($action->rejected_at);
     }
 
+    public function test_manager_cannot_review_proposed_action_unless_run_awaits_approval(): void
+    {
+        [$manager, $run, $task] = $this->runFixture(status: AgentRunStatus::Completed);
+        $action = $this->actionFor($run, AgentRunActionType::UpdateTaskFields, [
+            'fields' => [
+                'title' => 'Should stay pending',
+            ],
+        ]);
+
+        $this->actingAs($manager)
+            ->postJson(route('agent-runs.actions.approve', [$run, $action]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['run']);
+
+        $this->actingAs($manager)
+            ->postJson(route('agent-runs.actions.reject', [$run, $action]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['run']);
+
+        $this->assertSame('Write release checklist', $task->fresh()->title);
+        $this->assertSame(AgentRunActionStatus::Proposed, $action->fresh()->status);
+    }
+
     public function test_applier_leaves_non_proposed_actions_unchanged(): void
     {
         [$manager, $run, $task] = $this->runFixture(status: AgentRunStatus::Completed);
@@ -143,6 +166,25 @@ class AgentRunReviewTest extends TestCase
         $this->assertDatabaseHas('task_comments', [
             'task_id' => $task->id,
             'content' => 'Looks ready after the title change.',
+        ]);
+    }
+
+    public function test_manager_cannot_approve_all_unless_run_awaits_approval(): void
+    {
+        [$manager, $run, $task] = $this->runFixture(status: AgentRunStatus::Completed);
+        $action = $this->actionFor($run, AgentRunActionType::AddComment, [
+            'comment' => 'This should stay pending.',
+        ]);
+
+        $this->actingAs($manager)
+            ->postJson(route('agent-runs.approve-all', $run))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['run']);
+
+        $this->assertSame(AgentRunActionStatus::Proposed, $action->fresh()->status);
+        $this->assertDatabaseMissing('task_comments', [
+            'task_id' => $task->id,
+            'content' => 'This should stay pending.',
         ]);
     }
 
